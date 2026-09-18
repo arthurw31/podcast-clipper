@@ -105,25 +105,65 @@ def cmd_build(a: argparse.Namespace) -> list[Path]:
         if d.is_dir() and d.name not in keep:
             shutil.rmtree(d, ignore_errors=True)
             console.print(f"[dim]projet obsolète supprimé : {d.name}[/dim]")
-    projects = []
+    todo = []
     for clip in clips["clips"]:
         if only and clip["index"] not in only:
             continue
         clip.setdefault("guest", clips.get("guest", ""))
         clip.setdefault("company", clips.get("company", ""))
         clip.setdefault("host_side", clips.get("host_side", ""))
-        proj = build_clip(brand, video, transcript, clip, ep, formats=formats, force=a.force, with_broll=not a.no_broll)
+        todo.append(clip)
+    jobs = _jobs(a, brand.cfg.build.get("jobs"), len(todo))
+    projects: list[Path] = []
+    results: list[tuple[Path, list[tuple[str, bool, list[dict]]]]] = []
+    if jobs <= 1:
+        for clip in todo:
+            results.append(_build_one(a.brand, str(video), str(ep / "transcript.json"), clip, str(ep), formats,
+                                      a.force, not a.no_broll))
+    else:
+        # un processus par clip : découpe ffmpeg + analyse OpenCV + lint sont indépendants d'un clip à l'autre
+        from concurrent.futures import ProcessPoolExecutor
+
+        console.print(f"[bold]Build parallèle[/bold] · {len(todo)} clip(s) · {jobs} processus")
+        with ProcessPoolExecutor(max_workers=jobs) as pool:
+            futs = [pool.submit(_build_one, a.brand, str(video), str(ep / "transcript.json"), clip, str(ep), formats,
+                                a.force, not a.no_broll) for clip in todo]
+            for fut in futs:
+                results.append(fut.result())
+    for proj, lints in results:
         projects.append(proj)
-        if brand.cfg.render.lint:
-            for fmt, info in json.loads((proj / "clip.json").read_text(encoding="utf-8"))["formats"].items():
-                ok, findings = lint(proj / info["dir"])
-                errs = [f for f in findings if str(f.get("severity", "")).lower() in ("error", "warning")]
-                status = "[green]lint OK[/green]" if ok else "[red]lint ERREURS[/red]"
-                console.print(f"  {fmt:5s} {status}" + (f" · {len(errs)} avertissement(s)/erreur(s)" if errs else ""))
-                for f in errs[:8]:
-                    console.print(f"     - {f.get('code', '?')}: {str(f.get('message', ''))[:160]}")
+        console.print(f"[bold]{proj.name}[/bold]")
+        for fmt, ok, findings in lints:
+            errs = [f for f in findings if str(f.get("severity", "")).lower() in ("error", "warning")]
+            status = "[green]lint OK[/green]" if ok else "[red]lint ERREURS[/red]"
+            console.print(f"  {fmt:5s} {status}" + (f" · {len(errs)} avertissement(s)/erreur(s)" if errs else ""))
+            for f in errs[:8]:
+                console.print(f"     - {f.get('code', '?')}: {str(f.get('message', ''))[:160]}")
     _write_summary(ep, clips, projects)
     return projects
+
+
+def _jobs(a: argparse.Namespace, cfg_jobs: int | str | None, n_tasks: int) -> int:
+    """Nombre de tâches en parallèle : --jobs > config > 1 ; borné par le nombre de tâches."""
+    import os
+
+    raw = getattr(a, "jobs", None) or cfg_jobs or 1
+    jobs = max(1, (os.cpu_count() or 2) // 4) if str(raw) == "auto" else int(raw)
+    return max(1, min(jobs, n_tasks or 1))
+
+
+def _build_one(slug: str, video: str, transcript_path: str, clip: dict, ep: str, formats: list[str] | None,
+               force: bool, with_broll: bool) -> tuple[Path, list[tuple[str, bool, list[dict]]]]:
+    """Construit un clip (exécutable dans un processus fils : arguments simples, Brand rechargée ici)."""
+    brand = Brand(slug)
+    transcript = json.loads(Path(transcript_path).read_text(encoding="utf-8"))
+    proj = build_clip(brand, Path(video), transcript, clip, Path(ep), formats=formats, force=force, with_broll=with_broll)
+    lints = []
+    if brand.cfg.render.lint:
+        for fmt, info in json.loads((proj / "clip.json").read_text(encoding="utf-8"))["formats"].items():
+            ok, findings = lint(proj / info["dir"])
+            lints.append((fmt, ok, findings))
+    return proj, lints
 
 
 def cmd_render(a: argparse.Namespace) -> list[Path]:
@@ -134,6 +174,7 @@ def cmd_render(a: argparse.Namespace) -> list[Path]:
     clips = json.loads((ep / "clips.json").read_text(encoding="utf-8"))
     keep = {f"clip_{c['index']:02d}_{slugify(c.get('title', ''))}" for c in clips["clips"]}
     outputs = []
+    tasks: list[tuple[Path, Path]] = []
     for proj in sorted((ep / "clips").glob("clip_*")):
         idx = int(proj.name.split("_")[1])
         if proj.name not in keep or (only and idx not in only):
@@ -147,11 +188,30 @@ def cmd_render(a: argparse.Namespace) -> list[Path]:
                 console.print(f"[dim]déjà rendu : {out.name}[/dim]")
                 outputs.append(out)
                 continue
-            try:
-                outputs.append(render(proj / info["dir"], out, quality=a.quality or brand.cfg.render.quality, fps=int(brand.cfg.fps)))
-                console.print(f"[green]✓ {out.name}[/green] ({out.stat().st_size/1e6:.1f} Mo)")
-            except Exception as e:  # noqa: BLE001
-                console.print(f"[red]✗ {proj.name} {fmt} : {e}[/red]")
+            tasks.append((proj / info["dir"], out))
+    quality, fps = a.quality or brand.cfg.render.quality, int(brand.cfg.fps)
+
+    def one(t: tuple[Path, Path]) -> Path | None:
+        proj_dir, out = t
+        try:
+            res = render(proj_dir, out, quality=quality, fps=fps)
+            console.print(f"[green]✓ {out.name}[/green] ({out.stat().st_size/1e6:.1f} Mo)")
+            return res
+        except Exception as e:  # noqa: BLE001
+            console.print(f"[red]✗ {out.name} : {e}[/red]")
+            return None
+
+    jobs = _jobs(a, brand.cfg.render.get("jobs"), len(tasks))
+    if jobs <= 1:
+        done = [one(t) for t in tasks]
+    else:
+        # chaque rendu est un `npx hyperframes render` (Chromium) indépendant : N en parallèle sur les cœurs disponibles
+        from concurrent.futures import ThreadPoolExecutor
+
+        console.print(f"[bold]Rendu parallèle[/bold] · {len(tasks)} rendu(s) · {jobs} en même temps")
+        with ThreadPoolExecutor(max_workers=jobs) as pool:
+            done = list(pool.map(one, tasks))
+    outputs += [d for d in done if d]
     return outputs
 
 
@@ -307,6 +367,7 @@ def main(argv: list[str] | None = None) -> None:
         sp.add_argument("--formats", default="", help="ex: 9x16,16x9 (défaut : brand.yaml)")
         sp.add_argument("--only", default="", help="index de clips, ex: 1,3")
         sp.add_argument("--no-broll", action="store_true")
+        sp.add_argument("--jobs", default="", help="tâches en parallèle (build : clips, render : rendus) ; auto = cœurs/4 ; défaut : brand.yaml")
 
     def render_args(sp: argparse.ArgumentParser) -> None:
         sp.add_argument("--quality", default="", help="draft | looks | delivery")

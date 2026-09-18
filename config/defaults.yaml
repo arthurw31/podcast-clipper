@@ -27,6 +27,13 @@ selection:
   llm_model: claude-sonnet-5
   # nombre max de mots-clés à surligner par clip (le LLM propose, on filtre)
   max_keywords: 14
+  # Sélection parallèle par angle éditorial (pattern « parallelization workflow ») : si ≥ 2 angles sont
+  # listés, une passe LLM par angle tourne EN PARALLÈLE (chacune ne cherche que des extraits de cet angle,
+  # attention focalisée), puis les candidats sont dédoublonnés (passages qui se recouvrent) et un « jury »
+  # (appel court, sans la transcription) choisit et ordonne les n clips finaux, variés en thèmes.
+  # Vide = une seule passe classique. Voir brands/ai-corner/brand.yaml pour un exemple.
+  angles: []
+  jury: true                # false = agrégation par score des monteurs, sans appel LLM supplémentaire
 
 # ------------------------------------------------------------ transcribe ---
 transcribe:
@@ -212,6 +219,13 @@ publication:
 render:
   quality: looks            # draft | looks | delivery
   lint: true
+  # rendus HyperFrames lancés en même temps (chacun = un Chromium headless, ~2-3 cœurs).
+  # auto = cœurs/4 (2 sur un PC 8 cœurs). Mesuré sur 8 cœurs sans GPU : 2 rendus en parallèle ≈ 1,6× plus vite.
+  jobs: auto
+
+# ----------------------------------------------------------------- build ---
+build:
+  jobs: auto                # clips construits en parallèle (découpe ffmpeg + analyse visages + lint) ; auto = cœurs/4
 
 # ------------------------------------------------- surcharges par format ---
 # Fusionnées par-dessus tout le reste quand on compose ce format précis.

@@ -20,6 +20,11 @@ selection:
   min_duration: 30
   max_duration: 50
   target_duration: 40
+  # une passe LLM par angle, en parallèle, puis jury (voir defaults.yaml « angles »)
+  angles:
+    - "CHIFFRES ET TRAJECTOIRE : croissance, levée, CA, effectifs, décision business chiffrée, moment charnière du parcours."
+    - "ÉCHEC ET LEÇON : erreur, faux départ, galère, ce que l'invité ferait différemment, conseil qui en découle."
+    - "PUNCHLINE ET CONVICTION : opinion tranchée, contre-intuition sur l'entrepreneuriat ou le management, phrase qui claque."
 
 colors:
   primary: "#FFE14D"        # jaune des mots-clés / du logo

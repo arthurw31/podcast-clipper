@@ -23,6 +23,11 @@ selection:
   max_duration: 60
   target_duration: 52
   max_segments: 4            # style monteur : accroche + 2-3 passages d'ailleurs dans l'épisode
+  # une passe LLM par angle, en parallèle, puis jury (voir defaults.yaml « angles »)
+  angles:
+    - "CAS D'USAGE CONCRET : un déploiement d'IA précis dans l'entreprise, avec son résultat, un chiffre ou un ordre de grandeur, ce qui a marché ou pas."
+    - "POSITION TRANCHÉE / CONTRE-INTUITION : une conviction forte de l'invité sur l'IA (gouvernance, risque, souveraineté, vendeurs, coûts, ce que tout le monde fait mal), une question de Thomas qui pose un vrai dilemme."
+    - "HUMAIN ET ORGANISATION : collaborateurs, clients, adoption, formation, ce que l'IA change dans le travail des équipes, leçon d'un échec ou d'un faux départ, conseil actionnable à un dirigeant."
 
 colors:
   primary: "#258AF3"         # Blue Primaire — accents, CTA

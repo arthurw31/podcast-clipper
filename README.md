@@ -171,7 +171,22 @@ Pour une retouche fine, `preview` ouvre le Studio HyperFrames (timeline, déplac
 - **Le B-roll ne couvre jamais un visage** (placement automatique, sinon plein écran).
 - **Carte de fin** avec logo, invité/entreprise et CTA vers l'épisode complet, aux couleurs de la marque.
 
-## 8. Problèmes fréquents
+## 8. Parallélisme (ce qui tourne en même temps)
+
+Le pipeline parallélise ce qui est indépendant, sur le principe *découper → exécuter en parallèle → agréger* :
+
+| Étape | Parallélisme | Réglage |
+| --- | --- | --- |
+| `select` | **une passe LLM par angle éditorial** (ex. cas d'usage / position tranchée / humain), lancées en même temps, chacune focalisée sur un seul critère ; puis dédoublonnage des passages qui se recouvrent et **jury** (appel court) qui choisit et ordonne les n clips, variés en thèmes | `selection.angles` (liste ; vide = une seule passe), `selection.jury` |
+| `build` | **un processus par clip** (découpe ffmpeg, analyse visages OpenCV, lint) | `build.jobs` (`auto` = cœurs/4) ou `--jobs N` |
+| `posts` | un seul appel pour tous les clips (voulu : le modèle varie les structures d'un post à l'autre) | — |
+| `render` | **N rendus HyperFrames en même temps** (chacun est un Chromium headless) | `render.jobs` (`auto`) ou `--jobs N` |
+| `transcribe` | non (Whisper utilise déjà tous les cœurs) | — |
+
+Sur un PC 8 cœurs sans GPU, `--jobs 2` pour le rendu ≈ 1,6× plus rapide qu'en séquentiel ; au-delà, les rendus se
+gênent (CPU saturé) — `auto` reste le bon réglage. `--jobs 1` revient au comportement séquentiel.
+
+## 9. Problèmes fréquents
 
 | Symptôme | Cause / solution |
 | --- | --- |
@@ -182,7 +197,7 @@ Pour une retouche fine, `preview` ouvre le Studio HyperFrames (timeline, déplac
 | Mauvaise personne cadrée sur le plan large | vérifiez `--host-side` (l'animateur change parfois de côté selon l'épisode) |
 | Mots mal transcrits (noms propres) | corrigez dans `transcript.json` avant `select`, ou dans `clips.json` avant `build` |
 
-## 9. Sous le capot
+## 10. Sous le capot
 
 `clipper/` : `transcribe` (faster-whisper, mots horodatés) → `select_clips` (Claude : extraits, mots-clés,
 tours de parole, B-roll, posts) → `analysis` (coupes, visages YuNet, locuteur) → `reframe` (plan de caméras

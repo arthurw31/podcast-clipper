@@ -5,8 +5,10 @@ Sortie : clips.json  (éditable à la main, puis `python -m clipper build …`)
 from __future__ import annotations
 
 import json
+import math
 import re
 import unicodedata
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from rich.console import Console
@@ -273,6 +275,86 @@ def snap_to_sentences(sents: list[dict], start: float, end: float, max_duration:
     return new_start, new_end, " ; ".join(note)
 
 
+JURY_PROMPT = """Tu es rédacteur en chef d'un podcast. Plusieurs monteurs ont chacun proposé, selon un angle éditorial
+différent, des extraits candidats pour les clips d'un épisode. Tu reçois tous les candidats (angle, titre, raison,
+score du monteur, durée, transcription) et tu dois composer la sélection finale.
+
+Critères : force de l'accroche, idée complète et compréhensible seule, concret (chiffre, cas, décision), variété des
+thèmes (jamais deux clips sur la même idée — garde le meilleur des deux), respect des consignes de la marque.
+Ordonne du plus fort au plus faible. Tu peux reformuler `title` et `hook_title` mais pas les timecodes.
+Réponds UNIQUEMENT avec un objet JSON :
+{"selected": [{"id": 3, "score": 9.2, "title": "…", "hook_title": "…", "why": "…"}]}"""
+
+
+def _overlap(a: dict, b: dict) -> float:
+    """Part (0-1) du plus court des deux clips couverte par l'autre (sur leurs segments)."""
+    inter = 0.0
+    for x in a["segments"]:
+        for y in b["segments"]:
+            inter += max(0.0, min(x["end"], y["end"]) - max(x["start"], y["start"]))
+    return inter / max(0.1, min(a["duration"], b["duration"]))
+
+
+def _dedupe(clips: list[dict], max_overlap: float = 0.4) -> list[dict]:
+    """Garde le mieux noté quand deux candidats (d'angles différents) reprennent le même passage."""
+    kept: list[dict] = []
+    for c in sorted(clips, key=lambda c: -float(c.get("score") or 0)):
+        if all(_overlap(c, k) < max_overlap for k in kept):
+            kept.append(c)
+        else:
+            console.print(f"  [dim]candidat écarté (doublon) : {c.get('title', '')}[/dim]")
+    return kept
+
+
+def _jury(clips: list[dict], n: int, transcript: dict, brand: Brand, guest: str, company: str) -> list[dict]:
+    """Agrégation : un appel court (sans la transcription complète) qui choisit et ordonne les n finalistes."""
+    words = all_words(transcript)
+    cands = []
+    for c in clips:
+        text = " […] ".join(" ".join(w["w"] for w in words if w["s"] >= sg["start"] - 0.05 and w["e"] <= sg["end"] + 0.05)
+                            for sg in c["segments"])
+        cands.append(f"""### Candidat {c['index']} — angle : {c.get('angle', '')}
+- titre : {c.get('title', '')}
+- accroche : {c.get('hook_title', '')}
+- raison : {c.get('why', '')}
+- score monteur : {c.get('score', '')}
+- durée : {c['duration']:.0f}s ({len(c['segments'])} segment(s))
+- transcription : {text}
+""")
+    user = f"""## Consignes éditoriales de la marque « {brand.cfg.name} »
+{brand.guidelines or "(aucune)"}
+
+## Épisode
+Invité : {guest or "inconnu"} · Entreprise : {company or "inconnue"}
+
+## Demande
+Choisis les {n} meilleurs candidats (variés, sans doublon de thème), ordonnés du plus fort au plus faible.
+
+## Candidats
+{chr(10).join(cands)}
+"""
+    sel = brand.cfg.selection
+    data = ask_json(JURY_PROMPT, user, model=sel.llm_model, backend=sel.llm_backend, max_tokens=4000)
+    by_id = {c["index"]: c for c in clips}
+    final = []
+    for pick in data.get("selected", []) or []:
+        try:
+            c = by_id.pop(int(pick["id"]))
+        except (KeyError, TypeError, ValueError):
+            continue
+        for k in ("title", "hook_title", "why"):
+            if pick.get(k):
+                c[k] = str(pick[k])
+        if pick.get("score") is not None:
+            c["score"] = pick["score"]
+        final.append(c)
+        if len(final) >= n:
+            break
+    if not final:  # réponse inexploitable : repli sur les scores des monteurs
+        return sorted(clips, key=lambda c: -float(c.get("score") or 0))[:n]
+    return final
+
+
 def select_clips(transcript: dict, brand: Brand, out_json: Path, n_clips: int | None = None,
                  guest: str = "", company: str = "", force: bool = False, extra_instructions: str = "",
                  host_side: str = "") -> dict:
@@ -299,7 +381,30 @@ max_segments = {int(sel.get("max_segments", 1))}{" (un seul passage continu par 
 ## Transcription horodatée
 {to_timed_text(transcript)}
 """
-    data = ask_json(SYSTEM_PROMPT, user, model=sel.llm_model, backend=sel.llm_backend, max_tokens=12000)
+    angles = [str(a) for a in (sel.get("angles") or []) if str(a).strip()]
+    parallel = len(angles) >= 2
+    if parallel:
+        # Pattern « parallelization workflow » : une passe LLM par angle éditorial (attention focalisée),
+        # en parallèle, puis agrégation (dédoublonnage + jury) — voir README « Parallélisme ».
+        k = math.ceil(n / len(angles)) + 1
+        console.print(f"[bold]Sélection parallèle[/bold] · {len(angles)} angles × {k} candidats")
+
+        def one(angle: str) -> list[dict]:
+            u = user.replace(f"Sélectionne {n} extraits", f"Sélectionne {k} extraits") + (
+                f"\n## Angle de cette passe (ne retiens QUE des extraits qui y correspondent)\n{angle}\n")
+            try:
+                got = ask_json(SYSTEM_PROMPT, u, model=sel.llm_model, backend=sel.llm_backend, max_tokens=12000)
+            except Exception as e:  # noqa: BLE001 — un angle en échec ne bloque pas les autres
+                console.print(f"[yellow]angle « {angle[:40]}… » en échec : {e}[/yellow]")
+                return []
+            for c in got.get("clips", []) or []:
+                c["angle"] = angle
+            return got.get("clips", []) or []
+
+        with ThreadPoolExecutor(max_workers=len(angles)) as pool:
+            data = {"clips": [c for lst in pool.map(one, angles) for c in lst]}
+    else:
+        data = ask_json(SYSTEM_PROMPT, user, model=sel.llm_model, backend=sel.llm_backend, max_tokens=12000)
     out_json.parent.mkdir(parents=True, exist_ok=True)
     (out_json.parent / "llm_raw.json").write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
     words = all_words(transcript)
@@ -374,10 +479,18 @@ max_segments = {int(sel.get("max_segments", 1))}{" (un seul passage continu par 
             "turns": turns,
             "broll": brolls[: int(cfg.broll.max_per_clip)] if cfg.broll.enabled else [],
             "post": c.get("post", ""),
+            "angle": c.get("angle", ""),
             "guest": guest,
             "company": company,
         })
-    clips.sort(key=lambda c: -float(c.get("score") or 0))
+    if parallel:
+        clips = _dedupe(clips)
+        if len(clips) > n and sel.get("jury", True):
+            clips = _jury(clips, n, transcript, brand, guest, company)
+        else:
+            clips = sorted(clips, key=lambda c: -float(c.get("score") or 0))[:n]
+    else:
+        clips.sort(key=lambda c: -float(c.get("score") or 0))
     for i, c in enumerate(clips):
         c["index"] = i + 1
     result = {"brand": brand.slug, "guest": guest, "company": company,

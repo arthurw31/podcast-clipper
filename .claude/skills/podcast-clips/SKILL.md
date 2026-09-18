@@ -79,8 +79,14 @@ python -m clipper posts  --brand <slug> --input <fichier> [--episode-url URL] [-
 python -m clipper render --brand <slug> --input <fichier>                # long : arrière-plan
 ```
 
-- Transcription ≈ 0,4× la durée de l'épisode sur CPU ; rendu ≈ 4–5× la durée de chaque clip et par format.
-  Annonce ces délais, lance en arrière-plan, et occupe-toi du reste pendant ce temps.
+- Transcription ≈ 0,4× la durée de l'épisode sur CPU ; rendu ≈ 4–8× la durée de chaque clip et par format
+  (divisé par ~1,6 grâce aux rendus parallèles, `render.jobs: auto`). Annonce ces délais, lance en arrière-plan,
+  et occupe-toi du reste pendant ce temps.
+- **Chevauche les étapes** : pendant `transcribe`, prépare la marque / le brief posts ; pendant `render`, génère
+  et relis les posts (`posts` ne dépend pas du rendu) et vérifie les bornes des extraits. `select` tourne déjà
+  en parallèle par angle éditorial (`selection.angles`) et `build` un clip par processus : pas besoin de
+  sous-agents pour ça — les sous-agents servent seulement à relire en parallèle plusieurs clips (un par clip :
+  bornes mot à mot + post) si l'utilisateur le demande.
 - Après `select`, **vérifie mot à mot** le début et la fin de chaque extrait (script : mots avant/après
   chaque borne, voir CLAUDE.md règle 1). Un extrait qui coupe une pensée se corrige dans `clips.json`
   puis `build --only N` ; ne livre jamais un clip tronqué.

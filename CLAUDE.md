@@ -29,6 +29,7 @@ python -m clipper doctor                # vérifie l'installation
 python -m clipper run --brand <slug> --input <fichier-dans-brands/slug/episodes/> --guest "…" --company "…" --host-side left|right
 python -m clipper transcribe|select|build|posts|render|preview … --brand <slug> --input …   # étapes séparées, cache dans output/
 python -m clipper posts --brand <slug> --input … [--episode-url URL] [--guest-role "…"] [--only N] [--force]   # post LinkedIn + description par clip
+python -m clipper build|render … --jobs N          # parallélisme (défaut : build.jobs / render.jobs = auto)
 python -m clipper new-brand <slug>   # copie brands/_template
 npx hyperframes lint|check|snapshot --at 3,10 --no-end -o <dir>   # dans output/<brand>/<ep>/clips/<clip>/<format>/
 ```
@@ -78,6 +79,21 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
    « nouvel épisode » une seule fois). AI Corner : posts **en anglais**, voix de la page AI Partners, sans hashtags,
    CTA YouTube AI PARTNERS / Spotify / Ausha. Sortie : `output/…/posts/clip_NN_<titre>.md` + champs
    `linkedin_post` / `short_description` dans `clips.json` + `summary.md`.
+
+## Parallélisme (pattern « split → parallèle → agrégation »)
+
+- `select` : si `selection.angles` liste ≥ 2 angles, `select_clips` lance une passe LLM **par angle** en parallèle
+  (`ThreadPoolExecutor`, chaque `claude -p` est un process), tague chaque candidat `angle`, cale tous les candidats
+  (`snap_to_quotes`), écarte les recouvrements (`_dedupe`, > 40 % du plus court) puis un **jury** (`_jury`, appel
+  court sans transcription) choisit et ordonne les n finalistes. `jury: false` = tri par score. Angles définis par
+  marque dans `brand.yaml` ; vide = une passe unique (comportement d'origine).
+- `build` : `ProcessPoolExecutor` (un processus par clip, `_build_one` dans cli.py : arguments simples, `Brand`
+  rechargée dans le fils). **`clipper/__main__.py` garde `if __name__ == "__main__"`** (spawn Windows) — ne pas retirer.
+- `render` : `ThreadPoolExecutor` sur des `npx hyperframes render` indépendants. `render.jobs` / `build.jobs` :
+  `auto` = cœurs/4 (mesuré : 2 rendus en parallèle ≈ 1,6× plus vite sur 8 cœurs ; plus = contention).
+- `posts` reste un appel unique par épisode (le modèle doit voir tous les clips pour varier les structures).
+- Ne pas paralléliser `transcribe` (Whisper occupe déjà les cœurs) ni découper le transcript par tranches pour la
+  sélection : les clips multi-segments ont besoin de l'épisode entier.
 
 ## Pièges connus (déjà résolus — ne pas réintroduire)
 
