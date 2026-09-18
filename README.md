@@ -35,14 +35,21 @@ sélection ≈ 5 min, rendu ≈ 4–5 min par clip et par format.
 
 ## 2. Installation
 
+Le plus simple : ouvrez Claude Code et écrivez « clone https://github.com/arthurw31/podcast-clipper et
+installe tout ce qu'il faut pour que je puisse l'utiliser ». Claude lance le script d'installation, vous
+demande votre clé Pexels et vérifie que tout fonctionne.
+
+À la main :
+
 ```bash
 git clone https://github.com/arthurw31/podcast-clipper.git
 cd podcast-clipper
-pip install -r requirements.txt
-npm install
+powershell -ExecutionPolicy Bypass -File scripts\setup.ps1      # Windows
+bash scripts/setup.sh                                            # macOS / Linux
 ```
 
-Copiez `.env.example` en `.env` et renseignez au minimum `PEXELS_API_KEY`. Puis :
+Le script installe Python / Node / FFmpeg s'ils manquent, les dépendances, crée `.env` (renseignez-y
+`PEXELS_API_KEY`) et lance la vérification :
 
 ```bash
 python -m clipper doctor

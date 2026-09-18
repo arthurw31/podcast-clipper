@@ -9,6 +9,19 @@ ce fichier résume ce qu'il faut savoir pour **modifier** le projet sans casser 
 Le skill `.claude/skills/podcast-clips/SKILL.md` décrit l'interview à mener (marque, invité, côté animateur,
 nombre de clips, formats, style) puis le pipeline. Pour toute demande « fais-moi des clips », suis ce skill.
 
+## Installation sur une machine neuve (« installe tout ce qu'il faut »)
+
+1. Cloner le dépôt si ce n'est pas fait, puis lancer le script : Windows `powershell -ExecutionPolicy Bypass -File scripts\setup.ps1`,
+   macOS/Linux `bash scripts/setup.sh`. Il installe Python/Node/FFmpeg s'ils manquent (winget / brew), les
+   dépendances, crée `.env` et lance `python -m clipper doctor`.
+2. Demander à l'utilisateur sa clé Pexels (gratuite, pexels.com/api) et lui faire coller dans `.env`
+   (ne jamais l'écrire dans un fichier versionné ni la demander en clair dans le chat si un gestionnaire
+   de secrets est disponible). Sans clé, le B-roll est simplement désactivé (`broll.enabled: false`).
+3. La sélection des extraits utilise `claude -p` (l'abonnement Claude Code de l'utilisateur) si aucune
+   `ANTHROPIC_API_KEY` n'est définie : vérifier que `claude --version` répond.
+4. Relancer `python -m clipper doctor` jusqu'à « Tout est prêt », puis suivre le skill `podcast-clips`.
+   Le modèle Whisper (~1,6 Go) se télécharge au premier `transcribe`.
+
 ## Commandes
 
 ```bash
