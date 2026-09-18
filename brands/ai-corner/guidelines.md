@@ -56,7 +56,9 @@
   futuriste » cliché. Jamais de B-roll sur une idée abstraite.
 
 ## Publication
-- Description courte (2–3 lignes) qui reformule l'idée de l'invité + une question ouverte aux
-  décideurs. Mentionner l'invité et son entreprise.
-- Hashtags : #IA #IntelligenceArtificielle #Transformation #Data #Leadership #AICorner
-  + secteur de l'invité (ex. #Assurance).
+- Le post LinkedIn de chaque clip suit le brief `posts.md` (anglais, voix de la page AI Partners, sans hashtags,
+  CTA YouTube AI PARTNERS / Spotify / Ausha).
+- Description courte Reels/Shorts (2–3 lignes, en anglais comme le post) qui reformule l'idée de l'invité + une
+  question ouverte aux décideurs. Mentionner l'invité et son entreprise.
+- Hashtags de la description courte uniquement : #IA #IntelligenceArtificielle #Transformation #Data #Leadership
+  #AICorner + secteur de l'invité (ex. #Assurance).

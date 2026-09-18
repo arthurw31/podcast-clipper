@@ -27,7 +27,8 @@ nombre de clips, formats, style) puis le pipeline. Pour toute demande « fais-mo
 ```bash
 python -m clipper doctor                # vérifie l'installation
 python -m clipper run --brand <slug> --input <fichier-dans-brands/slug/episodes/> --guest "…" --company "…" --host-side left|right
-python -m clipper transcribe|select|build|render|preview … --brand <slug> --input …   # étapes séparées, cache dans output/
+python -m clipper transcribe|select|build|posts|render|preview … --brand <slug> --input …   # étapes séparées, cache dans output/
+python -m clipper posts --brand <slug> --input … [--episode-url URL] [--guest-role "…"] [--only N] [--force]   # post LinkedIn + description par clip
 python -m clipper new-brand <slug>   # copie brands/_template
 npx hyperframes lint|check|snapshot --at 3,10 --no-end -o <dir>   # dans output/<brand>/<ep>/clips/<clip>/<format>/
 ```
@@ -38,12 +39,14 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
 ## Structure
 
 - `brands/<slug>/` : **un dossier par podcasteur/marque** — `brand.yaml` (surcharge de `config/defaults.yaml`),
-  `guidelines.md` (brief éditorial injecté tel quel dans le prompt LLM), `assets/` (logo, fonts, musique),
+  `guidelines.md` (brief éditorial injecté tel quel dans le prompt LLM), `posts.md` (brief des posts LinkedIn +
+  posts déjà publiés, injecté tel quel dans `clipper/posts.py`), `assets/` (logo, fonts, musique),
   `episodes/` (sources), `references/` (clips existants pour caler le style).
 - `config/defaults.yaml` : toutes les options, commentées. `config/presets/` : styles de montage.
   Fusion : defaults ← preset ← brand.yaml ← `format_overrides[<format>]`.
 - `clipper/` : `transcribe` (faster-whisper) → `select_clips` (Claude) → `analysis` (plans, visages YuNet, locuteur)
-  → `reframe` (plan de caméras) → `captions` → `broll` (Pexels) → `compose` (Jinja → HyperFrames) → `render`.
+  → `reframe` (plan de caméras) → `captions` → `broll` (Pexels) → `compose` (Jinja → HyperFrames) → `posts`
+  (Claude : post LinkedIn + description courte par clip, un seul appel pour l'épisode) → `render`.
 - `clipper/templates/clip.html.j2` : LA composition HyperFrames. Respecte le contrat du skill `hyperframes-core`
   (voir « Pièges » ci-dessous) ; valider avec `npx hyperframes lint --json` après toute modification.
 - `output/<brand>/<episode>/` : généré, jamais versionné. `clips.json` est éditable à la main puis `build --only N`.
@@ -69,6 +72,12 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
    pris à des endroits différents de l'épisode ; `clip["segments"]` (liste ordonnée), `compose` découpe chaque
    segment, les concatène (`media.concat_segments`) et remappe mots/tours de parole/B-roll en temps relatif
    (`abs_to_rel`). `montage.join_transition: cut|flash`.
+6. **Un post LinkedIn par clip** (`clipper/posts.py`, commande `posts`, lancée par `run`) : rédigé dans le ton de
+   `brands/<slug>/posts.md` (règles + posts réellement publiés par la marque, à ne jamais recopier), porte l'idée
+   du clip, n'invente rien qui ne soit dans la transcription de l'extrait, alterne les variantes (idée / preview /
+   « nouvel épisode » une seule fois). AI Corner : posts **en anglais**, voix de la page AI Partners, sans hashtags,
+   CTA YouTube AI PARTNERS / Spotify / Ausha. Sortie : `output/…/posts/clip_NN_<titre>.md` + champs
+   `linkedin_post` / `short_description` dans `clips.json` + `summary.md`.
 
 ## Pièges connus (déjà résolus — ne pas réintroduire)
 

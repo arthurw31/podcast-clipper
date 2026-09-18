@@ -194,6 +194,20 @@ audio:
   music_volume: 0.06
   music_duck: true
 
+# ----------------------------------------------------------- publication ---
+# Textes qui accompagnent chaque clip : post LinkedIn complet + description courte Reels/Shorts,
+# rédigés par le LLM à partir de brands/<slug>/posts.md (règles + posts déjà publiés = référence de ton).
+# Sortie : output/<marque>/<épisode>/posts/clip_NN_<titre>.md, et champs linkedin_post / short_description
+# dans clips.json. `python -m clipper posts …` (aussi lancé par `run`).
+publication:
+  enabled: true
+  language: ""              # vide = langue du podcast ; ex. "en" si les posts sont en anglais (AI Corner)
+  host_name: ""             # animateur·ice à nommer dans les posts
+  channels: ""              # où écouter : "YouTube, Spotify, Apple Podcasts"
+  episode_url: ""           # URL de l'épisode complet (surchargée par `--episode-url`)
+  llm_backend: ""           # vide = selection.llm_backend
+  llm_model: ""             # vide = selection.llm_model
+
 # ---------------------------------------------------------------- render ---
 render:
   quality: looks            # draft | looks | delivery

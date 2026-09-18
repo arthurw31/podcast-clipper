@@ -88,6 +88,11 @@ outro:
 broll:
   enabled: false             # aucun B-roll dans les clips du monteur
 
+publication:                 # posts LinkedIn en anglais, style de la page AI Partners (voir posts.md)
+  language: en
+  host_name: "Thomas Spitz"
+  channels: "AI PARTNERS YouTube channel, Spotify, Ausha"
+
 framing:
   wide_shot_mode: speaker
   speaker_fallback: split

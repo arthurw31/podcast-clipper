@@ -87,6 +87,7 @@ crée `brands/mon-podcast/` :
 brands/mon-podcast/
   brand.yaml       ← charte : couleurs, police, logo, sous-titres, B-roll, recadrage, formats, carte de fin
   guidelines.md    ← consignes éditoriales (ton, ce qui fait un bon extrait, à éviter, hashtags)
+  posts.md         ← brief des posts LinkedIn (langue, voix, structure, CTA) + vos posts déjà publiés = référence de ton
   assets/          ← logo.png (fond transparent), fonts/*.ttf, musique éventuelle
   episodes/        ← vos épisodes sources
   references/      ← clips déjà publiés ou exemples du style voulu
@@ -131,6 +132,7 @@ python -m clipper transcribe --brand mon-podcast --input episode-12.mp4
 python -m clipper select     --brand mon-podcast --input episode-12.mp4 --guest "…" --company "…" --host-side right --n 6
 python -m clipper build      --brand mon-podcast --input episode-12.mp4 [--only 1,3] [--formats 9x16,16x9]
 python -m clipper render     --brand mon-podcast --input episode-12.mp4 [--only 1] [--quality draft|looks|delivery]
+python -m clipper posts      --brand mon-podcast --input episode-12.mp4 [--episode-url URL] [--guest-role "CDO at …"] [--only 1]
 python -m clipper preview    --brand mon-podcast --input episode-12.mp4 --clip 1     # ouvre l'éditeur HyperFrames
 ```
 
@@ -139,13 +141,17 @@ python -m clipper preview    --brand mon-podcast --input episode-12.mp4 --clip 1
 - `select … --instructions "…"` : consignes ponctuelles (« évite les passages sur la levée de fonds »).
 - `select … --ranges 120-160,900-940` : sélection manuelle par timecodes, sans LLM.
 - `select … --force` : refaire la sélection.
+- `posts` : rédige pour chaque clip le **post LinkedIn** complet et la **description courte** Reels/Shorts, dans le
+  ton de `brands/<marque>/posts.md` (lancé aussi par `run`). `--episode-url` met le lien de l'épisode en clair dans
+  le CTA ; `--force` réécrit un post déjà généré.
 
 ## 6. Ce que vous obtenez
 
 ```
 output/<marque>/<episode>/
   renders/                 ← les MP4 finaux : clip_01_<titre>_9x16.mp4, clip_01_<titre>_16x9.mp4, …
-  summary.md               ← récap des extraits + textes de publication (description, question, hashtags)
+  posts/                   ← un .md par clip : post LinkedIn prêt à coller + description courte Reels/Shorts
+  summary.md               ← récap des extraits (timecodes, segments, mots-clés) + les posts
   clips.json               ← la sélection, éditable à la main (timecodes, segments, mots-clés, B-roll)
   transcript.json          ← transcription mot à mot
   clips/clip_01_<titre>/   ← projet HyperFrames de chaque clip (retouche manuelle possible)

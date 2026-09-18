@@ -5,6 +5,7 @@
   python -m clipper select    --brand <slug> --input episode.mp4 [--force]        # (re)sélection LLM
   python -m clipper build     --brand <slug> --input episode.mp4 [--only 1,3]     # projets HyperFrames
   python -m clipper render    --brand <slug> --input episode.mp4 [--only 1]       # MP4
+  python -m clipper posts     --brand <slug> --input episode.mp4 [--episode-url URL] # post LinkedIn + description par clip
   python -m clipper new-brand <slug>
   python -m clipper brands
   python -m clipper doctor
@@ -21,6 +22,7 @@ from rich.console import Console
 
 from .config import BRANDS_DIR, FORMATS, OUTPUT_DIR, Brand, list_brands
 from .compose import build_clip, slugify
+from .posts import write_posts
 from .render import lint, render
 from .select_clips import manual_clips, select_clips
 from .transcribe import transcribe
@@ -153,28 +155,54 @@ def cmd_render(a: argparse.Namespace) -> list[Path]:
     return outputs
 
 
+def cmd_posts(a: argparse.Namespace) -> dict:
+    """Post LinkedIn + description courte pour chaque clip (brief : brands/<slug>/posts.md)."""
+    brand = Brand(a.brand)
+    video = resolve_input(brand, a.input)
+    ep = episode_dir(brand, video)
+    transcript = json.loads((ep / "transcript.json").read_text(encoding="utf-8"))
+    clips = json.loads((ep / "clips.json").read_text(encoding="utf-8"))
+    if getattr(a, "guest_role", ""):
+        clips["guest_role"] = a.guest_role
+    clips = write_posts(brand, ep, clips, transcript, episode_url=getattr(a, "episode_url", "") or "",
+                        only=_parse_only(getattr(a, "only", "")), force=a.force)
+    _write_summary(ep, clips)
+    return clips
+
+
 def cmd_run(a: argparse.Namespace) -> None:
     cmd_transcribe(a)
     cmd_select(a)
     cmd_build(a)
+    try:
+        cmd_posts(a)
+    except Exception as e:  # noqa: BLE001 — les textes ne doivent pas bloquer le rendu
+        console.print(f"[yellow]Posts non générés : {e}[/yellow] (relancer : python -m clipper posts …)")
     if not a.no_render:
         cmd_render(a)
     brand = Brand(a.brand)
     ep = episode_dir(brand, resolve_input(brand, a.input))
     console.rule("[bold green]Terminé[/bold green]")
-    console.print(f"Dossier épisode : {ep}\n  clips.json (sélection éditable), clips/<clip>/ (projets HyperFrames), renders/ (MP4), summary.md")
+    console.print(f"Dossier épisode : {ep}\n  clips.json (sélection éditable), clips/<clip>/ (projets HyperFrames), renders/ (MP4), posts/ (textes), summary.md")
 
 
-def _write_summary(ep: Path, clips: dict, projects: list[Path]) -> None:
+def _write_summary(ep: Path, clips: dict, projects: list[Path] | None = None) -> None:
     lines = [f"# Clips — {clips.get('guest', '')} ({clips.get('company', '')})", ""]
     for c in clips["clips"]:
+        segs = " + ".join(f"{sg['start']:.1f}→{sg['end']:.1f}" for sg in c.get("segments") or [])
         lines += [f"## #{c['index']} · {c['title']}",
-                  f"- **Timecode** : {c['start']:.1f}s → {c['end']:.1f}s ({c['duration']:.0f}s) · score {c.get('score', '')}",
+                  f"- **Timecode** : {c['start']:.1f}s → {c['end']:.1f}s ({c['duration']:.0f}s) · score {c.get('score', '')}"
+                  + (f" · segments {segs}" if len(c.get("segments") or []) > 1 else ""),
                   f"- **Pourquoi** : {c.get('why', '')}",
                   f"- **Accroche** : {c.get('hook_title', '')}",
                   f"- **Mots-clés** : {', '.join(c.get('keywords', []))}",
-                  f"- **B-roll** : {', '.join(b['query'] for b in c.get('broll', [])) or '—'}",
-                  "", "**Texte de publication :**", "", "```", c.get("post", ""), "```", ""]
+                  f"- **B-roll** : {', '.join(b['query'] for b in c.get('broll', [])) or '—'}", ""]
+        if c.get("linkedin_post"):
+            lines += ["**Post LinkedIn :**", "", "```", c["linkedin_post"], "```", "",
+                      "**Description courte (Reels / Shorts) :**", "", "```", c.get("short_description", ""), "```", ""]
+        else:
+            lines += ["**Texte de publication (brouillon de la sélection — `python -m clipper posts …` pour le post LinkedIn) :**",
+                      "", "```", c.get("post", ""), "```", ""]
     (ep / "summary.md").write_text("\n".join(lines), encoding="utf-8")
 
 
@@ -283,12 +311,18 @@ def main(argv: list[str] | None = None) -> None:
     def render_args(sp: argparse.ArgumentParser) -> None:
         sp.add_argument("--quality", default="", help="draft | looks | delivery")
 
-    sp = sub.add_parser("run", help="pipeline complet"); common(sp); selection_args(sp); build_args(sp); render_args(sp)
+    def posts_args(sp: argparse.ArgumentParser) -> None:
+        sp.add_argument("--episode-url", default="", help="URL de l'episode complet (mise en clair dans le CTA)")
+        sp.add_argument("--guest-role", default="", help="role de l'invite, ex: 'CDO at MAIF'")
+
+    sp = sub.add_parser("run", help="pipeline complet"); common(sp); selection_args(sp); build_args(sp); render_args(sp); posts_args(sp)
     sp.add_argument("--no-render", action="store_true"); sp.set_defaults(fn=cmd_run)
     sp = sub.add_parser("transcribe"); common(sp); sp.set_defaults(fn=cmd_transcribe)
     sp = sub.add_parser("select"); common(sp); selection_args(sp); sp.set_defaults(fn=cmd_select)
     sp = sub.add_parser("build"); common(sp); build_args(sp); sp.set_defaults(fn=cmd_build)
     sp = sub.add_parser("render"); common(sp); build_args(sp); render_args(sp); sp.set_defaults(fn=cmd_render)
+    sp = sub.add_parser("posts", help="post LinkedIn + description courte pour chaque clip"); common(sp); posts_args(sp)
+    sp.add_argument("--only", default="", help="index de clips, ex: 1,3"); sp.set_defaults(fn=cmd_posts)
     sp = sub.add_parser("preview", help="ouvre le Studio HyperFrames sur un clip"); common(sp)
     sp.add_argument("--clip", required=True, help="index du clip (ex: 1)"); sp.add_argument("--formats", default="", help="format à ouvrir (ex: 9x16)")
     sp.set_defaults(fn=cmd_preview)

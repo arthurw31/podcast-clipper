@@ -12,6 +12,9 @@ montage:
 # Les exemples fournis sont en 16:9 (LinkedIn). On produit le vertical + le LinkedIn.
 formats: ["9x16", "16x9"]
 
+publication:
+  channels: "YouTube, Spotify, Apple Podcasts"
+
 selection:
   n_clips: 6
   min_duration: 30

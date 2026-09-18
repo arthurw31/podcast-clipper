@@ -90,6 +90,8 @@ class Brand:
 
         gl = self.dir / "guidelines.md"
         self.guidelines = gl.read_text(encoding="utf-8") if gl.exists() else ""
+        pb = self.dir / "posts.md"   # brief + posts publiés servant de référence pour les textes de publication
+        self.posts_brief = pb.read_text(encoding="utf-8") if pb.exists() else ""
 
     # -- assets -------------------------------------------------------------
     def asset(self, rel: str | None) -> Path | None:
