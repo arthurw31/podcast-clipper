@@ -1,0 +1,16 @@
+# Preset "clean" : sobre et lisible (sous-titres centrés mot à mot, pas de zoom,
+# B-roll plein écran rare).
+captions:
+  reveal: word
+  entrance: fade
+  stagger_lines: false
+  align: center
+  keyword_pop: false
+  italic: false
+framing:
+  slow_zoom: false
+  synthetic_cuts: false
+  max_shot_len: 12
+broll:
+  mode: fullscreen
+  max_per_clip: 1

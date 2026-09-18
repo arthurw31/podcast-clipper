@@ -1,0 +1,14 @@
+# Preset "dynamic" : montage rythmé façon shorts modernes (coupes fréquentes,
+# typewriter, slide-in, zoom progressif, B-roll en PiP).
+captions:
+  reveal: typewriter
+  entrance: slide-left
+  stagger_lines: true
+  keyword_pop: true
+framing:
+  slow_zoom: true
+  synthetic_cuts: true
+  max_shot_len: 6.5
+broll:
+  enabled: true
+  mode: pip

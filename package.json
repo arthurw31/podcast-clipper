@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "hyperframes": "^0.8.46"
+  },
+  "name": "podcast-clipper",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Clips verticaux automatiques à partir de podcasts (HyperFrames)",
+  "scripts": {
+    "doctor": "hyperframes doctor"
+  }
+}

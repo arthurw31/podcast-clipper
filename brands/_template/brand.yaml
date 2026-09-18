@@ -1,0 +1,62 @@
+# ============================================================================
+# Fiche marque — copiez ce dossier :  python -m clipper new-brand <slug>
+# Tout ce qui n'est pas précisé ici hérite de config/defaults.yaml puis du
+# preset de montage choisi. Ne gardez que ce que vous voulez surcharger.
+# ============================================================================
+
+name: "Nom du podcast"
+podcast_name: "Nom du podcast"
+language: fr
+
+# Preset de montage : dynamic | clean | minimal (voir config/presets/)
+montage:
+  preset: dynamic
+
+# Formats à produire pour chaque clip
+formats: ["9x16"]          # ajouter "16x9" (LinkedIn) et/ou "1x1"
+
+selection:
+  n_clips: 6
+  min_duration: 25
+  max_duration: 60
+
+colors:
+  primary: "#FFE14D"        # couleur d'accent (mots-clés, nom d'entreprise)
+  secondary: "#7B2D8E"
+  text: "#FFFFFF"
+
+captions:
+  font_size: 62
+  highlight_color: "#FFE14D"
+  uppercase: true
+  italic: true
+
+logo:
+  file: "logo.png"          # déposez le fichier dans assets/ ; sinon un logo texte est généré
+  text_lines: ["NOM DU", "PODCAST"]
+  position: top-right
+  width: 0.13
+
+outro:
+  enabled: true
+  duration: 3.8
+  logo_width: 0.5
+  cta:                      # appel à l'action vers l'épisode complet (actif par défaut)
+    enabled: true
+    text: "▶  L'ÉPISODE COMPLET SUR {podcast_name}"
+    subtext: "Lien en bio"  # en 16:9 : "Lien en description" (voir config/defaults.yaml)
+    # enabled: false        # pour le désactiver sur cette marque
+
+broll:
+  enabled: true
+  max_per_clip: 2
+  mode: pip
+
+framing:
+  wide_shot_mode: speaker   # speaker | split | center
+  host_side: ""             # left | right (facultatif : côté de l'animateur dans le plan large)
+  ignore_regions: []        # zones du plan large à ignorer pour la détection (tableaux, écrans)
+
+audio:
+  music: ""                 # ex: "music/bed.mp3" (relatif à assets/)
+  music_volume: 0.06

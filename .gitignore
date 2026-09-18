@@ -1,0 +1,12 @@
+.env
+node_modules/
+output/
+cache/
+brands/*/episodes/*
+!brands/*/episodes/README.md
+brands/*/references/*.mp4
+__pycache__/
+*.pyc
+.claude/settings.local.json
+*.log
+.DS_Store

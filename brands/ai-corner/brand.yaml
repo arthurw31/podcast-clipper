@@ -1,0 +1,114 @@
+# ============================================================================
+# AI Corner — le podcast d'AI Partners
+# Charte : skill aip-brand-guidelines (Metropolis, bleu #258AF3, navy #151D53, jamais d'italique).
+# Style de montage : calé sur les 2 clips du monteur AI Partners (references/) —
+#   sous-titres sobres en minuscules centrés en bas, coupes franches, pas de B-roll,
+#   clips montés à partir de plusieurs passages (accroche + développement),
+#   carte de fin sur le motif « mountain lines » de la charte.
+# ============================================================================
+
+name: "AI Corner (AI Partners)"
+podcast_name: "AI Corner"
+language: fr
+
+montage:
+  preset: editorial          # sous-titres classiques, pas de typewriter ni de mot-clé coloré
+  join_transition: cut       # coupe franche entre les segments d'un clip (flash possible)
+
+formats: ["9x16", "16x9"]
+
+selection:
+  n_clips: 6
+  min_duration: 40
+  max_duration: 60
+  target_duration: 52
+  max_segments: 4            # style monteur : accroche + 2-3 passages d'ailleurs dans l'épisode
+
+colors:
+  primary: "#258AF3"         # Blue Primaire — accents, CTA
+  secondary: "#151D53"       # Navy Deep
+  text: "#FFFFFF"
+  background: "#000000"
+
+fonts:
+  family: "Metropolis"
+  caption: "fonts/Metropolis-BoldItalic.ttf"      # jamais utilisé (italic: false) mais requis
+  caption_upright: "fonts/Metropolis-Bold.ttf"
+  display: "fonts/Metropolis-ExtraBold.ttf"
+
+captions:
+  # Référence monteur : blanc, casse normale, gras, centré, 2 lignes courtes, ombre douce, en bas.
+  uppercase: false
+  italic: false
+  weight: 700
+  font_size: 54
+  color: "#FFFFFF"
+  highlight_keywords: false
+  dialogue_dashes: true
+  align: center
+  stagger_lines: false
+  reveal: instant
+  entrance: none
+  max_chars_per_line: 22
+  max_lines: 2
+  max_words_per_group: 9
+  pause_break: 0.7
+  position_y: 0.74
+  line_height: 1.2
+  side_margin: 0.06
+  text_shadow: "0 2px 4px rgba(0,0,0,.75), 0 0 16px rgba(0,0,0,.45)"
+
+logo:
+  mode: image
+  file: "logo.png"           # logo horizontal blanc — en 9:16 seulement (le master 16:9 l'a déjà)
+  position: top-right
+  width: 0.30
+  margin: 0.045
+  opacity: 0.95
+
+outro:
+  enabled: true
+  duration: 4.0
+  background: image          # cover de la charte : fond noir + motif « mountain lines »
+  image: "outro_bg.png"
+  image_position: "72% 50%"  # en vertical, garder les lignes du motif dans le cadre
+  layout: left               # logo et CTA alignés à gauche, motif à droite (comme les covers AI Partners)
+  logo_file: "logo.png"      # logo horizontal blanc
+  logo_width: 0.62
+  show_guest: false          # le monteur n'affiche pas l'invité ; passer à true pour l'ajouter
+  guest_color: "#FFFFFF"
+  company_color: "#258AF3"
+  company_italic: false
+  cta:                       # bouton bleu AI Partners, texte blanc (règle CTA de la charte)
+    text: "▶  L'ÉPISODE COMPLET SUR AI CORNER"
+    subtext: "Lien en bio"
+    pill_text_color: "#FFFFFF"
+    font_size: 34
+
+broll:
+  enabled: false             # aucun B-roll dans les clips du monteur
+
+framing:
+  wide_shot_mode: speaker
+  speaker_fallback: split
+  host_side: right           # Thomas (animateur) à droite, invité à gauche sur ce plateau
+  slow_zoom: false           # le monteur ne zoome pas
+  synthetic_cuts: true       # nécessaire en vertical pour suivre le locuteur sur les plans larges
+  max_shot_len: 9
+  split_divider: 4
+  split_divider_color: "#258AF3"
+
+format_overrides:
+  "16x9":
+    logo:
+      enabled: false         # le master 16:9 a déjà le logo AI PARTNERS incrusté en haut à droite
+    captions:
+      font_size: 46
+      max_chars_per_line: 30
+      position_y: 0.82
+    outro:
+      logo_width: 0.34
+      image_position: center
+      cta:
+        subtext: "Lien en description"
+        font_size: 30

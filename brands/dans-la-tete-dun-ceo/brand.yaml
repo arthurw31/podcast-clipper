@@ -1,0 +1,79 @@
+# ============================================================================
+# Dans la tête d'un CEO — charte déduite des 3 clips d'exemple (references/)
+# ============================================================================
+
+name: "Dans la tête d'un CEO"
+podcast_name: "Dans la tête d'un CEO"
+language: fr
+
+montage:
+  preset: dynamic
+
+# Les exemples fournis sont en 16:9 (LinkedIn). On produit le vertical + le LinkedIn.
+formats: ["9x16", "16x9"]
+
+selection:
+  n_clips: 6
+  min_duration: 30
+  max_duration: 50
+  target_duration: 40
+
+colors:
+  primary: "#FFE14D"        # jaune des mots-clés / du logo
+  secondary: "#8A2E9E"      # violet du contour du logo
+  text: "#FFFFFF"
+
+captions:
+  # Montserrat ExtraBold Italic, capitales, blanc + mots-clés jaunes, ombre portée douce
+  uppercase: true
+  italic: true
+  weight: 800
+  font_size: 72
+  highlight_color: "#FFE14D"
+  text_shadow: "0 3px 0 rgba(0,0,0,.30), 0 10px 26px rgba(0,0,0,.55)"
+  align: left
+  stagger_lines: true
+  stagger_offset: 0.12
+  reveal: typewriter
+  entrance: slide-left
+  max_chars_per_line: 17
+  max_lines: 2
+
+logo:
+  mode: auto                # remplacez assets/logo.png par le logo officiel ; sinon logo texte
+  file: "logo.png"
+  text_lines: ["DANS LA", "TÊTE", "D'UN CEO"]
+  position: top-right
+  width: 0.13
+  text_color: "#FFE14D"
+  text_stroke: "#8A2E9E"
+
+outro:
+  enabled: true
+  duration: 3.8
+  background: blur-freeze
+  blur: 22
+  logo_width: 0.52
+  show_guest: true
+  guest_color: "#FFFFFF"     # nom de l'invité en blanc gras
+  company_color: "#FFE14D"   # entreprise en jaune italique
+  cta:                       # pastille jaune, texte sombre (défaut du framework, rappelé ici)
+    text: "▶  VOIR L'ÉPISODE COMPLET"   # le nom du podcast est déjà dans le logo juste au-dessus
+    subtext: "Lien en bio"
+
+broll:
+  enabled: true
+  mode: pip                  # fenêtre bord blanc qui descend du haut (cf. clip Thomas Spitz)
+  max_per_clip: 2
+  duration: 2.6
+  pip_width: 0.62
+  pip_border: 6
+  entrance: drop
+
+framing:
+  wide_shot_mode: speaker
+  speaker_fallback: split
+  slow_zoom: true
+  synthetic_cuts: true
+  max_shot_len: 6.5
+  ignore_regions: []

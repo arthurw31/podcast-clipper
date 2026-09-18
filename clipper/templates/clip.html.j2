@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="{{ lang }}">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width={{ W }}, height={{ H }}" />
+    <title>{{ title }}</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      @font-face {
+        font-family: "{{ font.family }}";
+        src: url("assets/fonts/{{ font.italic_file }}") format("{{ 'opentype' if font.italic_file.lower().endswith('.otf') else 'truetype' }}");
+        font-style: italic;
+        font-weight: 100 900;
+      }
+      @font-face {
+        font-family: "{{ font.family }}";
+        src: url("assets/fonts/{{ font.upright_file }}") format("{{ 'opentype' if font.upright_file.lower().endswith('.otf') else 'truetype' }}");
+        font-style: normal;
+        font-weight: 100 900;
+      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: {{ W }}px; height: {{ H }}px; overflow: hidden; background: {{ colors.background }}; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; background: {{ colors.background }}; font-family: "{{ font.family }}", system-ui, sans-serif; }
+
+      /* ---- caméras (recadrage) ---- */
+      .slot { position: absolute; overflow: hidden; }
+      .slot-full { left: 0; top: 0; width: {{ W }}px; height: {{ H }}px; }
+      .slot-top { left: 0; top: 0; width: {{ W }}px; height: {{ H // 2 }}px; }
+      .slot-bottom { left: 0; top: {{ H // 2 }}px; width: {{ W }}px; height: {{ H - H // 2 }}px; }
+      .cam { position: absolute; }
+      .cam video { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+      .layer { position: absolute; left: 0; top: 0; width: {{ W }}px; height: {{ H }}px; pointer-events: none; }
+      .flash { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: {{ flash_color }}; opacity: 0; }
+      .divider { position: absolute; left: 0; top: {{ H // 2 - split_divider // 2 }}px; width: 100%; height: {{ split_divider }}px; background: {{ split_divider_color }}; }
+
+      /* ---- sous-titres ---- */
+      .cap-block {
+        position: absolute;
+        left: {{ cap.margin_px }}px; right: {{ cap.margin_px }}px;
+        top: {{ cap.top_px }}px;
+        font-family: "{{ font.family }}", system-ui, sans-serif;
+        font-weight: {{ cap.weight }};
+        font-style: {{ "italic" if cap.italic else "normal" }};
+        font-size: {{ cap.font_px }}px;
+        line-height: {{ cap.line_height }};
+        letter-spacing: {{ cap.letter_spacing }};
+        color: {{ cap.color }};
+        text-shadow: {{ cap.text_shadow }};
+        {% if cap.stroke_width %}-webkit-text-stroke: {{ cap.stroke_width }}px {{ cap.stroke_color }}; paint-order: stroke fill;{% endif %}
+        text-align: {{ cap.align }};
+        {% if cap.uppercase %}text-transform: uppercase;{% endif %}
+      }
+      .cap-line { display: block; white-space: nowrap; }
+      {% if cap.stagger_lines and cap.align == "left" %}.cap-line-2 { padding-left: {{ cap.stagger_px }}px; }{% endif %}
+      .cap-word { display: inline-block; white-space: pre; }
+      .cap-word.hl { color: {{ cap.highlight_color }}; }
+      {% if cap.reveal == "typewriter" %}.ch { opacity: 0; }{% elif cap.reveal == "word" %}.cap-word { opacity: 0; }{% endif %}
+
+      /* ---- logo ---- */
+      .logo-img { position: absolute; width: {{ logo.width_px }}px; height: auto; opacity: {{ logo.opacity }}; {{ logo.css_pos }} }
+      .logo-text {
+        position: absolute; {{ logo.css_pos }}
+        width: {{ logo.width_px }}px;
+        font-family: "{{ font.family }}", system-ui, sans-serif; font-weight: 900; font-style: normal;
+        font-size: {{ logo.text_px }}px; line-height: 1.0; text-transform: uppercase; letter-spacing: -0.01em;
+        color: {{ logo.text_color }}; text-align: center;
+        -webkit-text-stroke: {{ (logo.text_px * 0.06) | round(1) }}px {{ logo.text_stroke }}; paint-order: stroke fill;
+        text-shadow: 0 {{ (logo.text_px * 0.08) | round(1) }}px 0 {{ logo.text_stroke }};
+        opacity: {{ logo.opacity }};
+      }
+      .logo-text span { display: block; white-space: nowrap; }
+
+      /* ---- bandeau d'accroche ---- */
+      .hook-box {
+        position: absolute; left: {{ cap.margin_px }}px; right: {{ cap.margin_px }}px; top: {{ hook.top_px }}px;
+        padding: {{ (hook.font_px * 0.35) | round(0) | int }}px {{ (hook.font_px * 0.5) | round(0) | int }}px;
+        background: {{ hook.background }}; border-radius: 14px;
+        font-family: "{{ font.family }}", system-ui, sans-serif; font-weight: 900; font-size: {{ hook.font_px }}px; line-height: 1.1;
+        color: {{ hook.color }}; text-align: center; text-transform: uppercase;
+      }
+
+      /* ---- b-roll ---- */
+      .pip { position: absolute; overflow: hidden; opacity: 0; background: #000;
+             border: {{ broll.pip_border }}px solid {{ broll.pip_border_color }}; border-radius: {{ broll.pip_radius }}px;
+             box-shadow: 0 18px 50px rgba(0,0,0,.45); }
+      .pip video, .pip img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; }
+      .pip-full { left: 0; top: 0; width: {{ W }}px; height: {{ H }}px; border: 0; border-radius: 0; box-shadow: none; }
+      .pip-inner { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+
+      /* ---- carte de fin ---- */
+      .outro-bg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; object-position: {{ outro.image_position }}; }
+      .outro-bg-color { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: {{ colors.background }}; }
+      .outro-content { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: {{ "flex-start" if outro.layout == "left" else "center" }}; justify-content: center; gap: {{ (H * 0.02) | int }}px; {% if outro.layout == "left" %}padding-left: {{ (W * 0.08) | int }}px; padding-right: {{ (W * (0.3 if W > H else 0.06)) | int }}px;{% endif %} }
+      .outro-bg-wrap { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: hidden; }
+      .outro-logo-img { width: {{ outro.logo_px }}px; height: auto; }
+      .outro-logo-text {
+        width: {{ outro.logo_px }}px; text-align: center;
+        font-family: "{{ font.family }}", system-ui, sans-serif; font-weight: 900; font-style: normal;
+        font-size: {{ outro.logo_text_px }}px; line-height: 1.0; text-transform: uppercase;
+        color: {{ logo.text_color }};
+        -webkit-text-stroke: {{ (outro.logo_text_px * 0.06) | round(1) }}px {{ logo.text_stroke }}; paint-order: stroke fill;
+        text-shadow: 0 {{ (outro.logo_text_px * 0.08) | round(1) }}px 0 {{ logo.text_stroke }};
+      }
+      .outro-logo-text span { display: block; white-space: nowrap; }
+      .outro-cta, .outro-cta-sub, .outro-guest, .outro-company { {% if outro.layout == "left" %}text-align: left;{% endif %} }
+      .outro-guest { margin-top: {{ (H * 0.04) | int }}px; font-weight: 900; font-style: normal; font-size: {{ outro.guest_px }}px; color: {{ outro.guest_color }}; text-transform: uppercase; letter-spacing: 0.01em; text-shadow: 0 6px 20px rgba(0,0,0,.5); text-align: center; }
+      .outro-cta {
+        margin-top: {{ (H * 0.035) | int }}px;
+        font-weight: 800; font-style: normal; font-size: {{ outro.cta.font_px }}px; line-height: 1.15;
+        text-transform: uppercase; letter-spacing: 0.03em; text-align: center; max-width: {{ (W * 0.86) | int }}px;
+{% if outro.cta.style == "pill" %}
+        padding: 0.55em 1.15em; border-radius: 999px;
+        background: {{ outro.cta.pill_color_resolved }}; color: {{ outro.cta.pill_text_color }};
+        box-shadow: 0 10px 30px rgba(0,0,0,.35);
+{% else %}
+        color: {{ outro.cta.text_color_resolved }}; text-shadow: 0 6px 20px rgba(0,0,0,.5);
+{% endif %}
+      }
+      .outro-cta-sub { margin-top: {{ (H * 0.008) | int }}px; font-weight: 600; font-style: normal; font-size: {{ outro.cta.subtext_px }}px; color: {{ outro.cta.subtext_color }}; text-align: center; text-shadow: 0 4px 16px rgba(0,0,0,.5); opacity: 0.92; }
+      .outro-company { font-weight: 800; font-style: {{ "italic" if outro.company_italic else "normal" }}; font-size: {{ outro.company_px }}px; color: {{ outro.company_color }}; text-transform: uppercase; text-shadow: 0 6px 20px rgba(0,0,0,.5); text-align: center; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="{{ D_total }}" data-width="{{ W }}" data-height="{{ H }}" data-fps="{{ fps }}">
+
+      <!-- ===================== caméras ===================== -->
+{% for e in plan %}{% for cam in e.cams %}
+      <div class="slot slot-{{ cam.slot }}" id="slot-{{ e.id }}-{{ cam.slot }}" data-layout-allow-overflow>
+        <div class="cam" id="cam-{{ e.id }}-{{ cam.slot }}" data-layout-ignore style="left:{{ cam.left }}px; top:{{ cam.top }}px; width:{{ cam.width }}px; height:{{ cam.height }}px; transform-origin:{{ cam.ox }}px {{ cam.oy }}px;">
+          <video id="v-{{ e.id }}-{{ cam.slot }}" src="assets/source.mp4" data-start="{{ e.t0 }}" data-duration="{{ (e.t1 - e.t0) | round(3) }}" data-media-start="{{ (e.t0 + cam.media_offset) | round(3) }}" data-track-index="0" muted playsinline></video>
+        </div>
+      </div>
+{% endfor %}{% if e.layout == "split" and split_divider %}
+      <div class="clip layer" id="div-{{ e.id }}" data-start="{{ e.t0 }}" data-duration="{{ (e.t1 - e.t0) | round(3) }}" data-track-index="1"><div class="divider"></div></div>
+{% endif %}{% endfor %}
+
+      <!-- ===================== jonctions entre segments ===================== -->
+{% if join_transition == "flash" %}{% for j in junctions %}
+      <div class="clip layer" id="flash-{{ loop.index }}" data-start="{{ (j - 0.1) | round(3) }}" data-duration="0.2" data-track-index="8"><div class="flash" id="flashin-{{ loop.index }}"></div></div>
+{% endfor %}{% endif %}
+
+      <!-- ===================== audio ===================== -->
+      <audio id="a-main" src="assets/source.mp4" data-start="0" data-duration="{{ A_dur }}" data-track-index="10" data-volume="1"></audio>
+{% if music %}
+      <audio id="a-music" src="assets/{{ music.file }}" data-start="0" data-duration="{{ D_total }}" data-track-index="11" data-volume="{{ music.volume }}"></audio>
+{% endif %}
+
+      <!-- ===================== b-roll ===================== -->
+{% for b in brolls %}
+      <div class="pip {{ 'pip-full' if b.fullscreen else '' }}" id="pip-{{ b.id }}" {% if not b.fullscreen %}style="left:{{ b.box.left }}px; top:{{ b.box.top }}px; width:{{ b.box.w }}px; height:{{ b.box.h }}px;"{% endif %}>
+        <div class="pip-inner" id="pipin-{{ b.id }}">
+{% if b.kind == "video" %}
+          <video id="broll-{{ b.id }}" src="assets/broll/{{ b.file }}" data-start="{{ b.at }}" data-duration="{{ b.duration }}" data-media-start="0" data-track-index="2" muted playsinline></video>
+{% else %}
+          <img id="broll-{{ b.id }}" src="assets/broll/{{ b.file }}" alt="" />
+{% endif %}
+        </div>
+      </div>
+{% endfor %}
+
+      <!-- ===================== logo ===================== -->
+{% if logo.mode != "none" %}
+      <div class="clip layer" id="logo-layer" data-start="0" data-duration="{{ D_speech }}" data-track-index="5">
+{% if logo.mode == "image" %}
+        <img class="logo-img" id="logo-img" src="assets/{{ logo.file }}" alt="" />
+{% else %}
+        <div class="logo-text" id="logo-text" data-layout-allow-overlap>{% for l in logo.text_lines %}<span>{{ l }}</span>{% endfor %}</div>
+{% endif %}
+      </div>
+{% endif %}
+
+      <!-- ===================== accroche ===================== -->
+{% if hook.enabled and hook.text %}
+      <div class="clip layer" id="hook-layer" data-start="0" data-duration="{{ hook.duration }}" data-track-index="6">
+        <div class="hook-box" id="hook-box">{{ hook.text }}</div>
+      </div>
+{% endif %}
+
+      <!-- ===================== sous-titres ===================== -->
+{% for g in captions %}
+      <div class="clip layer cap" id="cap-{{ g.id }}" data-start="{{ g.start }}" data-duration="{{ (g.end - g.start) | round(3) }}" data-track-index="3">
+        <div class="cap-block" id="capb-{{ g.id }}" style="top:{{ g.top_px }}px;">
+{% for line in g.lines %}
+          <div class="cap-line{% if loop.index0 == 1 %} cap-line-2{% endif %}">{% for w in line %}<span class="cap-word{% if w.hl %} hl{% endif %}" id="w-{{ g.id }}-{{ loop.index }}" data-t="{{ w.s }}">{% for ch in w.chars %}<span class="ch" data-t="{{ ch.t }}">{{ ch.c }}</span>{% endfor %}</span>{% if not loop.last %}<span class="cap-word"> </span>{% endif %}{% endfor %}</div>
+{% endfor %}
+        </div>
+      </div>
+{% endfor %}
+
+      <!-- ===================== carte de fin ===================== -->
+{% if outro.enabled %}
+      <div class="clip layer" id="outro" data-start="{{ D_speech }}" data-duration="{{ outro.duration }}" data-track-index="7">
+{% if outro.bg_file %}
+        <div class="outro-bg-wrap"><img class="outro-bg" id="outro-bg" src="assets/{{ outro.bg_file }}" alt="" /></div>
+{% else %}
+        <div class="outro-bg-color"></div>
+{% endif %}
+        <div class="outro-content" id="outro-content">
+{% if outro.logo_file %}
+          <img class="outro-logo-img" id="outro-logo" src="assets/{{ outro.logo_file }}" alt="" />
+{% elif logo.mode == "image" %}
+          <img class="outro-logo-img" id="outro-logo" src="assets/{{ logo.file }}" alt="" />
+{% else %}
+          <div class="outro-logo-text" id="outro-logo" data-layout-allow-overlap>{% for l in logo.text_lines %}<span>{{ l }}</span>{% endfor %}</div>
+{% endif %}
+{% if outro.show_guest and guest %}
+          <div class="outro-guest" id="outro-guest">{{ guest }}</div>
+{% endif %}
+{% if outro.show_guest and company %}
+          <div class="outro-company" id="outro-company">{{ company }}</div>
+{% endif %}
+{% if outro.cta.enabled and outro.cta.text_rendered %}
+          <div class="outro-cta" id="outro-cta">{{ outro.cta.text_rendered }}</div>
+{% if outro.cta.subtext_rendered %}
+          <div class="outro-cta-sub" id="outro-cta-sub">{{ outro.cta.subtext_rendered }}</div>
+{% endif %}
+{% endif %}
+        </div>
+      </div>
+{% endif %}
+    </div>
+
+    <script>
+      const tl = gsap.timeline({ paused: true });
+
+      // ---- zoom lent par plan (sur le wrapper .cam, jamais sur le <video> timé) ----
+{% for e in plan %}{% if e.zoom_from != e.zoom_to %}{% for cam in e.cams %}
+      tl.fromTo("#cam-{{ e.id }}-{{ cam.slot }}", { scale: {{ e.zoom_from }} }, { scale: {{ e.zoom_to }}, duration: {{ (e.t1 - e.t0) | round(3) }}, ease: "none" }, {{ e.t0 }});
+{% endfor %}{% endif %}{% endfor %}
+
+      // ---- sous-titres : entrée du bloc + révélation ----
+{% for g in captions %}
+{% if cap.entrance == "slide-left" %}
+      tl.fromTo("#capb-{{ g.id }}", { x: -{{ (W * 0.05) | int }}, opacity: 0 }, { x: 0, opacity: 1, duration: {{ cap.entrance_duration }}, ease: "power3.out" }, {{ g.start }});
+{% elif cap.entrance == "pop" %}
+      tl.fromTo("#capb-{{ g.id }}", { scale: 0.8, opacity: 0 }, { scale: 1, opacity: 1, duration: {{ cap.entrance_duration }}, ease: "back.out(1.8)" }, {{ g.start }});
+{% elif cap.entrance == "fade" %}
+      tl.fromTo("#capb-{{ g.id }}", { opacity: 0 }, { opacity: 1, duration: {{ cap.entrance_duration }}, ease: "power2.out" }, {{ g.start }});
+{% endif %}
+{% endfor %}
+{% if cap.reveal == "typewriter" %}
+      document.querySelectorAll("#root .ch").forEach((el) => { tl.set(el, { opacity: 1 }, parseFloat(el.dataset.t)); });
+{% elif cap.reveal == "word" %}
+      document.querySelectorAll("#root .cap-word[data-t]").forEach((el) => { tl.set(el, { opacity: 1 }, parseFloat(el.dataset.t)); });
+{% endif %}
+{% if cap.keyword_pop %}
+      document.querySelectorAll("#root .cap-word.hl").forEach((el) => {
+        tl.fromTo(el, { scale: 0.86 }, { scale: 1, duration: 0.28, ease: "back.out(2.2)" }, parseFloat(el.dataset.t));
+      });
+{% endif %}
+
+      // ---- b-roll : apparition / disparition du cadre (wrapper non timé, piloté par la timeline) ----
+{% for b in brolls %}
+{% if broll.entrance == "drop" and not b.fullscreen %}
+      tl.fromTo("#pip-{{ b.id }}", { y: -{{ (H * 0.06) | int }}, opacity: 0 }, { y: 0, opacity: 1, duration: 0.32, ease: "power3.out" }, {{ b.at }});
+{% elif broll.entrance == "pop" and not b.fullscreen %}
+      tl.fromTo("#pip-{{ b.id }}", { scale: 0.85, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.32, ease: "back.out(1.6)" }, {{ b.at }});
+{% else %}
+      tl.fromTo("#pip-{{ b.id }}", { opacity: 0 }, { opacity: 1, duration: 0.25, ease: "power2.out" }, {{ b.at }});
+{% endif %}
+      tl.to("#pip-{{ b.id }}", { opacity: 0, duration: 0.22, ease: "power2.in" }, {{ (b.at + b.duration - 0.22) | round(3) }});
+{% if b.fullscreen or b.kind == "photo" %}
+      tl.fromTo("#pipin-{{ b.id }}", { scale: 1.0 }, { scale: {{ broll.fullscreen_zoom }}, duration: {{ b.duration }}, ease: "none" }, {{ b.at }});
+{% endif %}
+{% endfor %}
+
+      // ---- flash aux jonctions ----
+{% if join_transition == "flash" %}{% for j in junctions %}
+      tl.fromTo("#flashin-{{ loop.index }}", { opacity: 0 }, { opacity: 0.9, duration: 0.08, ease: "power2.in" }, {{ (j - 0.1) | round(3) }});
+      tl.to("#flashin-{{ loop.index }}", { opacity: 0, duration: 0.11, ease: "power2.out" }, {{ (j - 0.02) | round(3) }});
+{% endfor %}{% endif %}
+
+      // ---- logo / accroche ----
+{% if logo.mode != "none" %}
+      tl.fromTo("#{{ 'logo-img' if logo.mode == 'image' else 'logo-text' }}", { opacity: 0 }, { opacity: {{ logo.opacity }}, duration: 0.5 }, 0.1);
+{% endif %}
+{% if hook.enabled and hook.text %}
+      tl.fromTo("#hook-box", { y: -30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.35, ease: "power3.out" }, 0.05);
+      tl.to("#hook-box", { opacity: 0, duration: 0.3 }, {{ (hook.duration - 0.3) | round(3) }});
+{% endif %}
+
+      // ---- carte de fin + fondu audio ----
+{% if outro.enabled %}
+      tl.fromTo("#outro-content", { scale: 0.92, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "power3.out" }, {{ D_speech }});
+{% if outro.bg_is_image %}
+      tl.fromTo("#outro-bg", { scale: 1.0, xPercent: 0 }, { scale: 1.08, xPercent: -2, duration: {{ outro.duration }}, ease: "none" }, {{ D_speech }});
+{% endif %}
+{% if outro.cta.enabled and outro.cta.text_rendered %}
+      tl.fromTo("#outro-cta", { y: 26, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: "power3.out" }, {{ (D_speech + outro.cta.delay) | round(3) }});
+{% if outro.cta.subtext_rendered %}
+      tl.fromTo("#outro-cta-sub", { y: 16, opacity: 0 }, { y: 0, opacity: 0.92, duration: 0.4, ease: "power3.out" }, {{ (D_speech + outro.cta.delay + 0.15) | round(3) }});
+{% endif %}
+{% endif %}
+      tl.to("#a-main", { volume: 0, duration: {{ A_fade }}, ease: "power1.in" }, {{ D_speech }});
+{% if music %}
+      tl.to("#a-music", { volume: 0, duration: {{ outro.duration }}, ease: "power1.in" }, {{ D_speech }});
+{% endif %}
+{% endif %}
+
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>

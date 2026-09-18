@@ -1,0 +1,11 @@
+faster-whisper>=1.1
+torch
+opencv-python>=4.9
+numpy
+pyyaml
+pydantic>=2
+jinja2
+requests
+python-dotenv
+rich
+anthropic>=0.40

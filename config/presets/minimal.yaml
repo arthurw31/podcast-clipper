@@ -1,0 +1,16 @@
+# Preset "minimal" : juste le recadrage + sous-titres, aucun habillage.
+captions:
+  reveal: instant
+  entrance: none
+  stagger_lines: false
+  align: center
+  italic: false
+logo:
+  enabled: false
+outro:
+  enabled: false
+broll:
+  enabled: false
+framing:
+  slow_zoom: false
+  synthetic_cuts: false

@@ -1,0 +1,25 @@
+# Preset "editorial" : sous-titres classiques sobres (style monteur AI Partners) —
+# casse normale, centrés, en bas, sans mot-clé coloré ni typewriter ; coupes franches, pas de zoom, pas de B-roll.
+captions:
+  uppercase: false
+  italic: false
+  weight: 700
+  align: center
+  stagger_lines: false
+  highlight_keywords: false
+  dialogue_dashes: true
+  reveal: instant
+  entrance: none
+  max_chars_per_line: 24
+  max_lines: 2
+  max_words_per_group: 9
+  pause_break: 0.7
+  position_y: 0.76
+  line_height: 1.2
+  text_shadow: "0 2px 4px rgba(0,0,0,.7), 0 0 14px rgba(0,0,0,.45)"
+framing:
+  slow_zoom: false
+  synthetic_cuts: true
+  max_shot_len: 9
+broll:
+  enabled: false

@@ -1,0 +1,230 @@
+# ============================================================================
+# Valeurs par défaut du framework. Chaque marque (brands/<slug>/brand.yaml)
+# surcharge ce fichier clé par clé (fusion profonde). Un preset de montage
+# (config/presets/<nom>.yaml) s'intercale entre les deux :
+#   defaults.yaml  <-  presets/<montage.preset>.yaml  <-  brands/<slug>/brand.yaml
+# ============================================================================
+
+name: "Podcast sans nom"
+podcast_name: ""
+language: fr
+
+# ---------------------------------------------------------------- formats ---
+# 9x16 = TikTok / Reels / Shorts, 16x9 = LinkedIn / YouTube, 1x1 = feed carré
+formats: ["9x16"]
+fps: 30
+
+# ------------------------------------------------------------- selection ---
+selection:
+  n_clips: 6
+  min_duration: 25          # secondes (durée totale du clip)
+  max_duration: 60
+  target_duration: 40
+  # Un clip peut assembler plusieurs passages de l'épisode (montage thématique : accroche + développement).
+  # 1 = un seul passage continu ; 3-4 = style « monteur » (voir brands/ai-corner).
+  max_segments: 1
+  llm_backend: auto         # auto | anthropic | claude-cli
+  llm_model: claude-sonnet-5
+  # nombre max de mots-clés à surligner par clip (le LLM propose, on filtre)
+  max_keywords: 14
+
+# ------------------------------------------------------------ transcribe ---
+transcribe:
+  model: large-v3-turbo     # tiny | base | small | medium | large-v3 | large-v3-turbo
+  device: auto              # auto | cpu | cuda
+  compute_type: auto        # auto | int8 | float16 | float32
+  vad: true
+  beam_size: 5
+
+# ---------------------------------------------------------------- colors ---
+colors:
+  primary: "#FFE14D"        # jaune (mots-clés, logo, entreprise)
+  secondary: "#7B2D8E"      # violet (contour logo)
+  text: "#FFFFFF"
+  background: "#0B0B0F"
+
+# ----------------------------------------------------------------- fonts ---
+fonts:
+  # chemins relatifs à brands/<slug>/assets/ (ou brands/_template/assets/ en secours)
+  caption: "fonts/Montserrat-Italic[wght].ttf"
+  caption_upright: "fonts/Montserrat[wght].ttf"
+  display: "fonts/Montserrat[wght].ttf"
+  family: "Montserrat"
+
+# -------------------------------------------------------------- captions ---
+captions:
+  enabled: true
+  uppercase: true
+  italic: true
+  weight: 800
+  font_size: 72             # px (canvas 1080 de large) ; voir format_overrides pour 16x9
+  line_height: 1.08
+  letter_spacing: "0.01em"
+  color: "#FFFFFF"
+  highlight_color: "#FFE14D"
+  text_shadow: "0 3px 0 rgba(0,0,0,.35), 0 8px 22px rgba(0,0,0,.55)"
+  stroke_width: 0           # px (0 = pas de contour)
+  stroke_color: "#000000"
+  # ancre verticale (fraction de la hauteur) du haut du bloc de sous-titres
+  position_y: 0.64
+  align: left               # left | center
+  stagger_lines: true       # 2e ligne décalée vers la droite (style "dynamique")
+  stagger_offset: 0.12      # fraction de la largeur
+  side_margin: 0.07         # fraction de la largeur
+  max_chars_per_line: 17
+  max_lines: 2
+  max_words_per_group: 8
+  min_group_duration: 0.7   # secondes
+  pause_break: 0.55         # une pause > x s force un nouveau groupe
+  highlight_keywords: true  # false = sous-titres unis, sans mot-clé coloré
+  dialogue_dashes: false    # « - Ouais. / - Donc… » quand deux locuteurs se répondent dans un même bloc
+  reveal: typewriter        # typewriter | word | instant
+  typewriter_min_char_step: 0.03
+  entrance: slide-left      # slide-left | pop | fade | none
+  entrance_duration: 0.22
+  keyword_pop: true         # léger scale sur les mots surlignés à leur apparition
+
+# ------------------------------------------------------------------ logo ---
+logo:
+  enabled: true
+  mode: auto                # auto | image | text | none  (auto = image si fichier présent sinon text)
+  file: "logo.png"          # relatif à assets/
+  text_lines: ["DANS LA", "TÊTE", "D'UN CEO"]
+  position: top-right       # top-left | top-right | bottom-left | bottom-right
+  width: 0.13               # fraction de la largeur du canvas
+  margin: 0.045             # fraction de la largeur
+  opacity: 0.95
+  text_color: "#FFE14D"
+  text_stroke: "#7B2D8E"
+
+# --------------------------------------------------------------- montage ---
+montage:
+  preset: dynamic
+  join_transition: cut      # cut | flash  (jonction entre deux segments d'un clip multi-segments)
+  flash_color: "#FFFFFF"
+
+# ----------------------------------------------------------------- outro ---
+outro:
+  enabled: true
+  duration: 3.8
+  background: blur-freeze   # blur-freeze | color | image
+  image: ""                 # background: image -> fichier dans assets/ (ex: outro_bg.png), zoom lent
+  image_position: center    # cadrage de l'image (CSS object-position), ex: "70% 50%" pour garder le motif à droite
+  layout: center            # center | left  (left = logo/texte alignés à gauche, comme une cover de charte)
+  logo_file: ""             # logo spécifique à la carte de fin (vide = logo de la marque)
+  blur: 22
+  darken: 0.18
+  logo_width: 0.5           # fraction de la largeur (logo grand format)
+  show_guest: true
+  guest_color: "#FFFFFF"
+  company_color: "#FFE14D"
+  company_italic: true      # défaut : suit captions.italic
+  guest_font_size: 58
+  company_font_size: 44
+  audio_fade: 0.5             # fondu de la voix sous la carte de fin (court : la phrase suivante ne doit pas s'entendre)
+  # Appel à l'action vers l'épisode complet — actif pour toutes les marques sauf indication contraire.
+  # Variables disponibles : {podcast_name} {guest} {company}
+  cta:
+    enabled: true
+    style: pill             # pill (bouton plein) | text (texte simple)
+    text: "▶  L'ÉPISODE COMPLET SUR {podcast_name}"
+    subtext: "Lien en bio"  # 2e ligne (vide = aucune) ; surchargée en 16:9 ci-dessous
+    font_size: 38
+    subtext_font_size: 30
+    pill_color: ""          # vide = colors.primary
+    pill_text_color: "#111111"
+    text_color: ""          # style text : vide = colors.primary
+    subtext_color: "#FFFFFF"
+    delay: 0.55             # apparition après le nom de l'invité (secondes)
+
+# ----------------------------------------------------------------- hook ---
+hook:
+  enabled: false            # titre accrocheur en haut pendant les premières secondes
+  duration: 3.5
+  font_size: 56
+  color: "#FFFFFF"
+  background: "rgba(0,0,0,.55)"
+  position_y: 0.16
+
+# ---------------------------------------------------------------- b-roll ---
+broll:
+  enabled: true
+  provider: pexels
+  max_per_clip: 2
+  mode: pip                 # pip | fullscreen
+  prefer: video             # video | photo
+  duration: 2.6             # durée par défaut d'un insert
+  pip_width: 0.62           # fraction de la largeur
+  pip_aspect: 1.5           # largeur / hauteur de la fenêtre PiP
+  pip_position_y: 0.13      # fraction de la hauteur (bord haut)
+  pip_border: 6             # px
+  pip_border_color: "#FFFFFF"
+  pip_radius: 10
+  entrance: drop            # drop | fade | pop
+  fullscreen_zoom: 1.08     # Ken Burns léger en plein écran
+
+# --------------------------------------------------------------- framing ---
+framing:
+  # Comment recadrer un plan large (plusieurs visages) en vertical :
+  #  speaker = zoom sur celui qui parle (heuristique bouche) ; split = écran partagé haut/bas ;
+  #  center  = recadrage centré sans analyse
+  wide_shot_mode: speaker
+  speaker_min_confidence: 0.58
+  speaker_fallback: split
+  single_mode: face         # face | center
+  face_zoom: 1.0            # >1 zoome un peu plus sur le visage
+  headroom: 0.42            # position verticale du visage dans le cadre (0=haut, 1=bas)
+  slow_zoom: true           # léger zoom progressif sur chaque plan
+  slow_zoom_amount: 0.05
+  synthetic_cuts: true      # sur un plan fixe très long, alterner speaker/split au rythme des phrases
+  max_shot_len: 7.0
+  scene_threshold: 0.2      # sensibilité de détection des coupes (ffmpeg scene, plus bas = plus sensible)
+  min_shot_len: 0.6
+  sample_fps: 5             # fréquence d'analyse des visages
+  min_face_motion: 0.012    # filtre les "faux visages" immobiles (tableaux, affiches) ; écart-type du nez / largeur visage
+  ignore_regions: []        # ex: [{x: 0.40, y: 0.0, w: 0.2, h: 0.40}] (fractions)
+  host_side: ""             # left | right | "" (info facultative)
+  split_divider: 4          # px de séparation blanche en écran partagé (0 = aucune)
+  split_divider_color: "#FFFFFF"
+
+# ------------------------------------------------------------------ audio ---
+audio:
+  normalize: true           # loudnorm -16 LUFS
+  music: ""                 # fichier relatif à assets/ (vide = pas de musique)
+  music_volume: 0.06
+  music_duck: true
+
+# ---------------------------------------------------------------- render ---
+render:
+  quality: looks            # draft | looks | delivery
+  lint: true
+
+# ------------------------------------------------- surcharges par format ---
+# Fusionnées par-dessus tout le reste quand on compose ce format précis.
+format_overrides:
+  "16x9":
+    captions:
+      font_size: 72
+      max_chars_per_line: 26
+      position_y: 0.60
+      side_margin: 0.06
+      stagger_offset: 0.10
+    logo:
+      width: 0.075
+      margin: 0.03
+    broll:
+      pip_width: 0.34
+      pip_position_y: 0.06
+    outro:
+      logo_width: 0.28
+      guest_font_size: 54
+      company_font_size: 40
+      cta:
+        subtext: "Lien en description"
+        font_size: 32
+  "1x1":
+    captions:
+      font_size: 58
+      position_y: 0.70
+    outro:
+      logo_width: 0.45

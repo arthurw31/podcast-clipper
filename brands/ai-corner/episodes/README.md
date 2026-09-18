@@ -1,0 +1,3 @@
+Déposez ici les épisodes longs (mp4) de ce podcast.
+Lancez ensuite :  python -m clipper run --brand <slug> --input <nom-du-fichier>.mp4 …
+(un nom de fichier seul est cherché dans ce dossier).
