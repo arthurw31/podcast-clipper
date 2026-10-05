@@ -135,6 +135,74 @@ def _pip_box(plan: list[dict], t0: float, t1: float, sw: int, sh: int, fmt: str,
     return None
 
 
+def _same_camera(a: dict, b: dict, tol: float = 0.25) -> bool:
+    """Deux plans « single » cadrés sur la même caméra / la même personne (recadrage léger, même zoom) ?"""
+    if a["layout"] != "single" or b["layout"] != "single":
+        return False
+    ca, cb = a["cams"][0]["crop"], b["cams"][0]["crop"]
+    return (abs(ca["w"] - cb["w"]) <= 0.03 * ca["w"] and abs(ca["x"] - cb["x"]) <= tol * ca["w"]
+            and abs(ca["y"] - cb["y"]) <= tol * ca["h"])
+
+
+def _smooth_plan(plan: list[dict], shots: list[dict], junctions: list[float], fr: Cfg) -> list[dict]:
+    """Fluidité : supprime les micro-coupes que l'œil perçoit comme des saccades.
+
+    1. un plan de moins de `min_flash` s fusionne avec son voisin issu du même plan source (sinon : flash
+       d'une autre personne pendant quelques images) ;
+    2. deux plans consécutifs de la même caméra (petit recadrage, même zoom) fusionnent si l'un dure moins
+       de `min_reframe_len` s, ou si la coupe tombe à moins de `junction_gap` s d'une jonction de segments
+       (la jonction fait déjà une coupe) — la position du cadre est la moyenne pondérée des deux.
+    Les punch-in (zoom différent) et les changements de personne sont conservés : c'est le rythme voulu.
+    """
+    if not plan:
+        return plan
+    min_flash = float(fr.get("min_flash", 0.5))
+    min_reframe = float(fr.get("min_reframe_len", 1.2))
+    jgap = float(fr.get("junction_gap", 1.5))
+
+    def shot_of(e: dict) -> int:
+        mid = (e["t0"] + e["t1"]) / 2
+        return next((i for i, sh in enumerate(shots) if sh["t0"] - 0.05 <= mid <= sh["t1"] + 0.05), -1)
+
+    def merge(a: dict, b: dict, average: bool) -> dict:
+        da, db = a["t1"] - a["t0"], b["t1"] - b["t0"]
+        keep = a if da >= db else b
+        out = dict(keep, t0=a["t0"], t1=b["t1"])
+        if average:
+            ca, cb = a["cams"][0]["crop"], b["cams"][0]["crop"]
+            crop = dict(ca, x=round((ca["x"] * da + cb["x"] * db) / (da + db), 1),
+                        y=round((ca["y"] * da + cb["y"] * db) / (da + db), 1))
+            out["cams"] = [dict(keep["cams"][0], crop=crop)]
+        return out
+
+    changed = True
+    while changed and len(plan) > 1:
+        changed = False
+        for k in range(len(plan)):
+            e = plan[k]
+            d = e["t1"] - e["t0"]
+            prev = plan[k - 1] if k > 0 else None
+            nxt = plan[k + 1] if k + 1 < len(plan) else None
+            # 1. flash très court : avec le voisin du même plan source (le plus long des deux)
+            if d < min_flash:
+                cands = [n for n in (prev, nxt) if n is not None and shot_of(n) == shot_of(e)] or [n for n in (prev, nxt) if n]
+                n = max(cands, key=lambda x: x["t1"] - x["t0"])
+                if n is prev:
+                    plan[k - 1:k + 1] = [merge(prev, e, False)]
+                else:
+                    plan[k:k + 2] = [dict(merge(e, nxt, False), cams=nxt["cams"], layout=nxt["layout"])]
+                changed = True
+                break
+            # 2. recadrage de la même caméra trop rapproché
+            if nxt is not None and _same_camera(e, nxt):
+                near_junction = any(abs(e["t1"] - j) <= jgap and abs(e["t1"] - j) > 0.05 for j in junctions)
+                if d < min_reframe or (nxt["t1"] - nxt["t0"]) < min_reframe or near_junction:
+                    plan[k:k + 2] = [merge(e, nxt, True)]
+                    changed = True
+                    break
+    return plan
+
+
 def _hook_duration(hk: Cfg, segments: list[dict], caps: list[dict], D_speech: float) -> float:
     """Durée du titre. `auto` (style shorts AI Partners) : le temps de l'accroche — fin du 1er segment,
     bornée à [min_duration, max_duration], puis calée sur la fin d'un bloc de sous-titres (jamais en plein mot)."""
@@ -363,7 +431,6 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
         plan = build_plan(analysis, fmt, fcfg, words_rel, turns=turns_rel, host_side=clip.get("host_side", ""))
         for e in plan:
             e["t1"] = min(e["t1"], D_speech)
-            e["cams"] = [_cam_geometry(c, fmt, sw, sh) for c in e["cams"]]
         # un changement de plan détecté juste après une jonction de segments (coupe de l'export source) :
         # on le cale sur la jonction, sinon 1-2 images du segment suivant passent avec l'ancien cadrage
         for j in junctions:
@@ -372,6 +439,9 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
                     plan[k]["t1"] = j
                     plan[k + 1]["t0"] = j
         plan = [e for e in plan if e["t1"] - e["t0"] > 0.05]
+        plan = _smooth_plan(plan, analysis["shots"], junctions, fcfg.framing)
+        for e in plan:
+            e["cams"] = [_cam_geometry(c, fmt, sw, sh) for c in e["cams"]]
         if plan:
             plan[-1]["t1"] = D_speech
         caps = group_words(words_rel, 0.0, D_speech, fcfg, clip.get("keywords", []), turns_rel=turns_rel)

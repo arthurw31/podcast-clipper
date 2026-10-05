@@ -90,6 +90,14 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
    CTA YouTube AI PARTNERS / Spotify / Ausha. Sortie : `output/…/posts/clip_NN_<titre>.md` + champs
    `linkedin_post` / `short_description` dans `clips.json` + `summary.md`.
 
+## Fluidité des coupes (demande d'Arthur, 05/10/2026 : « moins de cuts, plus fluide »)
+
+- `compose._smooth_plan` (après calage des plans sur les jonctions) supprime les micro-coupes : flash < `min_flash`
+  (0,5 s) fusionné avec son voisin du même plan source ; recadrages de la même caméra (même zoom, décalage
+  ≤ 25 %) fusionnés si un morceau dure < `min_reframe_len` (1,2 s) ou si la coupe tombe à < `junction_gap` (1,5 s)
+  d'une jonction de segments. Les fausses coupes détectées dans un plan continu faisaient sauter le cadre
+  4 fois en 4 s. Les punch-in et changements de personne restent (c'est le rythme validé).
+
 ## Parallélisme (pattern « split → parallèle → agrégation »)
 
 - `select` : si `selection.angles` liste ≥ 2 angles, `select_clips` lance une passe LLM **par angle** en parallèle
