@@ -8,6 +8,7 @@
   python -m clipper check     --brand <slug> --input episode.mp4                                   # contrôle des coupes
   python -m clipper select    --brand <slug> --input episode.mp4 [--force]        # (re)sélection LLM directe
   python -m clipper build     --brand <slug> --input episode.mp4 [--only 1,3]     # projets HyperFrames
+  python -m clipper preview   --brand <slug> --input episode.mp4 [--stop]         # aperçu instantané, sans rendu
   python -m clipper render    --brand <slug> --input episode.mp4 [--only 1]       # MP4
   python -m clipper posts     --brand <slug> --input episode.mp4 [--episode-url URL] # post LinkedIn + description par clip
   python -m clipper new-brand <slug>
@@ -24,7 +25,7 @@ from pathlib import Path
 
 from rich.console import Console
 
-from .config import BRANDS_DIR, FORMATS, OUTPUT_DIR, Brand, list_brands
+from .config import BRANDS_DIR, FORMATS, OUTPUT_DIR, ROOT as ROOT_DIR, Brand, list_brands
 from .compose import build_clip, slugify
 from .posts import write_posts
 from .render import lint, render
@@ -389,19 +390,37 @@ def _write_summary(ep: Path, clips: dict, projects: list[Path] | None = None) ->
 
 
 def cmd_preview(a: argparse.Namespace) -> None:
-    """Ouvre le Studio HyperFrames (éditeur timeline) sur un clip pour retouches manuelles."""
-    import subprocess
+    """Aperçu instantané (sans rendu) : le short est joué en direct dans le navigateur par HyperFrames Studio.
+
+    Un serveur en arrière-plan par short (port 3002, 3003, …) ; ils se rechargent tout seuls après un
+    `build --only N`. `--stop` les arrête tous. À valider avant le rendu final."""
+    from .render import _npx
     brand = Brand(a.brand)
     ep = episode_dir(brand, resolve_input(brand, a.input))
-    idx = int(a.clip)
-    proj = next((p for p in sorted((ep / "clips").glob("clip_*")) if int(p.name.split("_")[1]) == idx), None)
-    if not proj:
-        sys.exit(f"Clip #{idx} introuvable dans {ep / 'clips'}")
     fmt = a.formats or brand.cfg.formats[0]
-    target = proj / fmt
-    console.print(f"Studio HyperFrames → {target}")
-    console.print(f"(Ctrl+C pour arrêter ; rendu ensuite avec : python -m clipper render … --only {idx})")
-    subprocess.run(["npx", "hyperframes", "preview"], cwd=str(target), shell=(sys.platform == "win32"))
+    only = None if str(a.clip).lower() in ("", "all", "tous") else _parse_only(a.clip)
+    projs = [p for p in sorted((ep / "clips").glob("clip_*")) if p.is_dir() and (p / fmt / "index.html").exists()
+             and (only is None or int(p.name.split("_")[1]) in only)]
+    if not projs:
+        sys.exit(f"Aucun short monté dans {ep / 'clips'} (lancer build d'abord)")
+    for proj in projs:
+        idx = int(proj.name.split("_")[1])
+        target = proj / fmt
+        if a.stop:
+            _npx(["preview", str(target), "--stop"], ROOT_DIR, timeout=60)
+            console.print(f"  #{idx} aperçu arrêté")
+            continue
+        port = int(a.port) + idx - 1
+        res = _npx(["preview", str(target), "--background", "--port", str(port), "--no-open" if a.no_open else "--open"],
+                   ROOT_DIR, timeout=180)
+        ok = res.returncode == 0
+        console.print(f"  #{idx} {'[green]' if ok else '[red]'}http://localhost:{port}/#project/{fmt}{'[/green]' if ok else ' (échec)[/red]'}"
+                      f"  {proj.name}")
+        if not ok:
+            console.print(res.stdout[-800:] + res.stderr[-800:])
+    if not a.stop:
+        console.print("Lecture en direct (▶ sous l'image, plein écran à droite). Après une retouche : build --only N, "
+                      "l'aperçu se recharge. Une fois validé : render, puis preview --stop.")
 
 
 def cmd_doctor(_: argparse.Namespace) -> None:
@@ -526,8 +545,12 @@ def main(argv: list[str] | None = None) -> None:
     sp.add_argument("--only", default=""); sp.set_defaults(fn=cmd_check)
     sp = sub.add_parser("posts", help="post LinkedIn + description courte pour chaque clip"); common(sp); posts_args(sp)
     sp.add_argument("--only", default="", help="index de clips, ex: 1,3"); sp.set_defaults(fn=cmd_posts)
-    sp = sub.add_parser("preview", help="ouvre le Studio HyperFrames sur un clip"); common(sp)
-    sp.add_argument("--clip", required=True, help="index du clip (ex: 1)"); sp.add_argument("--formats", default="", help="format à ouvrir (ex: 9x16)")
+    sp = sub.add_parser("preview", help="aperçu instantané des shorts dans le navigateur (sans rendu)"); common(sp)
+    sp.add_argument("--clip", default="all", help="all (défaut) ou index, ex: 1,3")
+    sp.add_argument("--formats", default="", help="format à ouvrir (ex: 9x16)")
+    sp.add_argument("--port", default="3002", help="port du short n°1 (les suivants : +1, +2…)")
+    sp.add_argument("--no-open", action="store_true", help="ne pas ouvrir le navigateur par défaut")
+    sp.add_argument("--stop", action="store_true", help="arrête les aperçus")
     sp.set_defaults(fn=cmd_preview)
     sp = sub.add_parser("new-brand"); sp.add_argument("slug"); sp.set_defaults(fn=cmd_new_brand)
     sp = sub.add_parser("brands"); sp.set_defaults(fn=cmd_brands)

@@ -9,8 +9,8 @@ Tu pilotes le framework `clipper` (voir [CLAUDE.md](../../../CLAUDE.md), [README
 schéma [docs/FRAMEWORK.md](../../../docs/FRAMEWORK.md)). L'utilisateur est un membre de l'équipe marketing :
 il ne tape aucune commande, tu fais tout et tu lui parles simplement (pas de jargon technique).
 
-Le workflow a **deux moments où l'humain décide** (étapes 2 et 3). Ne les saute jamais : ne monte rien avant
-que l'utilisateur ait choisi ses passages.
+Le workflow a **deux moments où l'humain décide** : le choix des passages (étape 3) et la validation des shorts
+en aperçu (étape 4). Ne monte rien avant le choix, ne rends rien avant la validation.
 
 ## 0. Environnement (une fois par machine)
 
@@ -82,42 +82,60 @@ python -m clipper check --brand <marque> --input <fichier>
 Chaque passage doit commencer au début d'une phrase et finir sur une fin de phrase complète ; jamais de mot du
 passage suivant (« après » ne doit pas être entamé). Corrige dans `clips.json` et relance `check`.
 
-## 4. Monter les 5 shorts et rédiger les posts
+## 4. Monter les 5 shorts, les faire valider en aperçu, rédiger les posts
 
 ```bash
-python -m clipper build  --brand <marque> --input <fichier>          # projets HyperFrames (lint OK attendu)
-python -m clipper posts  --brand <marque> --input <fichier> --guest-role "<Rôle> at <Entreprise>" [--episode-url URL]
-python -m clipper render --brand <marque> --input <fichier>          # long : arrière-plan
+python -m clipper build   --brand <marque> --input <fichier>          # ≈ 1 min/short en 1080p, 2-3 min en 4K (2 en parallèle)
+python -m clipper preview --brand <marque> --input <fichier> --no-open
 ```
 
-- Le rendu prend ≈ 12 × la durée de chaque short (2 en parallèle) : ≈ 30–40 min pour 5 shorts de 35 s. Annonce-le,
-  lance-le en arrière-plan, et pendant ce temps relis les posts.
-- Avant le rendu, contrôle visuellement un short : `npx hyperframes snapshot --at 2,10,20 --no-end` dans
-  `output/…/clips/clip_01_…/9x16/` (logos centrés en haut, bulle-titre, sous-titres, carte de fin).
-- Les posts suivent `brands/<marque>/posts.md` (méthode « post d'un short » : accroche-thèse, contraste, invité,
-  développement concret, chute, CTA ; anglais pour AI Corner, sans hashtags). Relis-les : rien d'inventé
-  (chiffre, exemple, citation absents du short), deux posts ne commencent pas pareil. Corrige à la main dans
-  `output/…/posts/clip_NN_….md` si besoin, ou `posts --only N --force`.
+`build` doit finir sur « lint OK ». `preview` lance un aperçu **instantané, sans rendu** pour chaque short
+(http://localhost:3002/#project/9x16 pour le n° 1, 3003 pour le n° 2, …) : ouvre-les dans le navigateur intégré
+(Claude Browser `navigate`), place-toi à 3 s pour vérifier logos / bulle / sous-titres, puis dis à l'utilisateur :
+« les 5 shorts sont prêts à être regardés à droite : ▶ pour lire, icône plein écran à côté ; dites-moi ce
+que vous voulez changer ». Si le navigateur intégré n'est pas disponible, relance `preview` sans `--no-open`
+(ouverture dans le navigateur du PC).
 
-## 5. Livrer
+Pendant qu'il regarde, rédige les posts (ils ne dépendent pas du rendu) :
 
+```bash
+python -m clipper posts --brand <marque> --input <fichier> --guest-role "<Rôle> at <Entreprise>" [--episode-url URL]
+```
+
+Les posts suivent `brands/<marque>/posts.md` (méthode « post d'un short » : accroche-thèse, contraste, invité,
+développement concret, chute, CTA ; anglais pour AI Corner, sans hashtags). Relis-les : rien d'inventé (chiffre,
+exemple, citation absents du short), deux posts ne commencent pas pareil.
+
+Retouches demandées sur l'aperçu : modifie `clips.json` (passages, `hook_title`) ou la config de la marque, puis
+`build --only N` ; l'aperçu se recharge tout seul. Recommence jusqu'à ce que l'utilisateur valide **tous** les shorts.
+Ne lance jamais le rendu final avant cette validation explicite.
+
+## 5. Rendu final et livraison
+
+```bash
+python -m clipper render  --brand <marque> --input <fichier>          # ≈ 6-8 min/short, 2 en parallèle : arrière-plan
+python -m clipper preview --brand <marque> --input <fichier> --stop   # arrête les aperçus
+```
+
+- Annonce la durée du rendu (≈ 30–40 min pour 5 shorts) ; l'utilisateur peut faire autre chose.
 - Envoie les 5 MP4 (`output/<marque>/<episode>/renders/`) avec SendUserFile, dans l'ordre.
 - Colle dans le chat, pour chaque short : le titre, la durée, puis son **post LinkedIn** prêt à copier.
-- Donne le chemin du dossier et propose les retouches : changer un passage, un titre, un post, refaire un short.
+- Donne le chemin du dossier.
 
 ## Retouches courantes
 
 | Demande | Action |
 | --- | --- |
-| « coupe trop tôt / trop tard » | ajuster `segments` dans `clips.json`, `check`, puis `build --only N` et `render --only N --force` |
-| « autre titre dans la bulle » | `hook_title` dans `clips.json`, `build --only N`, `render --only N --force` |
+| « coupe trop tôt / trop tard » | ajuster `segments` dans `clips.json`, `check`, `build --only N` (l'aperçu se recharge) ; après livraison : `render --only N --force` |
+| « autre titre dans la bulle » | `hook_title` dans `clips.json`, `build --only N` ; après livraison : `render --only N --force` |
 | « c'est saccadé » | ne pas ajouter de coupes : voir `framing` (max_shot_len, min_reframe_len) dans `brand.yaml` |
 | « refais le post » | `posts --only N --force` (ajouter une consigne dans `posts.md` si c'est un défaut récurrent) |
 | « nouvelle marque / autre podcast » | `python -m clipper new-brand <slug>`, puis brand.yaml, guidelines.md, posts.md (voir README) |
 
 ## Garde-fous
 
-- Jamais de montage sans le choix explicite de l'utilisateur (étape 3).
+- Jamais de montage sans le choix explicite de l'utilisateur (étape 3), jamais de rendu final sans sa validation
+  sur l'aperçu (étape 4).
 - Un short qui dépasse un peu la durée cible pour finir une idée est correct ; un short coupé au milieu ne l'est pas.
 - Ne modifie pas `config/defaults.yaml` pour un besoin propre à une marque : passe par `brands/<marque>/brand.yaml`.
 - Un retour de l'utilisateur sur le style qui vaut pour la suite (« moins de coupes », « logos plus grands »)

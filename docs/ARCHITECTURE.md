@@ -12,7 +12,7 @@ flowchart TB
     end
 
     subgraph PY["Package Python clipper/ (python -m clipper …)"]
-        CLI["cli.py<br/>commandes : transcribe, propose, pick,<br/>find, check, build, posts, render, doctor"]
+        CLI["cli.py<br/>commandes : transcribe, propose, pick,<br/>find, check, build, preview, posts, render, doctor"]
         CFG["config.py<br/>fusion de la configuration"]
         TR["transcribe.py"]
         SEL["select_clips.py"]
@@ -60,7 +60,7 @@ flowchart TB
 | `captions.py` | Regroupe les mots en blocs de sous-titres (3 lignes, mot à mot). |
 | `compose.py` | Assemble les passages, lisse les coupes, recadre avec FFmpeg, écrit la composition HTML HyperFrames (sous-titres, bulle-titre, logos, light leak, carte de fin). |
 | `media.py` | Toutes les opérations FFmpeg : découpe, concaténation, recadrage Lanczos, animation de fin. |
-| `render.py` | Rendu de la composition en MP4 par HyperFrames (Chrome headless), lint, aperçus. |
+| `render.py` | Rendu de la composition en MP4 par HyperFrames (Chrome headless), lint, captures. La commande `preview` lance HyperFrames Studio en arrière-plan (un port par short) pour lire les shorts en direct, sans rendu. |
 | `posts.py` | Rédige le post LinkedIn de chaque short avec `posts.md` (méthode + exemples). |
 
 ## 2. Le parcours d'un épisode, fichier par fichier
@@ -87,7 +87,9 @@ flowchart TD
         S5 --> S6
     end
 
-    B -->|render<br/>HyperFrames + Chrome| R["renders/clip_NN_titre_9x16.mp4<br/>1080×1920"]
+    B -->|preview<br/>HyperFrames Studio, lecture en direct| PV["Aperçu instantané<br/>localhost:3002, 3003…<br/>validation par l'équipe"]
+    PV -->|retouche : clips.json puis build --only N| CJ
+    PV -->|validé : render<br/>HyperFrames + Chrome| R["renders/clip_NN_titre_9x16.mp4<br/>1080×1920"]
     CJ -->|posts<br/>Claude + posts.md| P["posts/clip_NN_titre.md<br/>post LinkedIn + description courte"]
     R --> OUT["Livraison : 5 MP4 + 5 posts<br/>+ summary.md"]
     P --> OUT
@@ -117,7 +119,9 @@ sequenceDiagram
     CO->>FF: animation de fin recadrée, accélérée à 2 s
     CO->>CO: sous-titres, bulle-titre, barre de logos → index.html
     CO->>HF: lint (contrôle de la composition)
-    SK->>HF: render
+    SK->>HF: preview (serveur local, lecture en direct)
+    HF-->>SK: aperçu validé par l'utilisateur
+    SK->>HF: render (une seule fois)
     HF-->>SK: MP4 1080×1920 (CRF 12)
 ```
 

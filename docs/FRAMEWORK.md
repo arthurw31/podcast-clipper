@@ -13,12 +13,15 @@ flowchart TD
     C --> D["3 · L'équipe choisit 5 passages<br/>+ demandes particulières<br/>« il faut le passage où il dit… »"]
     D --> E["Calage des coupes<br/>début et fin de phrase · contrôle mot à mot"]
     E --> F["4 · Montage des 5 shorts<br/>recadrage vertical · logos · bulle-titre<br/>sous-titres · carte de fin animée"]
+    F --> V["4 · L'équipe regarde les shorts en aperçu instantané<br/>(lus en direct dans le navigateur, sans rendu)<br/>et demande ses retouches"]
+    V -->|retouche| F
     E --> G["4 · Rédaction des 5 posts LinkedIn<br/>méthode de la marque (posts.md)"]
-    F --> H["5 · Livraison<br/>5 MP4 1080×1920 + 5 posts prêts à publier"]
+    V -->|validé| R["5 · Rendu final unique des 5 MP4<br/>1080×1920"]
+    R --> H["5 · Livraison<br/>5 MP4 + 5 posts prêts à publier"]
     G --> H
 
     classDef human fill:#258AF3,color:#fff,stroke:#151D53;
-    class D human;
+    class D,V human;
 ```
 
 | Étape | Qui | Durée (PC sans GPU, épisode de 50 min) |
@@ -26,8 +29,12 @@ flowchart TD
 | 1. Dépôt + transcription | vous déposez, Claude transcrit | ≈ 20 min (automatique) |
 | 2. 10 propositions | Claude | ≈ 8 min |
 | 3. Choix + demandes | **vous** | 2 min |
-| 4. Montage + posts | Claude | ≈ 30–40 min pour 5 shorts (rendu en arrière-plan) |
-| 5. Livraison | Claude | — |
+| 4. Montage + aperçu + posts | Claude monte, **vous regardez et validez** | ≈ 4 min de montage (≈ 10 en 4K), aperçu instantané, ≈ 1 min par retouche |
+| 5. Rendu final + livraison | Claude | ≈ 30–40 min pour 5 shorts, une seule fois, en arrière-plan |
+
+**Aperçu ou rendu ?** Un short est d'abord une « page » (vidéo + sous-titres, logos, transitions programmés par
+dessus). L'**aperçu** la joue en direct dans le navigateur : immédiat, idéal pour vérifier et corriger. Le
+**rendu** la transforme en fichier MP4 image par image (≈ 7 min par short) : on ne le fait qu'une fois, à la fin.
 
 ## Ce qui se passe à l'intérieur
 

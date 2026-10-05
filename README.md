@@ -20,10 +20,10 @@ Deux façons de l'utiliser :
 flowchart LR
     A["1 · Dépôt<br/>épisode 4K dans depot/"] --> B["2 · Claude propose<br/>~10 passages"]
     B --> C["3 · Vous en choisissez 5<br/>+ demandes particulières"]
-    C --> D["4 · Claude monte les 5 shorts<br/>et rédige les posts LinkedIn"]
-    D --> E["5 · 5 MP4 1080×1920<br/>+ 5 posts prêts à publier"]
+    C --> D["4 · Claude monte les 5 shorts<br/>vous les regardez en aperçu instantané<br/>et demandez vos retouches"]
+    D --> E["5 · Rendu final unique<br/>5 MP4 1080×1920 + 5 posts LinkedIn"]
     classDef human fill:#258AF3,color:#fff,stroke:#151D53;
-    class C human;
+    class C,D human;
 ```
 
 - Guide d'utilisation (workflow, « quel fichier modifier pour changer le format ») : **[docs/FRAMEWORK.md](docs/FRAMEWORK.md)**
@@ -101,8 +101,9 @@ seul au premier lancement.
 
 4. Claude (skill `podcast-clips`) range les fichiers, transcrit l'épisode, puis vous propose une dizaine de
    passages (titre, timecodes, extrait). Vous répondez avec vos 5 numéros et vos demandes éventuelles
-   (« il faut absolument le passage où il parle de… »). Claude monte les 5 shorts, rédige les 5 posts
-   LinkedIn et vous envoie le tout.
+   (« il faut absolument le passage où il parle de… »). Claude monte les 5 shorts et vous les ouvre en
+   **aperçu instantané** dans le navigateur : vous les regardez, demandez vos retouches, et le rendu final
+   des MP4 n'est lancé qu'une fois tout validé. Claude vous envoie les 5 MP4 et les 5 posts LinkedIn.
 
 Vous pouvez aussi taper `/podcast-clips` pour lancer le workflow directement.
 
@@ -165,6 +166,7 @@ python -m clipper propose    --brand mon-podcast --input episode-12.mp4 --guest 
 python -m clipper pick       --brand mon-podcast --input episode-12.mp4 --ids 1,3,4,7,9
 python -m clipper find       --brand mon-podcast --input episode-12.mp4 "mots d'une phrase à retrouver"
 python -m clipper check      --brand mon-podcast --input episode-12.mp4                                  # coupes mot à mot
+python -m clipper preview    --brand mon-podcast --input episode-12.mp4 [--stop]                         # aperçu sans rendu
 
 # ou étape par étape (chaque étape est mise en cache et reprend là où elle s'est arrêtée)
 python -m clipper transcribe --brand mon-podcast --input episode-12.mp4

@@ -12,8 +12,9 @@ les fichiers récents de `~/Downloads`.
 
 Le skill `.claude/skills/podcast-clips/SKILL.md` décrit le **workflow en 5 étapes** voulu par Arthur (05/10/2026) :
 dépôt de l'épisode (4K) → `propose` (~10 passages) → l'humain en choisit 5 + demandes particulières (`pick`,
-`find`, `check`) → `build` + `posts` + `render` → livraison des 5 MP4 et des 5 posts. Ne jamais monter avant le
-choix humain. Schéma et « quel fichier modifier » : `docs/FRAMEWORK.md` (destiné à l'équipe marketing, qui
+`find`, `check`) → `build` + **`preview`** (aperçu instantané, retouches par `build --only N`) + `posts` → validation
+→ `render` une seule fois → livraison des 5 MP4 et des 5 posts. Ne jamais monter avant le choix humain, ne jamais
+rendre avant la validation sur l'aperçu. Schéma et « quel fichier modifier » : `docs/FRAMEWORK.md` (destiné à l'équipe marketing, qui
 installe via « clone … et installe tout ce qu'il faut » dans Claude Code — voir README).
 
 ## Installation sur une machine neuve (« installe tout ce qu'il faut »)
@@ -38,6 +39,7 @@ python -m clipper transcribe|select|build|posts|render|preview … --brand <slug
 python -m clipper posts --brand <slug> --input … [--episode-url URL] [--guest-role "…"] [--only N] [--force]   # post LinkedIn + description par clip
 python -m clipper build|render … --jobs N          # parallélisme (défaut : build.jobs / render.jobs = auto)
 python -m clipper propose|pick|find|check … --brand <slug> --input …   # workflow 10 propositions -> 5 choisies (skill)
+python -m clipper preview … [--clip all|N] [--stop]   # aperçu instantané (Studio en arrière-plan, ports 3002+), validé AVANT render
 python -m clipper new-brand <slug>   # copie brands/_template
 npx hyperframes lint|check|snapshot --at 3,10 --no-end -o <dir>   # dans output/<brand>/<ep>/clips/<clip>/<format>/
 ```
