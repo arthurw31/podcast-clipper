@@ -26,7 +26,8 @@ flowchart LR
     class C human;
 ```
 
-Détails, schéma complet et « quel fichier modifier pour changer le format » : **[docs/FRAMEWORK.md](docs/FRAMEWORK.md)**.
+- Guide d'utilisation (workflow, « quel fichier modifier pour changer le format ») : **[docs/FRAMEWORK.md](docs/FRAMEWORK.md)**
+- Fonctionnement technique (briques, fichiers produits, montage d'un short) : **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**
 
 ## Installation pour l'équipe (Windows ou Mac, ≈ 15 min)
 

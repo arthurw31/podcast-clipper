@@ -31,6 +31,8 @@ flowchart TD
 
 ## Ce qui se passe à l'intérieur
 
+(Version détaillée pour les curieux et les développeurs : [ARCHITECTURE.md](ARCHITECTURE.md).)
+
 ```mermaid
 flowchart LR
     subgraph Marque["brands/nom-de-la-marque/ (modifiable)"]
