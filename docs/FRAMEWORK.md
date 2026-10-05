@@ -1,8 +1,8 @@
 # Comment fonctionne le framework « Podcast → shorts »
 
 Un épisode entier entre, cinq shorts verticaux montés et leurs posts LinkedIn sortent. Claude fait le travail
-répétitif (transcrire, repérer, couper, monter, rédiger) ; l'équipe garde les deux décisions éditoriales :
-**quels passages** et **ce qu'il faut absolument inclure**.
+répétitif (transcrire, repérer, couper, monter, rédiger) ; l'équipe garde les décisions éditoriales :
+**quels passages**, **ce qu'il faut absolument inclure**, et la **validation des shorts** en aperçu avant le rendu final.
 
 ## Le workflow en 5 étapes
 
