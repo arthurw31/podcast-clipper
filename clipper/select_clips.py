@@ -51,7 +51,8 @@ Règles absolues :
   `at` = timestamp absolu (secondes) du mot qui déclenche l'image ; `query` en ANGLAIS, 2 à 4 mots, très concret.
 - `turns` : tours de parole DANS l'extrait : liste des changements de locuteur, chacun {"at": secondes absolues, "speaker": "host" | "guest"}.
   Le premier élément commence à `start`. L'animateur (host) pose les questions et relance ; l'invité (guest) raconte.
-- `hook_title` : titre de 4 à 8 mots, percutant, sans point final, pour un éventuel bandeau.
+- `hook_title` : titre de 4 à 8 mots, percutant, affiché pendant l'accroche. Si les consignes de la marque en précisent
+  la forme (question avec « ? », affirmation…), suis-les ; sinon sans point final.
 - `post` : texte de publication prêt à poster (2-3 lignes + hashtags), dans la langue du podcast.
 - Réponds UNIQUEMENT avec un objet JSON valide, sans commentaire, de la forme :
 {

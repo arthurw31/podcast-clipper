@@ -88,7 +88,8 @@ brands/mon-podcast/
   brand.yaml       ← charte : couleurs, police, logo, sous-titres, B-roll, recadrage, formats, carte de fin
   guidelines.md    ← consignes éditoriales (ton, ce qui fait un bon extrait, à éviter, hashtags)
   posts.md         ← brief des posts LinkedIn (langue, voix, structure, CTA) + vos posts déjà publiés = référence de ton
-  assets/          ← logo.png (fond transparent), fonts/*.ttf, musique éventuelle
+  assets/          ← logo.png (fond transparent), fonts/*.ttf, musique éventuelle,
+                     guests/<entreprise>.svg|png (logo de l'entreprise invitée, affiché si `guest_logo.enabled`)
   episodes/        ← vos épisodes sources
   references/      ← clips déjà publiés ou exemples du style voulu
 ```
@@ -99,7 +100,8 @@ entièrement commenté). Le plus rapide : choisir un **preset de montage** et aj
 | Preset | Style | Exemple |
 | --- | --- | --- |
 | `dynamic` | capitales, mots-clés colorés, révélation « machine à écrire », coupes rythmées, zoom lent, B-roll en fenêtre | `brands/dans-la-tete-dun-ceo/` |
-| `editorial` | sous-titres sobres en minuscules centrés en bas, montage multi-segments (accroche + développement + conclusion), pas de B-roll | `brands/ai-corner/` |
+| `aip-short` | shorts du monteur AI Partners : logo invité + logo marque en haut, titre-question dans une bulle blanche, sous-titres mot à mot sous la bulle, écran partagé, light leak aux raccords | `brands/ai-corner/` |
+| `editorial` | sous-titres sobres en minuscules centrés en bas, montage multi-segments (accroche + développement + conclusion), pas de B-roll | |
 | `clean` | sobre, mot à mot, B-roll plein écran | |
 | `minimal` | recadrage + sous-titres uniquement | |
 

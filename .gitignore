@@ -4,7 +4,8 @@ output/
 cache/
 brands/*/episodes/*
 !brands/*/episodes/README.md
-brands/*/references/*.mp4
+brands/*/references/**/*.mp4
+brands/*/references/**/*.mov
 __pycache__/
 *.pyc
 .claude/settings.local.json

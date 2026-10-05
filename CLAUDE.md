@@ -6,6 +6,10 @@ ce fichier résume ce qu'il faut savoir pour **modifier** le projet sans casser 
 
 ## Point d'entrée utilisateur
 
+Arthur dépose ses fichiers (épisodes, clips de référence, logos, posts) dans `depot/` (non versionné) : les ranger
+dans `brands/<marque>/episodes|references|assets|assets/guests/` (voir `depot/README.md`). S'il est vide, regarder
+les fichiers récents de `~/Downloads`.
+
 Le skill `.claude/skills/podcast-clips/SKILL.md` décrit l'interview à mener (marque, invité, côté animateur,
 nombre de clips, formats, style) puis le pipeline. Pour toute demande « fais-moi des clips », suis ce skill.
 
@@ -65,10 +69,16 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
 3. Le B-roll ne couvre jamais un visage : `compose._pip_box` cherche un espace libre sur toute la durée de
    l'insert ; sinon l'insert passe en plein écran. En écran partagé, les sous-titres se centrent sur la séparation.
 4. Chartes : DLTDC = Montserrat ExtraBold Italic, jaune #FFE14D, typewriter (preset `dynamic`).
-   AI Corner = style du **monteur AI Partners** (clips de référence dans `brands/ai-corner/references/`) :
-   preset `editorial` — sous-titres Metropolis Bold en minuscules, centrés, en bas, sans mot-clé coloré ni
-   typewriter, tirets de dialogue ; coupes franches ; pas de B-roll ; carte de fin = cover de la charte
-   (fond noir + motif « mountain lines » + logo blanc à gauche + CTA). Bleu #258AF3, **jamais d'italique**.
+   AI Corner = **shorts du monteur AI Partners** (5 shorts de référence dans `brands/ai-corner/references/dust/`,
+   demande d'Arthur du 05/10/2026 : « refaire exactement le même montage ») : preset `aip-short` — logo de
+   l'entreprise invitée en haut à gauche (`assets/guests/<entreprise>.svg|png`, `guest_logo`) + logo AI PARTNERS
+   blanc en haut à droite ; titre-question (`hook_title`) dans une bulle blanche translucide (`hook.style: pill`,
+   Fira Sans Condensed Bold, noir) pendant l'accroche (`hook.duration: auto`, 7,5–11,5 s) ; sous-titres blancs
+   type Arial Bold sous la bulle, centrés, 1–3 lignes construites mot à mot (`reveal: word`, `reveal_reflow`,
+   `word_fade`), même position en écran partagé (`split_center: false`) ; split sans séparateur ; light leak
+   aux raccords (`join_transition: leak`) ; 25–45 s ; pas de B-roll ; + carte de fin = cover de la charte
+   (fond noir + motif « mountain lines » + logo blanc + CTA). Bleu #258AF3, **jamais d'italique**.
+   L'ancien style LinkedIn 16:9 (`references/*.mp4`) reste disponible : preset `editorial`.
 5. **Clips multi-segments** (`selection.max_segments` > 1) : un clip = accroche + développement + conclusion
    pris à des endroits différents de l'épisode ; `clip["segments"]` (liste ordonnée), `compose` découpe chaque
    segment, les concatène (`media.concat_segments`) et remappe mots/tours de parole/B-roll en temps relatif
@@ -96,6 +106,11 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
   sélection : les clips multi-segments ont besoin de l'épisode entier.
 
 ## Pièges connus (déjà résolus — ne pas réintroduire)
+
+- Windows (Smart App Control / contrôle des applications) peut bloquer le `chrome-headless-shell` téléchargé par
+  HyperFrames (`spawn UNKNOWN`, doctor « Chrome failed ») : ne pas toucher au réglage de sécurité ;
+  `render._npx` bascule automatiquement sur Chrome/Edge installés (`fallback_browser`) et `.env` peut fixer
+  `HYPERFRAMES_BROWSER_PATH`. Pour un `npx hyperframes snapshot` lancé à la main, exporter cette variable.
 
 - OpenCV ne lit pas les chemins accentués sous Windows → YuNet est chargé depuis un buffer (`analysis._detector`).
 - HyperFrames refuse deux `index*.html` racine dans un même dossier → **un dossier projet par format**

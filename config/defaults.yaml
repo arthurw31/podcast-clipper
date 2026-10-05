@@ -90,6 +90,10 @@ captions:
   entrance: slide-left      # slide-left | pop | fade | none
   entrance_duration: 0.22
   keyword_pop: true         # léger scale sur les mots surlignés à leur apparition
+  word_fade: 0              # reveal: word -> fondu de chaque mot (s) ; 0 = apparition sèche
+  reveal_reflow: false      # reveal: word -> un mot ne prend sa place qu'à son apparition (ligne visible toujours centrée)
+  font_family: ""           # pile CSS propre aux sous-titres (ex. '"Arial", "Helvetica Neue", sans-serif') ; vide = police de la marque
+  split_center: true        # en écran partagé, centrer le bloc sur la séparation (false = position fixe)
 
 # ------------------------------------------------------------------ logo ---
 logo:
@@ -104,10 +108,22 @@ logo:
   text_color: "#FFE14D"
   text_stroke: "#7B2D8E"
 
+# ------------------------------------------------------------ guest_logo ---
+# Logo de l'entreprise invitée (style shorts AI Partners : en haut à gauche, face au logo de la marque).
+# Fichier : brands/<slug>/assets/guests/<entreprise-en-slug>.svg|png (ex. guests/mendo.svg pour « Mendo »),
+# ou clip["guest_logo"] dans clips.json.
+guest_logo:
+  enabled: false
+  position: top-left
+  height: 0.036             # fraction de la hauteur du canvas
+  max_width: 0.36           # fraction de la largeur
+  margin: 0.088             # fraction de la largeur
+  opacity: 1.0
+
 # --------------------------------------------------------------- montage ---
 montage:
   preset: dynamic
-  join_transition: cut      # cut | flash  (jonction entre deux segments d'un clip multi-segments)
+  join_transition: cut      # cut | flash | leak  (jonction entre deux segments ; leak = lumière orangée, style shorts AI Partners)
   flash_color: "#FFFFFF"
 
 # ----------------------------------------------------------------- outro ---
@@ -146,12 +162,22 @@ outro:
 
 # ----------------------------------------------------------------- hook ---
 hook:
-  enabled: false            # titre accrocheur en haut pendant les premières secondes
-  duration: 3.5
+  enabled: false            # titre accrocheur pendant les premières secondes (texte : hook_title de clips.json)
+  style: banner             # banner (bandeau plein, capitales) | pill (bulle arrondie, casse normale — shorts AI Partners)
+  duration: 3.5             # secondes, ou auto = le temps de l'accroche (fin du 1er segment, bornée min/max)
+  min_duration: 7.0         # duration: auto
+  max_duration: 11.0
   font_size: 56
+  weight: 700
+  line_height: 1.12
+  letter_spacing: "0"
+  uppercase: true
+  max_width: 0.86           # fraction de la largeur
+  radius: 999               # px (pill)
+  shadow: ""
   color: "#FFFFFF"
   background: "rgba(0,0,0,.55)"
-  position_y: 0.16
+  position_y: 0.16          # haut du titre (fraction de la hauteur)
 
 # ---------------------------------------------------------------- b-roll ---
 broll:

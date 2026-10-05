@@ -20,7 +20,10 @@ arrête-toi là. Ne lance jamais une transcription sur une machine qui n'a pas p
 
 ## 1. Comprendre la demande, puis poser UNIQUEMENT les questions manquantes
 
-Lis d'abord le message de l'utilisateur et le dossier : un fichier vidéo déposé à la racine ou dans
+Lis d'abord le message de l'utilisateur et le dossier : les fichiers fournis arrivent dans `depot/` (sinon
+regarde les fichiers récents de Téléchargements) — range-les d'abord (épisode → `brands/<slug>/episodes/`,
+clips de référence → `references/`, logo de l'entreprise invitée → `assets/guests/<entreprise>.svg|png`,
+logos/polices de la marque → `assets/`) et dis où tu as mis chaque fichier. Un fichier vidéo dans
 `brands/<slug>/episodes/` est l'épisode ; `python -m clipper brands` liste les marques existantes.
 Déduis tout ce qui peut l'être (nom du podcast dans le nom du fichier, invité dans une description YouTube
 collée, etc.). Ensuite, en UNE seule salve (AskUserQuestion, 4 questions max), demande ce qui reste :
@@ -28,7 +31,8 @@ collée, etc.). Ensuite, en UNE seule salve (AskUserQuestion, 4 questions max), 
 1. **Marque / podcast** — une marque existante (`brands/`) ou nouvelle ? Si nouvelle : nom du podcast, et
    a-t-il des clips déjà publiés ou des exemples de style à déposer dans `references/` ? un logo (PNG fond
    transparent) ? une charte (couleurs, police) ?
-2. **L'épisode** — invité (nom + **rôle** + entreprise) et **côté de l'animateur dans le plan large** (gauche /
+2. **L'épisode** — invité (nom + **rôle** + entreprise ; **logo de l'entreprise** si la marque l'affiche,
+   comme AI Corner) et **côté de l'animateur dans le plan large** (gauche /
    droite) ; l'épisode commence-t-il par un teaser déjà sous-titré à exclure ? **L'URL de l'épisode complet**
    (YouTube / Spotify) si elle existe déjà : elle est mise en clair dans le CTA des posts, sinon « lien en
    commentaire ».

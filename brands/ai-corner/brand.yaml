@@ -1,10 +1,11 @@
 # ============================================================================
 # AI Corner — le podcast d'AI Partners
 # Charte : skill aip-brand-guidelines (Metropolis, bleu #258AF3, navy #151D53, jamais d'italique).
-# Style de montage : calé sur les 2 clips du monteur AI Partners (references/) —
-#   sous-titres sobres en minuscules centrés en bas, coupes franches, pas de B-roll,
-#   clips montés à partir de plusieurs passages (accroche + développement),
-#   carte de fin sur le motif « mountain lines » de la charte.
+# Style de montage (depuis le 05/10/2026) : les shorts verticaux du monteur AI Partners
+#   (references/dust/, preset `aip-short`) — logo invité en haut à gauche + AI PARTNERS à droite,
+#   titre-question dans une bulle blanche, sous-titres blancs mot à mot sous la bulle, écran partagé,
+#   light leak aux raccords ; + carte de fin AI Partners (motif « mountain lines », logo, CTA).
+#   Ancien style LinkedIn 16:9 (references/*.mp4) : preset `editorial`.
 # ============================================================================
 
 name: "AI Corner (AI Partners)"
@@ -12,17 +13,16 @@ podcast_name: "AI Corner"
 language: fr
 
 montage:
-  preset: editorial          # sous-titres classiques, pas de typewriter ni de mot-clé coloré
-  join_transition: cut       # coupe franche entre les segments d'un clip (flash possible)
+  preset: aip-short          # style des shorts du monteur AI Partners (config/presets/aip-short.yaml)
 
 formats: ["9x16", "16x9"]
 
 selection:
   n_clips: 6
-  min_duration: 40
-  max_duration: 60
-  target_duration: 52
-  max_segments: 4            # style monteur : accroche + 2-3 passages d'ailleurs dans l'épisode
+  min_duration: 25           # shorts du monteur : 16–38 s
+  max_duration: 45
+  target_duration: 34
+  max_segments: 3            # accroche (souvent la question) + 1-2 passages qui y répondent
   # une passe LLM par angle, en parallèle, puis jury (voir defaults.yaml « angles »)
   angles:
     - "CAS D'USAGE CONCRET : un déploiement d'IA précis dans l'entreprise, avec son résultat, un chiffre ou un ordre de grandeur, ce qui a marché ou pas."
@@ -40,36 +40,7 @@ fonts:
   caption: "fonts/Metropolis-BoldItalic.ttf"      # jamais utilisé (italic: false) mais requis
   caption_upright: "fonts/Metropolis-Bold.ttf"
   display: "fonts/Metropolis-ExtraBold.ttf"
-
-captions:
-  # Référence monteur : blanc, casse normale, gras, centré, 2 lignes courtes, ombre douce, en bas.
-  uppercase: false
-  italic: false
-  weight: 700
-  font_size: 54
-  color: "#FFFFFF"
-  highlight_keywords: false
-  dialogue_dashes: true
-  align: center
-  stagger_lines: false
-  reveal: instant
-  entrance: none
-  max_chars_per_line: 22
-  max_lines: 2
-  max_words_per_group: 9
-  pause_break: 0.7
-  position_y: 0.74
-  line_height: 1.2
-  side_margin: 0.06
-  text_shadow: "0 2px 4px rgba(0,0,0,.75), 0 0 16px rgba(0,0,0,.45)"
-
-logo:
-  mode: image
-  file: "logo.png"           # logo horizontal blanc — en 9:16 seulement (le master 16:9 l'a déjà)
-  position: top-right
-  width: 0.30
-  margin: 0.045
-  opacity: 0.95
+  hook: "fonts/FiraSansCondensed-Bold.ttf"        # bulle-titre des shorts (police condensée du monteur)
 
 outro:
   enabled: true
@@ -102,11 +73,10 @@ framing:
   wide_shot_mode: speaker
   speaker_fallback: split
   host_side: right           # Thomas (animateur) à droite, invité à gauche sur ce plateau
-  slow_zoom: false           # le monteur ne zoome pas
+  slow_zoom: false           # le monteur ne zoome pas (punch-in par coupes)
   synthetic_cuts: true       # nécessaire en vertical pour suivre le locuteur sur les plans larges
-  max_shot_len: 9
-  split_divider: 4
-  split_divider_color: "#258AF3"
+  max_shot_len: 6
+  split_divider: 0           # pas de trait entre les deux images (shorts du monteur)
 
 format_overrides:
   "16x9":
@@ -114,8 +84,16 @@ format_overrides:
       enabled: false         # le master 16:9 a déjà le logo AI PARTNERS incrusté en haut à droite
     captions:
       font_size: 46
-      max_chars_per_line: 30
-      position_y: 0.82
+      max_chars_per_line: 34
+      max_lines: 2
+      position_y: 0.80
+    hook:
+      font_size: 50
+      max_width: 0.6
+      position_y: 0.62
+    guest_logo:
+      height: 0.06
+      margin: 0.035
     outro:
       logo_width: 0.34
       image_position: center

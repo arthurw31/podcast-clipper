@@ -30,11 +30,28 @@ def _is_highlight(word: str, keywords: set[str]) -> bool:
     return any(len(k) >= 5 and (n.startswith(k) or k.startswith(n)) and abs(len(n) - len(k)) <= 2 for k in keywords)
 
 
+def _fill_lines(words: list[dict], max_chars: int, max_lines: int) -> list[list[dict]]:
+    """Remplissage ligne par ligne (≥ 3 lignes, sous-titres qui se construisent mot à mot) : on passe à la
+    ligne quand la suivante déborderait, ou après une ponctuation si la ligne est déjà aux 2/3 pleine."""
+    lines: list[list[dict]] = [[]]
+    for w in words:
+        cur = lines[-1]
+        cur_len = sum(len(x["w"]) for x in cur) + max(0, len(cur) - 1)
+        punct = bool(cur) and cur[-1]["w"][-1:] in ",;:.?!" and cur_len >= max_chars * 0.66
+        if cur and (cur_len + 1 + len(w["w"]) > max_chars or punct) and len(lines) < max_lines:
+            lines.append([w])
+        else:
+            cur.append(w)
+    return [ln for ln in lines if ln]
+
+
 def _split_lines(words: list[dict], max_chars: int, max_lines: int) -> list[list[dict]]:
     """Coupe une liste de mots en ≤ max_lines lignes équilibrées."""
     text_len = sum(len(w["w"]) for w in words) + len(words) - 1
     if text_len <= max_chars or max_lines == 1 or len(words) == 1:
         return [words]
+    if max_lines >= 3:
+        return _fill_lines(words, max_chars, max_lines)
     # cherche le point de coupe qui équilibre le mieux les 2 lignes
     best, best_score = 1, 1e9
     for i in range(1, len(words)):
@@ -92,6 +109,8 @@ def group_words(words: list[dict], clip_start: float, clip_end: float, cfg: Cfg,
         gap = (w["s"] - cur[-1]["e"]) if cur else 0.0
         ends_sentence = bool(cur) and cur[-1]["w"][-1:] in ".?!…"
         too_long = cur_len + len(w["w"]) + 1 > budget or len(cur) >= max_words
+        if not too_long and cur and max_lines >= 3:
+            too_long = len(_fill_lines(cur + [w], max_chars, max_lines + 1)) > max_lines
         speaker_change = bool(cur) and w["spk"] != cur[-1]["spk"]
         if cur and (too_long or gap > pause_break or ends_sentence or speaker_change):
             groups.append(cur)

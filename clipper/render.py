@@ -18,8 +18,42 @@ def _npx(args: list[str], cwd: Path, timeout: int = 1800) -> subprocess.Complete
     env = dict(os.environ)
     # le CLI est installé à la racine du framework (node_modules) : npx le trouve en remontant
     env["PATH"] = str(ROOT / "node_modules" / ".bin") + os.pathsep + env.get("PATH", "")
+    if not env.get("HYPERFRAMES_BROWSER_PATH"):
+        alt = fallback_browser()
+        if alt:
+            env["HYPERFRAMES_BROWSER_PATH"] = alt
     return subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True, encoding="utf-8",
                           errors="replace", shell=(os.name == "nt"), env=env, timeout=timeout)
+
+
+def _bundled_chrome_blocked() -> bool:
+    """Le chrome-headless-shell téléchargé par HyperFrames refuse-t-il de s'exécuter ? (Windows : Smart App
+    Control / stratégie de contrôle des applications sur un binaire non signé)."""
+    if os.name != "nt":
+        return False
+    base = Path.home() / ".cache" / "hyperframes" / "chrome" / "chrome-headless-shell"
+    exes = sorted(base.glob("*/chrome-headless-shell-win64/chrome-headless-shell.exe")) if base.exists() else []
+    if not exes:
+        return False
+    try:
+        subprocess.run([str(exes[-1]), "--version"], capture_output=True, timeout=30)
+        return False
+    except OSError:
+        return True
+    except subprocess.TimeoutExpired:
+        return False
+
+
+def fallback_browser() -> str | None:
+    """Chrome/Edge installés, à utiliser si le navigateur embarqué est bloqué."""
+    if not _bundled_chrome_blocked():
+        return None
+    for c in (r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+              r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+              r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"):
+        if Path(c).exists():
+            return c
+    return None
 
 
 def lint(proj: Path) -> tuple[bool, list[dict]]:

@@ -312,6 +312,14 @@ def cmd_doctor(_: argparse.Namespace) -> None:
     v = which_version(["ffmpeg", "-version"]); check("FFmpeg", bool(v), (v or "")[:60], "installer FFmpeg et l'ajouter au PATH (winget install Gyan.FFmpeg)")
     v = which_version(["node", "--version"]); check("Node.js ≥ 22", bool(v) and int((v or "v0").lstrip("v").split(".")[0]) >= 22, v or "", "installer Node 22+ (nodejs.org)")
     check("HyperFrames CLI", (ROOT / "node_modules" / "hyperframes").exists(), "", "npm install (dans le dossier du projet)")
+    from .render import _bundled_chrome_blocked, fallback_browser
+    if env("HYPERFRAMES_BROWSER_PATH"):
+        bp = env("HYPERFRAMES_BROWSER_PATH")
+        check("navigateur de rendu", Path(bp).exists(), bp, "HYPERFRAMES_BROWSER_PATH (.env) pointe vers un fichier absent")
+    elif _bundled_chrome_blocked():
+        alt = fallback_browser()
+        check("navigateur de rendu", bool(alt), f"Chrome embarqué bloqué par Windows -> {alt or '?'}",
+              "installer Google Chrome, ou renseigner HYPERFRAMES_BROWSER_PATH dans .env")
     for mod, pipname in [("faster_whisper", "faster-whisper"), ("cv2", "opencv-python"), ("jinja2", "jinja2"), ("yaml", "pyyaml"), ("rich", "rich"), ("requests", "requests"), ("dotenv", "python-dotenv")]:
         check(f"python: {pipname}", importlib.util.find_spec(mod) is not None, "", "pip install -r requirements.txt")
     check("modèle visages (YuNet)", (ROOT / "models" / "face_detection_yunet_2023mar.onnx").exists(), "", "fichier models/face_detection_yunet_2023mar.onnx manquant (voir README)")

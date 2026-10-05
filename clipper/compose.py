@@ -135,6 +135,21 @@ def _pip_box(plan: list[dict], t0: float, t1: float, sw: int, sh: int, fmt: str,
     return None
 
 
+def _hook_duration(hk: Cfg, segments: list[dict], caps: list[dict], D_speech: float) -> float:
+    """Durée du titre. `auto` (style shorts AI Partners) : le temps de l'accroche — fin du 1er segment,
+    bornée à [min_duration, max_duration], puis calée sur la fin d'un bloc de sous-titres (jamais en plein mot)."""
+    d = hk.get("duration", 3.5)
+    if str(d) != "auto":
+        return round(min(float(d), D_speech), 3)
+    lo, hi = float(hk.get("min_duration", 7.0)), float(hk.get("max_duration", 11.0))
+    target = float(segments[0]["duration"]) if len(segments) > 1 else hi
+    target = max(lo, min(hi, target))
+    ends = [g["end"] for g in caps if lo - 0.5 <= g["end"] <= hi + 1.5]
+    if ends:
+        target = min(ends, key=lambda e: abs(e - target))
+    return round(min(target, D_speech), 3)
+
+
 def _split_share(plan: list[dict], t0: float, t1: float) -> float:
     """Fraction de [t0, t1] passée en écran partagé."""
     if t1 <= t0:
@@ -300,6 +315,33 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
         raise FileNotFoundError("Police introuvable : vérifiez fonts.caption / fonts.caption_upright dans brand.yaml")
     shutil.copy2(italic, fonts_dir / italic.name)
     shutil.copy2(upright, fonts_dir / upright.name)
+    hook_font = brand.font_path("hook")   # police propre au titre (fonts.hook), sinon celle de la marque
+    if hook_font:
+        shutil.copy2(hook_font, fonts_dir / hook_font.name)
+    # logo de l'invité / de son entreprise (style shorts AI Partners : en haut à gauche)
+    guest_logo_file = None
+    gl_cfg = cfg.get("guest_logo") or {}
+    if gl_cfg.get("enabled"):
+        src_gl = None
+        if clip.get("guest_logo"):
+            src_gl = brand.asset(clip["guest_logo"]) or (Path(clip["guest_logo"]) if Path(clip["guest_logo"]).exists() else None)
+        if not src_gl:
+            for key in (clip.get("company", ""), clip.get("guest", "")):
+                for ext in (".svg", ".png", ".webp", ".jpg"):
+                    cand = brand.asset(f"guests/{slugify(key)}{ext}") if key else None
+                    if cand:
+                        src_gl = cand
+                        break
+                if src_gl:
+                    break
+        if src_gl:
+            guest_logo_file = "guest_logo" + src_gl.suffix.lower()
+            if src_gl.suffix.lower() == ".svg":
+                shutil.copy2(src_gl, assets / guest_logo_file)
+            else:
+                _copy_logo(src_gl, assets / guest_logo_file)
+        else:
+            console.print(f"  [yellow]logo invité introuvable (brands/{brand.slug}/assets/guests/{slugify(clip.get('company', '') or 'entreprise')}.svg|png)[/yellow]")
     logo_file = None
     if cfg.logo.enabled and cfg.logo.mode in ("auto", "image") and brand.logo_path:
         logo_file = "logo" + brand.logo_path.suffix.lower()
@@ -322,6 +364,13 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
         for e in plan:
             e["t1"] = min(e["t1"], D_speech)
             e["cams"] = [_cam_geometry(c, fmt, sw, sh) for c in e["cams"]]
+        # un changement de plan détecté juste après une jonction de segments (coupe de l'export source) :
+        # on le cale sur la jonction, sinon 1-2 images du segment suivant passent avec l'ancien cadrage
+        for j in junctions:
+            for k in range(len(plan) - 1):
+                if abs(plan[k]["t1"] - j) <= 0.2:
+                    plan[k]["t1"] = j
+                    plan[k + 1]["t0"] = j
         plan = [e for e in plan if e["t1"] - e["t0"] > 0.05]
         if plan:
             plan[-1]["t1"] = D_speech
@@ -342,6 +391,13 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
         logo_ctx.update({"mode": logo_mode, "file": logo_file, "width_px": logo_w,
                          "css_pos": _pos_css(lg.position, int(W * float(lg.margin))),
                          "text_px": int(logo_w / max(len(max(lg.text_lines, key=len)), 4) / 0.74)})
+        glc = Cfg(fcfg.get("guest_logo") or {})
+        guest_logo_ctx = dict(glc)
+        guest_logo_ctx.update({"file": guest_logo_file,
+                               "height_px": int(H * float(glc.get("height", 0.036))),
+                               "max_w_px": int(W * float(glc.get("max_width", 0.36))),
+                               "css_pos": _pos_css(glc.get("position", "top-left"), int(W * float(glc.get("margin", lg.margin)))),
+                               "opacity": float(glc.get("opacity", 1.0))})
         o = fcfg.outro
         outro_logo_w = int(W * float(o.logo_width))
         outro_ctx = dict(o)
@@ -375,7 +431,9 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
                           "guest_px": int(o.guest_font_size), "company_px": int(o.company_font_size)})
         hk = fcfg.hook
         hook_ctx = dict(hk)
-        hook_ctx.update({"text": clip.get("hook_title", ""), "top_px": int(H * float(hk.position_y)), "font_px": int(hk.font_size)})
+        hook_ctx.update({"text": clip.get("hook_title", ""), "top_px": int(H * float(hk.position_y)), "font_px": int(hk.font_size),
+                         "style": hk.get("style", "banner"), "font_file": hook_font.name if hook_font else "",
+                         "max_w_px": int(W * float(hk.get("max_width", 0.86))), "duration": _hook_duration(hk, segments, caps, D_speech)})
         br = fcfg.broll
         broll_ctx = dict(br)
         brolls_fmt = []
@@ -387,7 +445,7 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
             brolls_fmt.append(bb)
         # sous-titres : en écran partagé, le bloc est centré sur la ligne de séparation
         for g in caps:
-            if _split_share(plan, g["start"], g["end"]) >= 0.4:
+            if c.get("split_center", True) and _split_share(plan, g["start"], g["end"]) >= 0.4:
                 block_h = len(g["lines"]) * cap_ctx["font_px"] * float(c.line_height)
                 g["top_px"] = int(H / 2 - block_h / 2)
             else:
@@ -399,6 +457,7 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
             font={"family": cfg.fonts.family, "italic_file": italic.name, "upright_file": upright.name},
             colors=dict(cfg.colors), plan=plan, captions=caps, cap=Cfg(cap_ctx), logo=Cfg(logo_ctx),
             outro=Cfg(outro_ctx), hook=Cfg(hook_ctx), broll=Cfg(broll_ctx), brolls=brolls_fmt, music=music,
+            guest_logo=Cfg(guest_logo_ctx),
             guest=clip.get("guest", ""), company=clip.get("company", ""),
             junctions=junctions, join_transition=fcfg.montage.get("join_transition", "cut"), flash_color=fcfg.montage.get("flash_color", "#FFFFFF"),
             split_divider=int(fcfg.framing.get("split_divider", 0)), split_divider_color=fcfg.framing.get("split_divider_color", "#FFFFFF"),

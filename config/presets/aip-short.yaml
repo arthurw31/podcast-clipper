@@ -1,0 +1,72 @@
+# Preset "aip-short" : style des shorts verticaux du monteur AI Partners (références :
+# brands/ai-corner/references/dust/, 5 shorts de l'épisode Dust, octobre 2026).
+#  - en haut : logo de l'entreprise invitée à gauche, logo AI PARTNERS blanc à droite, toute la durée
+#  - titre-question dans une bulle blanche translucide arrondie, texte noir condensé gras, à mi-hauteur,
+#    pendant l'accroche (8–11 s)
+#  - sous-titres blancs gras (Arial Bold), centrés juste sous la bulle, 1 à 3 lignes construites mot à mot
+#    avec un léger fondu ; même position en écran partagé ; pas de tirets de dialogue ni de mot-clé coloré
+#  - gros plans recadrés sur le visage + punch-in, plans larges en écran partagé haut/bas sans séparateur,
+#    light leak orangé aux raccords entre passages ; pas de B-roll
+captions:
+  uppercase: false
+  italic: false
+  weight: 700
+  font_family: '"Arial", "Helvetica Neue", Helvetica, "Liberation Sans", sans-serif'
+  font_size: 64
+  line_height: 1.0
+  letter_spacing: "0"
+  color: "#FFFFFF"
+  text_shadow: "0 2px 5px rgba(0,0,0,.55), 0 0 2px rgba(0,0,0,.35)"
+  align: center
+  stagger_lines: false
+  highlight_keywords: false
+  keyword_pop: false
+  dialogue_dashes: false
+  reveal: word
+  word_fade: 0.12
+  reveal_reflow: true
+  entrance: none
+  max_chars_per_line: 22
+  max_lines: 3
+  max_words_per_group: 11
+  min_group_duration: 0.8
+  pause_break: 0.6
+  position_y: 0.661
+  side_margin: 0.08
+  split_center: false
+hook:
+  enabled: true
+  style: pill
+  duration: auto
+  min_duration: 7.5
+  max_duration: 11.5
+  font_size: 76
+  weight: 700
+  line_height: 1.12
+  uppercase: false
+  color: "#111111"
+  background: "rgba(255,255,255,.84)"
+  max_width: 0.84
+  radius: 999
+  position_y: 0.545
+guest_logo:
+  enabled: true
+  position: top-left
+  height: 0.036
+  max_width: 0.27          # ne jamais toucher le logo AI PARTNERS (logos très larges type Mendo)
+  margin: 0.088
+logo:
+  mode: image
+  position: top-right
+  width: 0.46
+  margin: 0.088
+  opacity: 1.0
+montage:
+  join_transition: leak
+framing:
+  slow_zoom: false
+  synthetic_cuts: true
+  max_shot_len: 6
+  split_divider: 0
+broll:
+  enabled: false

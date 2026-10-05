@@ -18,6 +18,14 @@
         font-style: normal;
         font-weight: 100 900;
       }
+{% if hook.font_file %}
+      @font-face {
+        font-family: "HookFont";
+        src: url("assets/fonts/{{ hook.font_file }}") format("{{ 'opentype' if hook.font_file.lower().endswith('.otf') else 'truetype' }}");
+        font-style: normal;
+        font-weight: 100 900;
+      }
+{% endif %}
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body { width: {{ W }}px; height: {{ H }}px; overflow: hidden; background: {{ colors.background }}; }
       #root { position: relative; width: 100%; height: 100%; overflow: hidden; background: {{ colors.background }}; font-family: "{{ font.family }}", system-ui, sans-serif; }
@@ -38,7 +46,7 @@
         position: absolute;
         left: {{ cap.margin_px }}px; right: {{ cap.margin_px }}px;
         top: {{ cap.top_px }}px;
-        font-family: "{{ font.family }}", system-ui, sans-serif;
+        font-family: {{ cap.font_family if cap.font_family else '"' ~ font.family ~ '", system-ui, sans-serif' }};
         font-weight: {{ cap.weight }};
         font-style: {{ "italic" if cap.italic else "normal" }};
         font-size: {{ cap.font_px }}px;
@@ -55,6 +63,8 @@
       .cap-word { display: inline-block; white-space: pre; }
       .cap-word.hl { color: {{ cap.highlight_color }}; }
       {% if cap.reveal == "typewriter" %}.ch { opacity: 0; }{% elif cap.reveal == "word" %}.cap-word { opacity: 0; }{% endif %}
+      /* reveal_reflow : le mot n'occupe sa place qu'à son apparition -> la ligne visible reste centrée */
+      .cap-word.rf { display: none; }
 
       /* ---- logo ---- */
       .logo-img { position: absolute; width: {{ logo.width_px }}px; height: auto; opacity: {{ logo.opacity }}; {{ logo.css_pos }} }
@@ -78,6 +88,25 @@
         font-family: "{{ font.family }}", system-ui, sans-serif; font-weight: 900; font-size: {{ hook.font_px }}px; line-height: 1.1;
         color: {{ hook.color }}; text-align: center; text-transform: uppercase;
       }
+
+      .hook-pill-wrap { position: absolute; left: 0; right: 0; top: {{ hook.top_px }}px; display: flex; justify-content: center; }
+      .hook-pill {
+        max-width: {{ hook.max_w_px }}px;
+        padding: {{ (hook.font_px * 0.16) | round(0) | int }}px {{ (hook.font_px * 0.62) | round(0) | int }}px {{ (hook.font_px * 0.2) | round(0) | int }}px;
+        background: {{ hook.background }}; border-radius: {{ hook.get("radius", 999) }}px;
+        font-family: {{ '"HookFont", ' if hook.font_file else '' }}"{{ font.family }}", system-ui, sans-serif;
+        font-weight: {{ hook.get("weight", 700) }}; font-size: {{ hook.font_px }}px; line-height: {{ hook.get("line_height", 1.12) }};
+        letter-spacing: {{ hook.get("letter_spacing", "0") }};
+        color: {{ hook.color }}; text-align: center; text-wrap: balance; {% if hook.get("uppercase", False) %}text-transform: uppercase;{% endif %}
+        {% if hook.get("shadow") %}box-shadow: {{ hook.shadow }};{% endif %}
+      }
+
+      /* ---- logo de l'invité ---- */
+      .guest-logo-img { position: absolute; height: {{ guest_logo.height_px }}px; width: auto; max-width: {{ guest_logo.max_w_px }}px; object-fit: contain; opacity: {{ guest_logo.opacity }}; {{ guest_logo.css_pos }} }
+
+      /* ---- light leak (jonctions) ---- */
+      .leak { position: absolute; left: -15%; top: -10%; width: 130%; height: 120%; opacity: 0; mix-blend-mode: screen;
+              background: radial-gradient(ellipse 55% 45% at 30% 38%, rgba(255,190,90,.95) 0%, rgba(255,120,40,.75) 35%, rgba(230,70,20,.35) 60%, rgba(0,0,0,0) 80%); }
 
       /* ---- b-roll ---- */
       .pip { position: absolute; overflow: hidden; opacity: 0; background: #000;
@@ -139,6 +168,10 @@
       <div class="clip layer" id="flash-{{ loop.index }}" data-start="{{ (j - 0.1) | round(3) }}" data-duration="0.2" data-track-index="8"><div class="flash" id="flashin-{{ loop.index }}"></div></div>
 {% endfor %}{% endif %}
 
+{% if join_transition == "leak" %}{% for j in junctions %}
+      <div class="clip layer" id="leak-{{ loop.index }}" data-start="{{ (j - 0.25) | round(3) }}" data-duration="0.65" data-track-index="8"><div class="leak" id="leakin-{{ loop.index }}"></div></div>
+{% endfor %}{% endif %}
+
       <!-- ===================== audio ===================== -->
       <audio id="a-main" src="assets/source.mp4" data-start="0" data-duration="{{ A_dur }}" data-track-index="10" data-volume="1"></audio>
 {% if music %}
@@ -169,10 +202,20 @@
       </div>
 {% endif %}
 
+{% if guest_logo.file %}
+      <div class="clip layer" id="guest-logo-layer" data-start="0" data-duration="{{ D_speech }}" data-track-index="4">
+        <img class="guest-logo-img" id="guest-logo-img" src="assets/{{ guest_logo.file }}" alt="" />
+      </div>
+{% endif %}
+
       <!-- ===================== accroche ===================== -->
 {% if hook.enabled and hook.text %}
       <div class="clip layer" id="hook-layer" data-start="0" data-duration="{{ hook.duration }}" data-track-index="6">
+{% if hook.style == "pill" %}
+        <div class="hook-pill-wrap"><div class="hook-pill" id="hook-box">{{ hook.text }}</div></div>
+{% else %}
         <div class="hook-box" id="hook-box">{{ hook.text }}</div>
+{% endif %}
       </div>
 {% endif %}
 
@@ -181,7 +224,11 @@
       <div class="clip layer cap" id="cap-{{ g.id }}" data-start="{{ g.start }}" data-duration="{{ (g.end - g.start) | round(3) }}" data-track-index="3">
         <div class="cap-block" id="capb-{{ g.id }}" style="top:{{ g.top_px }}px;">
 {% for line in g.lines %}
+{% if cap.get("reveal_reflow", False) %}
+          <div class="cap-line{% if loop.index0 == 1 %} cap-line-2{% endif %}">{% for w in line %}<span class="cap-word rf{% if w.hl %} hl{% endif %}" data-t="{{ w.s }}">{% if not loop.first %} {% endif %}{{ w.text }}</span>{% endfor %}</div>
+{% else %}
           <div class="cap-line{% if loop.index0 == 1 %} cap-line-2{% endif %}">{% for w in line %}<span class="cap-word{% if w.hl %} hl{% endif %}" id="w-{{ g.id }}-{{ loop.index }}" data-t="{{ w.s }}">{% for ch in w.chars %}<span class="ch" data-t="{{ ch.t }}">{{ ch.c }}</span>{% endfor %}</span>{% if not loop.last %}<span class="cap-word"> </span>{% endif %}{% endfor %}</div>
+{% endif %}
 {% endfor %}
         </div>
       </div>
@@ -241,7 +288,17 @@
 {% if cap.reveal == "typewriter" %}
       document.querySelectorAll("#root .ch").forEach((el) => { tl.set(el, { opacity: 1 }, parseFloat(el.dataset.t)); });
 {% elif cap.reveal == "word" %}
+{% if cap.get("reveal_reflow", False) %}
+      document.querySelectorAll("#root .cap-word.rf").forEach((el) => {
+        const t = parseFloat(el.dataset.t);
+        tl.set(el, { display: "inline" }, t);
+        tl.fromTo(el, { opacity: 0 }, { opacity: 1, duration: {{ cap.get("word_fade", 0) or 0.01 }}, ease: "power1.out" }, t);
+      });
+{% elif cap.get("word_fade", 0) %}
+      document.querySelectorAll("#root .cap-word[data-t]").forEach((el) => { tl.fromTo(el, { opacity: 0 }, { opacity: 1, duration: {{ cap.word_fade }}, ease: "power1.out" }, parseFloat(el.dataset.t)); });
+{% else %}
       document.querySelectorAll("#root .cap-word[data-t]").forEach((el) => { tl.set(el, { opacity: 1 }, parseFloat(el.dataset.t)); });
+{% endif %}
 {% endif %}
 {% if cap.keyword_pop %}
       document.querySelectorAll("#root .cap-word.hl").forEach((el) => {
@@ -270,13 +327,26 @@
       tl.to("#flashin-{{ loop.index }}", { opacity: 0, duration: 0.11, ease: "power2.out" }, {{ (j - 0.02) | round(3) }});
 {% endfor %}{% endif %}
 
+{% if join_transition == "leak" %}{% for j in junctions %}
+      tl.fromTo("#leakin-{{ loop.index }}", { opacity: 0, x: -{{ (W * 0.08) | int }} }, { opacity: 0.9, x: 0, duration: 0.25, ease: "power2.in" }, {{ (j - 0.25) | round(3) }});
+      tl.to("#leakin-{{ loop.index }}", { opacity: 0, x: {{ (W * 0.06) | int }}, duration: 0.4, ease: "power2.out" }, {{ j | round(3) }});
+{% endfor %}{% endif %}
+
       // ---- logo / accroche ----
+{% if guest_logo.file %}
+      tl.fromTo("#guest-logo-img", { opacity: 0 }, { opacity: {{ guest_logo.opacity }}, duration: 0.5 }, 0.1);
+{% endif %}
 {% if logo.mode != "none" %}
       tl.fromTo("#{{ 'logo-img' if logo.mode == 'image' else 'logo-text' }}", { opacity: 0 }, { opacity: {{ logo.opacity }}, duration: 0.5 }, 0.1);
 {% endif %}
 {% if hook.enabled and hook.text %}
+{% if hook.style == "pill" %}
+      tl.fromTo("#hook-box", { scale: 0.9, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.3, ease: "back.out(1.6)" }, 0.05);
+      tl.to("#hook-box", { opacity: 0, duration: 0.2 }, {{ (hook.duration - 0.2) | round(3) }});
+{% else %}
       tl.fromTo("#hook-box", { y: -30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.35, ease: "power3.out" }, 0.05);
       tl.to("#hook-box", { opacity: 0, duration: 0.3 }, {{ (hook.duration - 0.3) | round(3) }});
+{% endif %}
 {% endif %}
 
       // ---- carte de fin + fondu audio ----
