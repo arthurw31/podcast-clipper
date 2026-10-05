@@ -70,15 +70,15 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
    l'insert ; sinon l'insert passe en plein écran. En écran partagé, les sous-titres se centrent sur la séparation.
 4. Chartes : DLTDC = Montserrat ExtraBold Italic, jaune #FFE14D, typewriter (preset `dynamic`).
    AI Corner = **shorts du monteur AI Partners** (5 shorts de référence dans `brands/ai-corner/references/dust/`,
-   demande d'Arthur du 05/10/2026 : « refaire exactement le même montage ») : preset `aip-short` — logo de
-   l'entreprise invitée en haut à gauche (`assets/guests/<entreprise>.svg|png`, `guest_logo`) + logo AI PARTNERS
-   blanc en haut à droite ; titre-question (`hook_title`) dans une bulle blanche translucide (`hook.style: pill`,
+   demande d'Arthur du 05/10/2026 : « refaire exactement le même montage ») : preset `aip-short` — **barre de
+   logos centrée** en haut (`guest_logo.bar`) : logo de l'entreprise invitée (`assets/guests/<entreprise>.svg|png`)
+   + logo AI PARTNERS blanc, même hauteur, même ligne, agrandis jusqu'à `bar_max_width` (marges PNG rognées) ; titre-question (`hook_title`) dans une bulle blanche translucide (`hook.style: pill`,
    Fira Sans Condensed Bold, noir) pendant l'accroche (`hook.duration: auto`, 7,5–11,5 s) ; sous-titres blancs
    type Arial Bold sous la bulle, centrés, 1–3 lignes construites mot à mot (`reveal: word`, `reveal_reflow`,
    `word_fade`), même position en écran partagé (`split_center: false`) ; split sans séparateur ; light leak
    aux raccords (`join_transition: leak`) ; 25–45 s ; pas de B-roll ; + carte de fin de **2 s** sur l'animation
    officielle AI Partners (`assets/outro_anim.mov`, lignes « montagne » qui se dessinent, recadrée au format et
-   accélérée ×5 : `outro.background: video`, `media.prepare_outro_video`) + logo blanc + CTA. Bleu #258AF3,
+   accélérée ×5 : `outro.background: video`, `media.prepare_outro_video`) + logo blanc + CTA **centrés** (`outro.layout: center`, voile radial). Bleu #258AF3,
    **jamais d'italique**.
    L'ancien style LinkedIn 16:9 (`references/*.mp4`) reste disponible : preset `editorial`.
 5. **Clips multi-segments** (`selection.max_segments` > 1) : un clip = accroche + développement + conclusion
