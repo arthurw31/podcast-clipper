@@ -10,7 +10,9 @@ Sortie : transcript.json
 """
 from __future__ import annotations
 
+import difflib
 import json
+import re
 import time
 from pathlib import Path
 
@@ -37,10 +39,60 @@ def _device_and_compute(cfg: Cfg) -> tuple[str, str]:
     return device, compute
 
 
-def transcribe(video: Path, out_json: Path, cfg: Cfg, work_dir: Path, force: bool = False) -> dict:
+def vocabulary(cfg: Cfg, names: list[str] | None = None) -> list[str]:
+    """Noms propres et termes à faire reconnaître par Whisper : invité + entreprise (passés à la commande)
+    + lexique de la marque (`transcribe.vocabulary` dans brand.yaml)."""
+    out: list[str] = []
+    for v in [*(names or []), *(cfg.transcribe.get("vocabulary") or [])]:
+        v = str(v).strip()
+        if v and v not in out:
+            out.append(v)
+    return out
+
+
+def apply_corrections(data: dict, cfg: Cfg, names: list[str] | None = None) -> int:
+    """Corrige les noms propres mal transcrits, mot par mot (horaires inchangés) :
+    1. la table `transcribe.corrections` de la marque (ex. « iPartners » -> « AI Partners ») ;
+    2. les mots à majuscule très proches d'un nom du vocabulaire (« Amodry » -> « Amaudry », « Mondo » -> « Mendo »).
+    Idempotent : appliqué après la transcription et à chaque relecture du cache."""
+    table = {str(k): str(v) for k, v in (cfg.transcribe.get("corrections") or {}).items()}
+    # rapprochement approximatif seulement pour les noms (≥ 5 lettres, pas les sigles) : « Mais » ne doit
+    # jamais devenir « MAIF », ni « Comme » « COMEX » — les sigles passent par la table `corrections`
+    targets = []
+    for v in vocabulary(cfg, names):
+        for tok in re.findall(r"[A-ZÀ-Ÿ][\wÀ-ÿ'-]{4,}", v):
+            if not tok.isupper():
+                targets.append(tok)
+    n = 0
+    for seg in data.get("segments", []):
+        changed = False
+        for w in seg.get("words", []):
+            m = re.match(r"^([^\wÀ-ÿ]*)([\wÀ-ÿ'’-]+)([^\wÀ-ÿ]*)$", w["w"])
+            if not m:
+                continue
+            pre, core, post = m.groups()
+            new = table.get(core)
+            if new is None and targets and core[:1].isupper() and not core.isupper() and len(core) >= 5                     and core not in targets:
+                best = max(targets, key=lambda t: difflib.SequenceMatcher(None, core.lower(), t.lower()).ratio())
+                if difflib.SequenceMatcher(None, core.lower(), best.lower()).ratio() >= 0.7:
+                    new = best
+            if new and new != core:
+                w["w"] = pre + new + post
+                n += 1
+                changed = True
+        if changed:
+            seg["text"] = " ".join(w["w"] for w in seg["words"])
+    return n
+
+
+def transcribe(video: Path, out_json: Path, cfg: Cfg, work_dir: Path, force: bool = False,
+               names: list[str] | None = None) -> dict:
     if out_json.exists() and not force:
         console.print(f"[dim]Transcription en cache : {out_json.name}[/dim]")
-        return json.loads(out_json.read_text(encoding="utf-8"))
+        data = json.loads(out_json.read_text(encoding="utf-8"))
+        if apply_corrections(data, cfg, names):
+            out_json.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+        return data
 
     from faster_whisper import WhisperModel
 
@@ -53,6 +105,9 @@ def transcribe(video: Path, out_json: Path, cfg: Cfg, work_dir: Path, force: boo
 
     t0 = time.time()
     model = WhisperModel(model_name, device=device, compute_type=compute)
+    vocab = vocabulary(cfg, names)
+    if vocab:
+        console.print(f"  vocabulaire donné à Whisper : {', '.join(vocab)}")
     segments_iter, tinfo = model.transcribe(
         str(wav),
         language=cfg.get("language") or None,
@@ -61,6 +116,8 @@ def transcribe(video: Path, out_json: Path, cfg: Cfg, work_dir: Path, force: boo
         vad_filter=bool(cfg.transcribe.get("vad", True)),
         vad_parameters={"min_silence_duration_ms": 400},
         condition_on_previous_text=False,
+        # indices d'orthographe pour les noms propres, appliqués à chaque fenêtre de 30 s
+        hotwords=", ".join(vocab) if vocab else None,
     )
 
     segments = []
@@ -93,6 +150,9 @@ def transcribe(video: Path, out_json: Path, cfg: Cfg, work_dir: Path, force: boo
         "model": model_name,
         "segments": segments,
     }
+    fixed = apply_corrections(data, cfg, names)
+    if fixed:
+        console.print(f"  {fixed} nom(s) propre(s) corrigé(s) automatiquement")
     out_json.parent.mkdir(parents=True, exist_ok=True)
     out_json.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
     console.print(f"[green]Transcription terminée[/green] · {len(segments)} segments · {time.time()-t0:.0f}s")

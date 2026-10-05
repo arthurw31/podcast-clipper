@@ -37,11 +37,13 @@ Si un point est KO : suis les indications (`-> …`), ou lance `scripts\setup.ps
 4. Lance la transcription **en arrière-plan** (≈ 20 min pour 50 min d'épisode sur CPU) :
 
 ```bash
-python -m clipper transcribe --brand <marque> --input <fichier>
+python -m clipper transcribe --brand <marque> --input <fichier> --guest "Prénom Nom" --company "Entreprise"
 ```
 
-   Ensuite, corrige dans `output/<marque>/<episode>/transcript.json` les noms propres mal écrits (Whisper écrit
-   souvent mal le nom de l'invité et de son entreprise ; « iPartners » = AI Partners).
+   `--guest` / `--company` sont donnés à Whisper (avec le lexique de la marque, `transcribe.vocabulary`) pour qu'il
+   écrive correctement les noms propres ; les quasi-homonymes restants sont corrigés automatiquement
+   (`transcribe.corrections`). Jette quand même un œil aux noms dans les 10 propositions ; si un terme revient mal
+   écrit, ajoute-le au lexique de la marque dans `brand.yaml`.
 
 ## 2. Proposer une dizaine de passages
 

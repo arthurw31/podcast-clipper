@@ -42,6 +42,11 @@ transcribe:
   compute_type: auto        # auto | int8 | float16 | float32
   vad: true
   beam_size: 5
+  # Noms propres et termes du podcast : donnés à Whisper avant la transcription (avec l'invité et son
+  # entreprise passés à la commande) pour qu'il les écrive correctement.
+  vocabulary: []
+  # Corrections automatiques mot à mot après transcription (mal entendu -> correct).
+  corrections: {}
 
 # ---------------------------------------------------------------- colors ---
 colors:

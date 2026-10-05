@@ -73,14 +73,15 @@ def cmd_transcribe(a: argparse.Namespace) -> dict:
     brand = Brand(a.brand)
     video = resolve_input(brand, a.input)
     ep = episode_dir(brand, video)
-    return transcribe(video, ep / "transcript.json", brand.cfg, ep / "work", force=a.force)
+    return transcribe(video, ep / "transcript.json", brand.cfg, ep / "work", force=a.force,
+                      names=[getattr(a, "guest", ""), getattr(a, "company", "")])
 
 
 def cmd_select(a: argparse.Namespace) -> dict:
     brand = Brand(a.brand)
     video = resolve_input(brand, a.input)
     ep = episode_dir(brand, video)
-    transcript = transcribe(video, ep / "transcript.json", brand.cfg, ep / "work")
+    transcript = transcribe(video, ep / "transcript.json", brand.cfg, ep / "work", names=[a.guest, a.company])
     if getattr(a, "ranges", None):
         data = manual_clips(transcript, _parse_ranges(a.ranges), a.guest, a.company)
         data["brand"] = brand.slug
@@ -109,7 +110,7 @@ def cmd_propose(a: argparse.Namespace) -> dict:
     brand = Brand(a.brand)
     video = resolve_input(brand, a.input)
     ep = episode_dir(brand, video)
-    transcript = transcribe(video, ep / "transcript.json", brand.cfg, ep / "work")
+    transcript = transcribe(video, ep / "transcript.json", brand.cfg, ep / "work", names=[a.guest, a.company])
     data = select_clips(transcript, brand, ep / "candidates.json", n_clips=a.n or 10, guest=a.guest, company=a.company,
                         force=a.force or not (ep / "candidates.json").exists(), extra_instructions=a.instructions or "",
                         host_side=a.host_side)
@@ -507,7 +508,10 @@ def main(argv: list[str] | None = None) -> None:
 
     sp = sub.add_parser("run", help="pipeline complet"); common(sp); selection_args(sp); build_args(sp); render_args(sp); posts_args(sp)
     sp.add_argument("--no-render", action="store_true"); sp.set_defaults(fn=cmd_run)
-    sp = sub.add_parser("transcribe"); common(sp); sp.set_defaults(fn=cmd_transcribe)
+    sp = sub.add_parser("transcribe"); common(sp)
+    sp.add_argument("--guest", default="", help="nom de l'invité (aide Whisper à l'écrire correctement)")
+    sp.add_argument("--company", default="", help="entreprise de l'invité")
+    sp.set_defaults(fn=cmd_transcribe)
     sp = sub.add_parser("select"); common(sp); selection_args(sp); sp.set_defaults(fn=cmd_select)
     sp = sub.add_parser("build"); common(sp); build_args(sp); sp.set_defaults(fn=cmd_build)
     sp = sub.add_parser("render"); common(sp); build_args(sp); render_args(sp); sp.set_defaults(fn=cmd_render)

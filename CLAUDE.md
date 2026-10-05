@@ -152,8 +152,10 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
   `window.__timelines["main"]` ; pas de `transform` CSS initial sur un élément tweené en `x/y/scale`.
 - Deux `<video>` identiques (src/start/durée) déclenchent `duplicate_media_discovery_risk` → la caméra du bas
   en écran partagé a `data-media-start` décalé de 0,001 s.
-- Whisper coupe « c'est » en « c » + « 'est » → `transcribe.merge_fragments`. Il écrit « iPartners » pour
-  « AI Partners » ; il oublie souvent les points sur des passages entiers (d'où les citations `end_text`).
+- Whisper coupe « c'est » en « c » + « 'est » → `transcribe.merge_fragments`. Il écorche les noms propres
+  (« Modry » pour Amaudry, « iPartners ») : `transcribe --guest --company` + `transcribe.vocabulary` sont passés
+  en `hotwords` à Whisper, puis `apply_corrections` (table `transcribe.corrections` + rapprochement approximatif
+  réservé aux noms ≥ 5 lettres, jamais aux sigles : « Mais » ≠ MAIF). Il oublie souvent les points (d'où `end_text`).
 - Le LLM cite parfois les bons mots avec un mauvais timestamp : `snap_to_quotes` cherche la citation près du
   timestamp puis dans tout l'épisode (les mots font foi). La réponse brute est gardée dans `output/…/llm_raw.json`.
 - Le master E20 d'AI Corner commence par un teaser déjà sous-titré (0–30 s) : à exclure des sélections

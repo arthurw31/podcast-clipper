@@ -29,6 +29,12 @@ selection:
     - "POSITION TRANCHÉE / CONTRE-INTUITION : une conviction forte de l'invité sur l'IA (gouvernance, risque, souveraineté, vendeurs, coûts, ce que tout le monde fait mal), une question de Thomas qui pose un vrai dilemme."
     - "HUMAIN ET ORGANISATION : collaborateurs, clients, adoption, formation, ce que l'IA change dans le travail des équipes, leçon d'un échec ou d'un faux départ, conseil actionnable à un dirigeant."
 
+transcribe:
+  vocabulary: ["AI Partners", "AI Corner", "Thomas Spitz", "COMEX", "Copilot", "ChatGPT", "agentique", "LLM"]
+  corrections:
+    iPartners: "AI Partners"
+    IPartners: "AI Partners"
+
 colors:
   primary: "#258AF3"         # Blue Primaire — accents, CTA
   secondary: "#151D53"       # Navy Deep
