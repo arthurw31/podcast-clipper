@@ -62,8 +62,8 @@ Pour récupérer les améliorations plus tard : « mets à jour le projet » (Cl
 Facultatif : une clé `ANTHROPIC_API_KEY` (sinon la sélection des extraits passe par votre abonnement Claude Code,
 via la commande `claude`). Un GPU NVIDIA accélère fortement la transcription mais n'est pas nécessaire.
 
-Ordres de grandeur sans GPU (PC portable) : transcription ≈ 0,4× la durée de l'épisode (18 min pour 45 min),
-sélection ≈ 5 min, rendu ≈ 4–5 min par clip et par format.
+Ordres de grandeur sans GPU (PC portable) : transcription ≈ 20 min pour un épisode de 50 min, 10 propositions
+≈ 8 min, montage + rendu ≈ 6–8 min par short (2 en parallèle), soit ≈ 30–40 min pour 5 shorts.
 
 ## 2. Installation
 

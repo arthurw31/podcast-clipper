@@ -46,17 +46,9 @@
 - Passages promotionnels sur AI Partners (la marque se montre par le logo, pas par le discours).
 - Hésitations longues, phrases inachevées, digressions techniques sans conclusion.
 
-## Mots-clés à surligner (bleu AI Partners)
-- Chiffres et pourcentages, verbes/mots forts (« remplacer », « assister », « gouvernance »,
-  « risque », « confiance »), noms d'outils ou de cas d'usage marquants, mots contre-intuitifs.
-- 1 à 2 mots par phrase, uniquement des mots pleins, jamais des mots vides.
-
-## B-roll
-- Autorisé en fenêtre PiP, 1 à 2 par clip maximum, uniquement sur une image mentale concrète
-  (un centre d'appels, un conseiller au téléphone, une salle de réunion, un tableau de bord, un
-  entrepôt, une usine, un document signé…).
-- Style réaliste et sobre, bureaux/entreprise, jamais de robot humanoïde ni d'imagerie « IA
-  futuriste » cliché. Jamais de B-roll sur une idée abstraite.
+## Mots-clés et B-roll
+- Aucun : le style des shorts n'utilise ni mot-clé coloré ni B-roll (c'est le propos qui porte). Les champs
+  `keywords` et `broll` peuvent rester vides.
 
 ## Publication
 - Le post LinkedIn de chaque clip suit le brief `posts.md` (anglais, voix de la page AI Partners, sans hashtags,

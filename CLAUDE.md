@@ -160,7 +160,8 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
   (consigne dans guidelines.md + `--instructions`).
 - Le locuteur actif par heuristique bouche est peu fiable (plans larges 720p) : la vérité vient des tours de
   parole du LLM + `--host-side` (l'animateur change de côté selon l'épisode).
-- Pas de GPU sur ce PC : Whisper large-v3-turbo ≈ 0,4× temps réel ; rendu HyperFrames ≈ 4–5× la durée du clip.
+- Pas de GPU sur ce PC : Whisper large-v3-turbo ≈ 0,4× la durée de l'épisode ; rendu HyperFrames ≈ 12× la durée
+  du clip (images PNG, CRF 12), 2 rendus en parallèle.
 - Backend LLM sans clé API : `claude -p --output-format json --tools ""` dans un cwd temporaire (`llm.py`).
 
 ## Vérifier une modification du montage

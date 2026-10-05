@@ -383,8 +383,7 @@ def _write_summary(ep: Path, clips: dict, projects: list[Path] | None = None) ->
             lines += ["**Post LinkedIn :**", "", "```", c["linkedin_post"], "```", "",
                       "**Description courte (Reels / Shorts) :**", "", "```", c.get("short_description", ""), "```", ""]
         else:
-            lines += ["**Texte de publication (brouillon de la sélection — `python -m clipper posts …` pour le post LinkedIn) :**",
-                      "", "```", c.get("post", ""), "```", ""]
+            lines += ["*Post LinkedIn pas encore rédigé : `python -m clipper posts …`*", ""]
     (ep / "summary.md").write_text("\n".join(lines), encoding="utf-8")
 
 

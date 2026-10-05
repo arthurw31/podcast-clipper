@@ -55,7 +55,6 @@ Règles absolues :
   Le premier élément commence à `start`. L'animateur (host) pose les questions et relance ; l'invité (guest) raconte.
 - `hook_title` : titre de 4 à 8 mots, percutant, affiché pendant l'accroche. Si les consignes de la marque en précisent
   la forme (question avec « ? », affirmation…), suis-les ; sinon sans point final.
-- `post` : texte de publication prêt à poster (2-3 lignes + hashtags), dans la langue du podcast.
 - Réponds UNIQUEMENT avec un objet JSON valide, sans commentaire, de la forme :
 {
   "clips": [
@@ -70,8 +69,7 @@ Règles absolues :
       "why": "…", "score": 8.5,
       "keywords": ["…"],
       "turns": [{"at": 123.4, "speaker": "host"}, {"at": 131.0, "speaker": "guest"}],
-      "broll": [{"at": 140.2, "duration": 2.5, "query": "…", "type": "video"}],
-      "post": "…"
+      "broll": [{"at": 140.2, "duration": 2.5, "query": "…", "type": "video"}]
     }
   ]
 }"""
@@ -481,7 +479,6 @@ max_segments = {int(sel.get("max_segments", 1))}{" (un seul passage continu par 
             "keywords": kw,
             "turns": turns,
             "broll": brolls[: int(cfg.broll.max_per_clip)] if cfg.broll.enabled else [],
-            "post": c.get("post", ""),
             "angle": c.get("angle", ""),
             "guest": guest,
             "company": company,
@@ -523,5 +520,5 @@ def manual_clips(transcript: dict, ranges: list[tuple[float, float]], guest: str
                       "duration": round(e - s, 3), "tail_silence": tail,
                       "segments": [{"start": s, "end": e, "duration": round(e - s, 3), "tail_silence": tail}],
                       "why": "manuel", "score": 0, "keywords": [], "broll": [], "turns": [],
-                      "post": "", "guest": guest, "company": company})
+                      "guest": guest, "company": company})
     return {"guest": guest, "company": company, "clips": clips}

@@ -94,6 +94,3 @@ def snapshot(proj: Path, at: list[float], out_dir: Path) -> list[Path]:
         raise RuntimeError(res.stdout[-1500:] + res.stderr[-1500:])
     return sorted(out_dir.glob("*.png"))
 
-
-def preview_cmd(proj: Path) -> str:
-    return f'cd "{proj}" && npx hyperframes preview --background'

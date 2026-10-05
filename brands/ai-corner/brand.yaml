@@ -2,9 +2,9 @@
 # AI Corner — le podcast d'AI Partners
 # Charte : skill aip-brand-guidelines (Metropolis, bleu #258AF3, navy #151D53, jamais d'italique).
 # Style de montage (depuis le 05/10/2026) : les shorts verticaux du monteur AI Partners
-#   (references/dust/, preset `aip-short`) — logo invité en haut à gauche + AI PARTNERS à droite,
+#   (references/dust/, preset `aip-short`) — barre de logos centrée (invité + AI PARTNERS),
 #   titre-question dans une bulle blanche, sous-titres blancs mot à mot sous la bulle, écran partagé,
-#   light leak aux raccords ; + carte de fin AI Partners (motif « mountain lines », logo, CTA).
+#   light leak aux raccords ; + carte de fin animée AI Partners de 2 s (logo + CTA centrés).
 #   Ancien style LinkedIn 16:9 (references/*.mp4) : preset `editorial`.
 # ============================================================================
 
@@ -18,7 +18,7 @@ montage:
 formats: ["9x16", "16x9"]
 
 selection:
-  n_clips: 6
+  n_clips: 5                 # workflow : ~10 propositions (`propose`), 5 retenues (`pick`)
   min_duration: 25           # shorts du monteur : 16–38 s
   max_duration: 45
   target_duration: 34
@@ -98,7 +98,6 @@ format_overrides:
       margin: 0.035
     outro:
       logo_width: 0.34
-      image_position: center
       video_focus_x: 0.68
       cta:
         subtext: "Lien en description"
