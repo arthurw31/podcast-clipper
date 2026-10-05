@@ -104,6 +104,17 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
 - Peu de coupes ajoutées : `max_shot_len: 10` (AI Corner). Les vraies coupes de la source restent.
 - Sous-titres : nouveau bloc à chaque jonction (`group_words(breaks=junctions)`).
 
+## Qualité d'image (demande d'Arthur, 05/10/2026 : « il faut que ce soit en 1080p »)
+
+- Un cadre 9:16 dans un master 1920×1080 ne fait que 608 px de large : agrandi ×1,8 (×2 en punch-in). Pour éviter
+  d'empiler les pertes : `cut_segment` encode en CRF 10 (intermédiaire quasi sans perte) ; `media.reframe_video`
+  applique le plan de caméras avec FFmpeg (crop + Lanczos + `render.sharpen`) en une vidéo au format de sortie
+  (`assets/reframed_<fmt>.mp4`), jouée 1:1 par HyperFrames (`plan_render` = un seul plan plein cadre) ; rendu final
+  `--crf 12` et `--video-frame-format png` (sinon images source en JPEG). Désactivé si `framing.slow_zoom` (le
+  zoom lent reste animé par la timeline). Rendu ≈ 12× la durée du clip avec PNG.
+- `-filter_complex_script` n'existe plus dans FFmpeg 9 : utiliser `-/filter_complex <fichier>`.
+- La vraie limite reste la source : pour une netteté « native », il faut les rushes 4K ou un export haut débit.
+
 ## Parallélisme (pattern « split → parallèle → agrégation »)
 
 - `select` : si `selection.angles` liste ≥ 2 angles, `select_clips` lance une passe LLM **par angle** en parallèle

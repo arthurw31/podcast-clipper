@@ -54,7 +54,7 @@ def cut_segment(src: Path, dst: Path, start: float, duration: float, height: int
     af = "loudnorm=I=-16:TP=-1.5:LRA=11" if normalize_audio else "anull"
     cmd = [FFMPEG, "-y", "-v", "error", "-ss", f"{start:.3f}", "-i", str(src), "-t", f"{duration:.3f}",
            "-map", "0:v:0", "-map", "0:a:0?",
-           "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p",
+           "-c:v", "libx264", "-preset", "medium", "-crf", "10", "-pix_fmt", "yuv420p",   # intermédiaire quasi sans perte
            "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-af", af, "-movflags", "+faststart"]
     if vf:
         cmd += ["-vf", ",".join(vf)]
@@ -135,4 +135,45 @@ def prepare_outro_video(src: Path, dst: Path, width: int, height: int, duration:
     vf = f"setpts=PTS/{speed:.4f},crop={cw}:{ch}:{x}:{y},scale={width}:{height}:flags=lanczos,fps={fps},tpad=stop_mode=clone:stop_duration=1,format=yuv420p"
     run([FFMPEG, "-y", "-v", "error", "-i", str(src), "-an", "-vf", vf, "-t", f"{duration:.3f}",
          "-c:v", "libx264", "-preset", "medium", "-crf", "16", "-movflags", "+faststart", str(dst)])
+    return dst
+
+
+def reframe_video(src: Path, dst: Path, plan: list[dict], width: int, height: int, duration: float,
+                  fps: int = 30, sharpen: float = 0.0, crf: int = 10) -> Path:
+    """Applique le plan de caméras (recadrages, écran partagé, punch-in) directement avec FFmpeg :
+    une vidéo au format de sortie, à jouer 1:1 dans HyperFrames. Recadrer + agrandir ici (Lanczos,
+    accentuation légère) est nettement plus net que l'agrandissement du navigateur pendant le rendu.
+
+    `plan` : entrées {"t0", "t1", "layout", "cams": [{"slot": full|top|bottom, "crop": {x,y,w,h}}]} en px source.
+    """
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    half = height // 2
+    sh = f",unsharp=5:5:{sharpen:.2f}:5:5:0" if sharpen > 0 else ""
+    chains, labels = [], []
+    for i, e in enumerate(plan):
+        t0, t1 = float(e["t0"]), float(e["t1"])
+        if t1 - t0 <= 0.01:
+            continue
+        trim = f"trim=start={t0:.4f}:end={t1:.4f},setpts=PTS-STARTPTS"
+        if e["layout"] == "split" and len(e["cams"]) >= 2:
+            parts = []
+            for k, cam in enumerate(e["cams"][:2]):
+                c = cam["crop"]
+                h_out = half if k == 0 else height - half
+                chains.append(f"[0:v]{trim},crop={int(c['w'])}:{int(c['h'])}:{int(c['x'])}:{int(c['y'])},"
+                              f"scale={width}:{h_out}:flags=lanczos{sh},setsar=1[p{i}_{k}]")
+                parts.append(f"[p{i}_{k}]")
+            chains.append(f"{''.join(parts)}vstack=inputs=2[s{i}]")
+        else:
+            c = e["cams"][0]["crop"]
+            chains.append(f"[0:v]{trim},crop={int(c['w'])}:{int(c['h'])}:{int(c['x'])}:{int(c['y'])},"
+                          f"scale={width}:{height}:flags=lanczos{sh},setsar=1[s{i}]")
+        labels.append(f"[s{i}]")
+    chains.append(f"{''.join(labels)}concat=n={len(labels)}:v=1:a=0,fps={fps},format=yuv420p[out]")
+    script = dst.with_suffix(".filter.txt")
+    script.write_text(";\n".join(chains), encoding="utf-8")
+    run([FFMPEG, "-y", "-v", "error", "-i", str(src), "-/filter_complex", str(script), "-map", "[out]", "-an",
+         "-t", f"{duration:.3f}", "-c:v", "libx264", "-preset", "medium", "-crf", str(crf), "-pix_fmt", "yuv420p",
+         "-movflags", "+faststart", str(dst)])
+    script.unlink(missing_ok=True)
     return dst

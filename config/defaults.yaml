@@ -252,7 +252,12 @@ publication:
 
 # ---------------------------------------------------------------- render ---
 render:
-  quality: looks            # draft | looks | delivery
+  quality: looks            # draft | looks | delivery (ignoré si crf est défini)
+  crf: 12                   # qualité d'encodage du MP4 final (plus bas = plus net ; looks = 16)
+  video_frame_format: png   # images source extraites en PNG (auto = JPEG, recompression visible)
+  prereframe: true          # recadrage vertical fait par FFmpeg (Lanczos) au lieu du navigateur
+  sharpen: 0.5              # accentuation après agrandissement (0 = aucune, 0.3–0.8 recommandé)
+  intermediate_crf: 10      # vidéos intermédiaires quasi sans perte
   lint: true
   # rendus HyperFrames lancés en même temps (chacun = un Chromium headless, ~2-3 cœurs).
   # auto = cœurs/4 (2 sur un PC 8 cœurs). Mesuré sur 8 cœurs sans GPU : 2 rendus en parallèle ≈ 1,6× plus vite.

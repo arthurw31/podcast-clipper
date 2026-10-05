@@ -70,11 +70,15 @@ def lint(proj: Path) -> tuple[bool, list[dict]]:
     return ok, findings
 
 
-def render(proj: Path, output: Path, quality: str = "looks", fps: int | None = None) -> Path:
+def render(proj: Path, output: Path, quality: str = "looks", fps: int | None = None, crf: int | None = None,
+           frame_format: str = "") -> Path:
     output.parent.mkdir(parents=True, exist_ok=True)
-    args = ["render", "--output", str(output), "--quality", quality]
+    args = ["render", "--output", str(output)]
+    args += ["--crf", str(crf)] if crf else ["--quality", quality]
     if fps:
         args += ["--fps", str(fps)]
+    if frame_format:
+        args += ["--video-frame-format", frame_format]   # png = pas de recompression JPEG des images source
     console.print(f"  rendu {proj.parent.name}/{proj.name} → {output.name} ({quality})…")
     res = _npx(args, proj, timeout=3600)
     if res.returncode != 0 or not output.exists() or output.stat().st_size == 0:

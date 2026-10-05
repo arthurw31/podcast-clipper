@@ -18,7 +18,8 @@ from . import broll as broll_mod
 from .analysis import analyze
 from .captions import group_words
 from .config import FORMATS, TEMPLATES_DIR, Brand, Cfg, deep_merge
-from .media import concat_segments, cut_segment, extract_frame, make_blurred_still, prepare_outro_video, probe
+from .media import (concat_segments, cut_segment, extract_frame, make_blurred_still, prepare_outro_video, probe,
+                    reframe_video)
 from .reframe import build_plan
 from .transcribe import words_between
 
@@ -612,11 +613,25 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
             else:
                 g["top_px"] = cap_ctx["top_px"]
 
+        # Netteté : le recadrage est appliqué par FFmpeg (Lanczos + accentuation) en une vidéo au format de
+        # sortie, jouée 1:1 par HyperFrames — au lieu d'agrandir ×1,8 dans le navigateur au moment du rendu.
+        plan_render = plan
+        rr = fcfg.render
+        if rr.get("prereframe", True) and not fcfg.framing.get("slow_zoom", False) and any(e["layout"] != "full" for e in plan):
+            ref_name = f"reframed_{fmt}.mp4"
+            reframe_video(src_clip, assets / ref_name, plan, W, H, D_speech, fps=int(cfg.fps),
+                          sharpen=float(rr.get("sharpen", 0.0)), crf=int(rr.get("intermediate_crf", 10)))
+            full = {"slot": "full", "src": ref_name, "media_offset": 0.0, "width": W, "height": H, "left": 0, "top": 0,
+                    "ox": W / 2, "oy": H / 2}
+            plan_render = [{"id": 1, "t0": 0.0, "t1": D_speech, "layout": "full", "zoom_from": 1.0, "zoom_to": 1.0,
+                            "cams": [full]}]
+            console.print(f"  {fmt:5s} recadrage FFmpeg → {ref_name}")
+
         html = tpl.render(
             lang=cfg.get("language", "fr"), title=f"{clip.get('title','')} · {fmt}", W=W, H=H, fps=int(cfg.fps),
             D_total=D_total, D_speech=D_speech, A_dur=A_dur, A_fade=round(A_fade, 3),
             font={"family": cfg.fonts.family, "italic_file": italic.name, "upright_file": upright.name},
-            colors=dict(cfg.colors), plan=plan, captions=caps, cap=Cfg(cap_ctx), logo=Cfg(logo_ctx),
+            colors=dict(cfg.colors), plan=plan_render, captions=caps, cap=Cfg(cap_ctx), logo=Cfg(logo_ctx),
             outro=Cfg(outro_ctx), hook=Cfg(hook_ctx), broll=Cfg(broll_ctx), brolls=brolls_fmt, music=music,
             guest_logo=Cfg(guest_logo_ctx), outro_start=outro_start,
             guest=clip.get("guest", ""), company=clip.get("company", ""),

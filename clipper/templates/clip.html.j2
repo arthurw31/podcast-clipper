@@ -156,7 +156,7 @@
 {% for e in plan %}{% for cam in e.cams %}
       <div class="slot slot-{{ cam.slot }}" id="slot-{{ e.id }}-{{ cam.slot }}" data-layout-allow-overflow>
         <div class="cam" id="cam-{{ e.id }}-{{ cam.slot }}" data-layout-ignore style="left:{{ cam.left }}px; top:{{ cam.top }}px; width:{{ cam.width }}px; height:{{ cam.height }}px; transform-origin:{{ cam.ox }}px {{ cam.oy }}px;">
-          <video id="v-{{ e.id }}-{{ cam.slot }}" src="assets/source.mp4" data-start="{{ e.t0 }}" data-duration="{{ (e.t1 - e.t0) | round(3) }}" data-media-start="{{ (e.t0 + cam.media_offset) | round(3) }}" data-track-index="0" muted playsinline></video>
+          <video id="v-{{ e.id }}-{{ cam.slot }}" src="assets/{{ cam.get('src', 'source.mp4') }}" data-start="{{ e.t0 }}" data-duration="{{ (e.t1 - e.t0) | round(3) }}" data-media-start="{{ (e.t0 + cam.media_offset) | round(3) }}" data-track-index="0" muted playsinline></video>
         </div>
       </div>
 {% endfor %}{% if e.layout == "split" and split_divider %}

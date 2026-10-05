@@ -194,7 +194,9 @@ def cmd_render(a: argparse.Namespace) -> list[Path]:
     def one(t: tuple[Path, Path]) -> Path | None:
         proj_dir, out = t
         try:
-            res = render(proj_dir, out, quality=quality, fps=fps)
+            res = render(proj_dir, out, quality=quality, fps=fps,
+                         crf=None if a.quality else (int(brand.cfg.render.get("crf") or 0) or None),
+                         frame_format=str(brand.cfg.render.get("video_frame_format") or ""))
             console.print(f"[green]✓ {out.name}[/green] ({out.stat().st_size/1e6:.1f} Mo)")
             return res
         except Exception as e:  # noqa: BLE001
