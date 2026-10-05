@@ -32,5 +32,12 @@ if [ ! -f .env ]; then
   echo "Fichier .env créé : renseignez PEXELS_API_KEY (clé gratuite sur https://www.pexels.com/api/)."
 fi
 
+echo "== Claude (sélection des passages et rédaction des posts) =="
+if ! have claude && ! grep -qE "^ANTHROPIC_API_KEY=.+" .env 2>/dev/null; then
+  echo "Commande 'claude' absente -> installation de Claude Code (CLI) via npm"
+  npm install -g @anthropic-ai/claude-code
+  echo "Ouvrez un terminal, tapez 'claude' une fois et connectez-vous avec votre compte Claude."
+fi
+
 echo "== Vérification =="
 python3 -m clipper doctor

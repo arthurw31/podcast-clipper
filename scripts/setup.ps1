@@ -1,4 +1,4 @@
-# Installation complète sous Windows (PowerShell) : prérequis, dépendances, .env, vérification.
+﻿# Installation complète sous Windows (PowerShell) : prérequis, dépendances, .env, vérification.
 # Usage :  powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
 $ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..")
@@ -22,6 +22,14 @@ npm install
 if (-not (Test-Path ".env")) {
   Copy-Item ".env.example" ".env"
   Write-Host "Fichier .env créé : ouvrez-le et renseignez PEXELS_API_KEY (clé gratuite sur https://www.pexels.com/api/)."
+}
+
+Write-Host "== Claude (sélection des passages et rédaction des posts) =="
+$envText = if (Test-Path ".env") { Get-Content ".env" -Raw } else { "" }
+if (-not (Have "claude") -and ($envText -notmatch "ANTHROPIC_API_KEY=\S")) {
+  Write-Host "Commande 'claude' absente -> installation de Claude Code (CLI) via npm"
+  npm install -g @anthropic-ai/claude-code
+  Write-Host "Ouvrez un terminal, tapez 'claude' une fois et connectez-vous avec votre compte Claude."
 }
 
 Write-Host "== Vérification =="

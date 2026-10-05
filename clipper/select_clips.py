@@ -35,7 +35,9 @@ Règles absolues :
 - `start_text` = les 5 à 8 PREMIERS mots exacts de l'extrait, `end_text` = les 5 à 8 DERNIERS mots exacts
   (copiés tels quels depuis la transcription). Ces mots font foi pour le découpage : `end_text` doit être la fin
   d'une phrase complète qui conclut l'idée — jamais un mot de liaison (« et », « que », « donc », « mais »…).
-- Chaque extrait doit être compréhensible seul, avec une accroche dès les premiers mots.
+- Chaque extrait doit être compréhensible seul, avec une accroche dès les premiers mots. Il ne commence jamais par
+  une réponse ou un mot de liaison qui renvoie à ce qui précède (« exactement », « oui », « ouais », « voilà »,
+  « et après », « du coup », « donc ») : démarre à la phrase suivante, celle qui porte l'idée.
 - MONTAGE MULTI-SEGMENTS (si `max_segments` > 1) : un clip peut assembler 2 à `max_segments` passages pris à des
   endroits DIFFÉRENTS de l'épisode, dans l'ordre de ton choix, autour d'un même thème : d'abord une accroche
   (souvent une phrase choc, une question ou une position tranchée), puis les passages qui développent et concluent.

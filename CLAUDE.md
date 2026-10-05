@@ -10,8 +10,11 @@ Arthur dépose ses fichiers (épisodes, clips de référence, logos, posts) dans
 dans `brands/<marque>/episodes|references|assets|assets/guests/` (voir `depot/README.md`). S'il est vide, regarder
 les fichiers récents de `~/Downloads`.
 
-Le skill `.claude/skills/podcast-clips/SKILL.md` décrit l'interview à mener (marque, invité, côté animateur,
-nombre de clips, formats, style) puis le pipeline. Pour toute demande « fais-moi des clips », suis ce skill.
+Le skill `.claude/skills/podcast-clips/SKILL.md` décrit le **workflow en 5 étapes** voulu par Arthur (05/10/2026) :
+dépôt de l'épisode (4K) → `propose` (~10 passages) → l'humain en choisit 5 + demandes particulières (`pick`,
+`find`, `check`) → `build` + `posts` + `render` → livraison des 5 MP4 et des 5 posts. Ne jamais monter avant le
+choix humain. Schéma et « quel fichier modifier » : `docs/FRAMEWORK.md` (destiné à l'équipe marketing, qui
+installe via « clone … et installe tout ce qu'il faut » dans Claude Code — voir README).
 
 ## Installation sur une machine neuve (« installe tout ce qu'il faut »)
 
@@ -34,6 +37,7 @@ python -m clipper run --brand <slug> --input <fichier-dans-brands/slug/episodes/
 python -m clipper transcribe|select|build|posts|render|preview … --brand <slug> --input …   # étapes séparées, cache dans output/
 python -m clipper posts --brand <slug> --input … [--episode-url URL] [--guest-role "…"] [--only N] [--force]   # post LinkedIn + description par clip
 python -m clipper build|render … --jobs N          # parallélisme (défaut : build.jobs / render.jobs = auto)
+python -m clipper propose|pick|find|check … --brand <slug> --input …   # workflow 10 propositions -> 5 choisies (skill)
 python -m clipper new-brand <slug>   # copie brands/_template
 npx hyperframes lint|check|snapshot --at 3,10 --no-end -o <dir>   # dans output/<brand>/<ep>/clips/<clip>/<format>/
 ```
@@ -87,9 +91,10 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
    (`abs_to_rel`). `montage.join_transition: cut|flash`.
 6. **Un post LinkedIn par clip** (`clipper/posts.py`, commande `posts`, lancée par `run`) : rédigé dans le ton de
    `brands/<slug>/posts.md` (règles + posts réellement publiés par la marque, à ne jamais recopier), porte l'idée
-   du clip, n'invente rien qui ne soit dans la transcription de l'extrait, alterne les variantes (idée / preview /
-   « nouvel épisode » une seule fois). AI Corner : posts **en anglais**, voix de la page AI Partners, sans hashtags,
-   CTA YouTube AI PARTNERS / Spotify / Ausha. Sortie : `output/…/posts/clip_NN_<titre>.md` + champs
+   du clip, n'invente rien qui ne soit dans la transcription de l'extrait. AI Corner : **méthode « post d'un short »**
+   déduite des 4 posts publiés pour les shorts Dust (accroche-thèse en 1 ligne — citation, constat ou question —,
+   contraste, invité « Prénom Nom, Rôle at Entreprise », développement concret, chute en 1 ligne, CTA 🎬/🎙️ + lien) ;
+   anglais, voix de la page AI Partners, sans hashtags. Les formats « nouvel épisode / preview » seulement sur demande. Sortie : `output/…/posts/clip_NN_<titre>.md` + champs
    `linkedin_post` / `short_description` dans `clips.json` + `summary.md`.
 
 ## Fluidité des coupes (demande d'Arthur, 05/10/2026 : « moins de cuts, pas trop couper, plus fluide »)
@@ -113,7 +118,8 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
   `--crf 12` et `--video-frame-format png` (sinon images source en JPEG). Désactivé si `framing.slow_zoom` (le
   zoom lent reste animé par la timeline). Rendu ≈ 12× la durée du clip avec PNG.
 - `-filter_complex_script` n'existe plus dans FFmpeg 9 : utiliser `-/filter_complex <fichier>`.
-- La vraie limite reste la source : pour une netteté « native », il faut les rushes 4K ou un export haut débit.
+- La vraie limite reste la source : AI Partners a accès aux épisodes en 4K (octobre 2026) — toujours partir de la
+  4K. `cut_segment` garde jusqu'à `render.max_source_height` (2160) lignes ; un cadre 9:16 y fait 1215 px de large.
 
 ## Parallélisme (pattern « split → parallèle → agrégation »)
 

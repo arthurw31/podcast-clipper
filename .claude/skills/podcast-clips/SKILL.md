@@ -1,121 +1,122 @@
 ---
 name: podcast-clips
-description: Transforme un épisode de podcast (mp4) en shorts/reels/clips LinkedIn montés (9:16, 16:9, 1:1) avec le framework « clipper » de ce dépôt — transcription, sélection des meilleurs extraits par Claude, recadrage vertical, sous-titres, carte de fin, rendu HyperFrames, et pour chaque clip un post LinkedIn + une description courte dans le ton de la marque. Pose d'abord les questions qui manquent (marque, invité, côté de l'animateur, nombre de clips, formats, style, lien de l'épisode), crée la fiche marque si elle n'existe pas, puis lance tout le pipeline et livre les MP4 + les posts. Déclencher sur « clip », « short », « reel », « découpe mon podcast », « fais des extraits », « /podcast-clips », ou dès qu'un fichier de podcast est déposé dans le dossier.
+description: Transforme un épisode de podcast (mp4, idéalement 4K) en 5 shorts verticaux montés + le post LinkedIn de chacun, avec le framework « clipper » de ce dépôt. Workflow en 5 étapes — l'utilisateur dépose l'épisode dans depot/, Claude transcrit et propose une dizaine de passages (thème, titre, timecodes, extrait), l'utilisateur en choisit 5 et ajoute ses demandes particulières (« il faut absolument le passage où il dit… »), puis Claude monte les 5 shorts (charte de la marque, sous-titres, logos, carte de fin) et rédige les posts LinkedIn. Déclencher sur « clip », « short », « reel », « découpe mon podcast », « fais des extraits », « nouveau podcast », « /podcast-clips », ou dès qu'un épisode est déposé dans depot/.
 ---
 
-# Podcast → clips (interview guidée puis pipeline complet)
+# Podcast → 5 shorts + posts LinkedIn
 
-Tu pilotes le framework `clipper` (voir [CLAUDE.md](../../../CLAUDE.md) et [README.md](../../../README.md)).
-Objectif : l'utilisateur donne son podcast et ses envies de montage en langage naturel, tu complètes ce
-qui manque par quelques questions, puis tu produis les clips sans qu'il touche à la ligne de commande.
+Tu pilotes le framework `clipper` (voir [CLAUDE.md](../../../CLAUDE.md), [README.md](../../../README.md) et le
+schéma [docs/FRAMEWORK.md](../../../docs/FRAMEWORK.md)). L'utilisateur est un membre de l'équipe marketing :
+il ne tape aucune commande, tu fais tout et tu lui parles simplement (pas de jargon technique).
 
-## 0. Vérifier l'environnement (une fois par machine)
+Le workflow a **deux moments où l'humain décide** (étapes 2 et 3). Ne les saute jamais : ne monte rien avant
+que l'utilisateur ait choisi ses passages.
+
+## 0. Environnement (une fois par machine)
 
 ```bash
 python -m clipper doctor
 ```
 
-Si quelque chose manque (FFmpeg, Node, dépendances Python, clé Pexels, Claude), dis quoi installer et
-arrête-toi là. Ne lance jamais une transcription sur une machine qui n'a pas passé le doctor.
+Si un point est KO : suis les indications (`-> …`), ou lance `scripts\setup.ps1` (Windows) / `scripts/setup.sh`
+(macOS). Ne lance jamais une transcription sur une machine qui n'a pas passé le doctor.
 
-## 1. Comprendre la demande, puis poser UNIQUEMENT les questions manquantes
+## 1. Récupérer et ranger l'épisode
 
-Lis d'abord le message de l'utilisateur et le dossier : les fichiers fournis arrivent dans `depot/` (sinon
-regarde les fichiers récents de Téléchargements) — range-les d'abord (épisode → `brands/<slug>/episodes/`,
-clips de référence → `references/`, logo de l'entreprise invitée → `assets/guests/<entreprise>.svg|png`,
-logos/polices de la marque → `assets/`) et dis où tu as mis chaque fichier. Un fichier vidéo dans
-`brands/<slug>/episodes/` est l'épisode ; `python -m clipper brands` liste les marques existantes.
-Déduis tout ce qui peut l'être (nom du podcast dans le nom du fichier, invité dans une description YouTube
-collée, etc.). Ensuite, en UNE seule salve (AskUserQuestion, 4 questions max), demande ce qui reste :
-
-1. **Marque / podcast** — une marque existante (`brands/`) ou nouvelle ? Si nouvelle : nom du podcast, et
-   a-t-il des clips déjà publiés ou des exemples de style à déposer dans `references/` ? un logo (PNG fond
-   transparent) ? une charte (couleurs, police) ?
-2. **L'épisode** — invité (nom + **rôle** + entreprise ; **logo de l'entreprise** si la marque l'affiche,
-   comme AI Corner) et **côté de l'animateur dans le plan large** (gauche /
-   droite) ; l'épisode commence-t-il par un teaser déjà sous-titré à exclure ? **L'URL de l'épisode complet**
-   (YouTube / Spotify) si elle existe déjà : elle est mise en clair dans le CTA des posts, sinon « lien en
-   commentaire ».
-3. **La commande** — nombre de clips (défaut 6), formats (9:16 seul, ou + 16:9 LinkedIn, ou + 1:1),
-   durée cible, thèmes à privilégier ou à éviter.
-4. **Le style de montage** — un des presets : `dynamic` (capitales, mots-clés colorés, typewriter, B-roll :
-   style « Dans la tête d'un CEO »), `editorial` (sobre, minuscules centrées, montage multi-segments,
-   pas de B-roll : style AI Partners), `clean`, `minimal` ; ou « comme la marque X » ; ou « comme ces clips »
-   (références). Demande aussi le texte du CTA de fin si la marque est nouvelle (défaut : « L'épisode complet
-   sur {podcast} / Lien en bio »), et **2 ou 3 posts LinkedIn déjà publiés** par le podcast (collés dans le chat
-   ou en fichier) : ils calent le ton des posts générés pour chaque clip (`brands/<slug>/posts.md`).
-
-Ne redemande jamais ce que l'utilisateur a déjà dit. Si tout est clair, ne pose aucune question.
-
-## 2. Mettre en place la marque si elle n'existe pas
+1. Regarde `depot/` (sinon les fichiers récents de Téléchargements). Range chaque fichier et dis où tu l'as mis :
+   épisode → `brands/<marque>/episodes/<E-numéro>_<invite>_<entreprise>.mp4` ; logo de l'entreprise invitée →
+   `brands/<marque>/assets/guests/<entreprise>.svg|png` ; clips de référence → `references/` ; logos/polices → `assets/`.
+2. Préfère toujours la **version 4K** de l'épisode si elle existe (bien plus net en vertical). Vérifie avec
+   `ffprobe` : 3840×2160 attendu ; si c'est du 1080p, signale-le en une phrase et continue.
+3. Demande en UNE salve (AskUserQuestion) uniquement ce qui manque :
+   - la marque (`python -m clipper brands` ; par défaut `ai-corner`) ;
+   - l'invité : prénom nom, **rôle**, entreprise, et son **logo** (SVG ou PNG transparent) s'il n'est pas déposé ;
+   - le côté de l'animateur dans le plan large (gauche / droite) — regarde une image de l'épisode pour le déduire
+     toi-même (`ffmpeg -ss 600 -i … -frames:v 1`) avant de demander ;
+   - le lien de l'épisode complet (YouTube) s'il existe déjà — sinon les posts finiront par « Link in the comments ».
+4. Lance la transcription **en arrière-plan** (≈ 20 min pour 50 min d'épisode sur CPU) :
 
 ```bash
-python -m clipper new-brand <slug>
+python -m clipper transcribe --brand <marque> --input <fichier>
 ```
 
-Puis édite `brands/<slug>/brand.yaml` (ne garde que ce qui diffère de `config/defaults.yaml`),
-`brands/<slug>/guidelines.md` (brief éditorial : ton, ce qui fait un bon extrait, à éviter, hashtags) et
-`brands/<slug>/posts.md` (brief des posts LinkedIn : langue, voix, longueur, emojis, hashtags ou non, CTA,
-structure, **puis les posts déjà publiés collés tels quels** en exemples — analyse-les d'abord : langue,
-qui parle, accroche, puces ou non, longueur, emojis, présence de hashtags, forme du CTA, et écris les règles
-qui en découlent ; renseigne `publication.language / host_name / channels` dans brand.yaml). Copie
-logo/polices dans `assets/`, l'épisode dans `episodes/`, les clips de référence dans `references/`.
-Exemple complet de brief posts : `brands/ai-corner/posts.md` (posts AI Partners en anglais, 3 variantes).
+   Ensuite, corrige dans `output/<marque>/<episode>/transcript.json` les noms propres mal écrits (Whisper écrit
+   souvent mal le nom de l'invité et de son entreprise ; « iPartners » = AI Partners).
 
-Si des clips de référence sont fournis : **analyse-les avant d'écrire brand.yaml** (extraire une planche
-contact avec ffmpeg, regarder typo/casse/couleur/position des sous-titres, mots-clés colorés ou non,
-typewriter ou non, présence de B-roll, structure du montage — un passage continu ou plusieurs segments —,
-carte de fin) et choisis le preset le plus proche, puis ajuste. Exemple complet : `brands/ai-corner/`
-(style monteur, multi-segments) et `brands/dans-la-tete-dun-ceo/` (style punchy).
-
-Résume à l'utilisateur en 5 lignes la charte que tu as déduite et demande une validation rapide
-avant de lancer les rendus (la transcription peut démarrer pendant qu'il répond).
-
-## 3. Lancer le pipeline
-
-Toujours étape par étape (chaque étape est en cache, on peut reprendre) :
+## 2. Proposer une dizaine de passages
 
 ```bash
-python -m clipper transcribe --brand <slug> --input <fichier>            # long : lance-le en arrière-plan
-python -m clipper select --brand <slug> --input <fichier> --guest "…" --company "…" --host-side left|right --n 6 [--instructions "…"]
-python -m clipper build  --brand <slug> --input <fichier>
-python -m clipper posts  --brand <slug> --input <fichier> [--episode-url URL] [--guest-role "CDO at …"]   # post LinkedIn + description par clip
-python -m clipper render --brand <slug> --input <fichier>                # long : arrière-plan
+python -m clipper propose --brand <marque> --input <fichier> --guest "…" --company "…" --host-side left|right --n 10 [--instructions "…"]
 ```
 
-- Transcription ≈ 0,4× la durée de l'épisode sur CPU ; rendu ≈ 4–8× la durée de chaque clip et par format
-  (divisé par ~1,6 grâce aux rendus parallèles, `render.jobs: auto`). Annonce ces délais, lance en arrière-plan,
-  et occupe-toi du reste pendant ce temps.
-- **Chevauche les étapes** : pendant `transcribe`, prépare la marque / le brief posts ; pendant `render`, génère
-  et relis les posts (`posts` ne dépend pas du rendu) et vérifie les bornes des extraits. `select` tourne déjà
-  en parallèle par angle éditorial (`selection.angles`) et `build` un clip par processus : pas besoin de
-  sous-agents pour ça — les sous-agents servent seulement à relire en parallèle plusieurs clips (un par clip :
-  bornes mot à mot + post) si l'utilisateur le demande.
-- Après `select`, **vérifie mot à mot** le début et la fin de chaque extrait (script : mots avant/après
-  chaque borne, voir CLAUDE.md règle 1). Un extrait qui coupe une pensée se corrige dans `clips.json`
-  puis `build --only N` ; ne livre jamais un clip tronqué.
-- Après `build`, `lint` doit être OK ; pour tout changement de style, fais un `npx hyperframes snapshot`
-  et regarde les images avant de rendre.
-- `posts` (rapide, un seul appel LLM pour tous les clips) écrit `output/<slug>/<épisode>/posts/clip_NN_<titre>.md` :
-  le **post LinkedIn** complet dans le ton de `posts.md` (variantes alternées : idée / preview / nouvel épisode,
-  celle-ci une seule fois) + la **description courte** Reels/Shorts. Relis chaque post : il doit porter l'idée du
-  clip, ne rien inventer (chiffres, clients, citations absents de l'extrait → à retirer), respecter la langue et
-  les règles du brief. Corrige à la main dans le `.md` ou relance `posts --only N --force` avec une consigne
-  ajoutée dans `posts.md`. Si l'extrait d'un clip change (`clips.json` + `build --only N`), relance
-  `posts --only N --force`.
+Trois lectures de l'épisode en parallèle (une par angle éditorial de la marque), puis un « jury » garde les 10
+meilleurs, variés. Sortie : `output/<marque>/<episode>/candidates.md` (+ `candidates.json`).
 
-## 4. Livrer
+Présente-les à l'utilisateur dans le chat, numérotés, chacun en 3 lignes : **le titre de la bulle** (la question),
+le thème + timecodes + durée, et une phrase-clé de ce qu'on entend. Puis demande :
+« Lesquels gardez-vous ? (5 numéros, ex. 1, 3, 4, 7, 9) — et y a-t-il un passage précis que vous voulez
+absolument, ou quelque chose à éviter ? »
 
-- Envoie les MP4 (`output/<slug>/<épisode>/renders/`) à l'utilisateur avec SendUserFile, en commençant par
-  le format principal.
-- Donne le chemin du dossier, le récapitulatif des extraits (titre, timecodes, durée) et, **pour chaque clip,
-  son post LinkedIn et sa description courte** (`posts/clip_NN_<titre>.md`, repris dans `summary.md`) — colle-les
-  dans la réponse, prêts à publier, dans l'ordre des clips.
-- Propose les retouches possibles : modifier un extrait dans `clips.json`, ouvrir le Studio HyperFrames
-  (`python -m clipper preview … --clip N`), changer le preset, désactiver le CTA.
+## 3. Choix de l'utilisateur et demandes particulières
+
+```bash
+python -m clipper pick --brand <marque> --input <fichier> --ids 1,3,4,7,9
+```
+
+Pour chaque demande particulière :
+- « il faut absolument le passage où il dit … » → `python -m clipper find --brand … --input … "mots de la phrase"`
+  donne le timecode et le contexte. Intègre ce passage au short le plus proche par le thème (comme accroche ou
+  conclusion), ou remplace un candidat — en éditant `segments` dans `output/…/clips.json` (début = début d'une
+  phrase, fin = fin d'une phrase) ; dis à l'utilisateur ce que tu as fait.
+- « pas ce sujet / pas ce chiffre » → retire ou recoupe le segment concerné.
+- un changement de titre de bulle → `hook_title` dans `clips.json`.
+
+Puis **vérifie chaque coupe mot à mot** (règle absolue : ne jamais couper une pensée) :
+
+```bash
+python -m clipper check --brand <marque> --input <fichier>
+```
+
+Chaque passage doit commencer au début d'une phrase et finir sur une fin de phrase complète ; jamais de mot du
+passage suivant (« après » ne doit pas être entamé). Corrige dans `clips.json` et relance `check`.
+
+## 4. Monter les 5 shorts et rédiger les posts
+
+```bash
+python -m clipper build  --brand <marque> --input <fichier>          # projets HyperFrames (lint OK attendu)
+python -m clipper posts  --brand <marque> --input <fichier> --guest-role "<Rôle> at <Entreprise>" [--episode-url URL]
+python -m clipper render --brand <marque> --input <fichier>          # long : arrière-plan
+```
+
+- Le rendu prend ≈ 12 × la durée de chaque short (2 en parallèle) : ≈ 30–40 min pour 5 shorts de 35 s. Annonce-le,
+  lance-le en arrière-plan, et pendant ce temps relis les posts.
+- Avant le rendu, contrôle visuellement un short : `npx hyperframes snapshot --at 2,10,20 --no-end` dans
+  `output/…/clips/clip_01_…/9x16/` (logos centrés en haut, bulle-titre, sous-titres, carte de fin).
+- Les posts suivent `brands/<marque>/posts.md` (méthode « post d'un short » : accroche-thèse, contraste, invité,
+  développement concret, chute, CTA ; anglais pour AI Corner, sans hashtags). Relis-les : rien d'inventé
+  (chiffre, exemple, citation absents du short), deux posts ne commencent pas pareil. Corrige à la main dans
+  `output/…/posts/clip_NN_….md` si besoin, ou `posts --only N --force`.
+
+## 5. Livrer
+
+- Envoie les 5 MP4 (`output/<marque>/<episode>/renders/`) avec SendUserFile, dans l'ordre.
+- Colle dans le chat, pour chaque short : le titre, la durée, puis son **post LinkedIn** prêt à copier.
+- Donne le chemin du dossier et propose les retouches : changer un passage, un titre, un post, refaire un short.
+
+## Retouches courantes
+
+| Demande | Action |
+| --- | --- |
+| « coupe trop tôt / trop tard » | ajuster `segments` dans `clips.json`, `check`, puis `build --only N` et `render --only N --force` |
+| « autre titre dans la bulle » | `hook_title` dans `clips.json`, `build --only N`, `render --only N --force` |
+| « c'est saccadé » | ne pas ajouter de coupes : voir `framing` (max_shot_len, min_reframe_len) dans `brand.yaml` |
+| « refais le post » | `posts --only N --force` (ajouter une consigne dans `posts.md` si c'est un défaut récurrent) |
+| « nouvelle marque / autre podcast » | `python -m clipper new-brand <slug>`, puis brand.yaml, guidelines.md, posts.md (voir README) |
 
 ## Garde-fous
 
-- Jamais de rendu sans avoir montré la sélection (titres + timecodes) à l'utilisateur.
-- Un clip qui dépasse la durée cible pour finir une idée est correct ; un clip coupé au milieu ne l'est pas.
-- Ne modifie pas `config/defaults.yaml` pour un besoin propre à une marque : passe par `brand.yaml`.
+- Jamais de montage sans le choix explicite de l'utilisateur (étape 3).
+- Un short qui dépasse un peu la durée cible pour finir une idée est correct ; un short coupé au milieu ne l'est pas.
+- Ne modifie pas `config/defaults.yaml` pour un besoin propre à une marque : passe par `brands/<marque>/brand.yaml`.
+- Un retour de l'utilisateur sur le style qui vaut pour la suite (« moins de coupes », « logos plus grands »)
+  se règle dans la config de la marque ou le preset, pas seulement sur ce short — et se note dans CLAUDE.md.

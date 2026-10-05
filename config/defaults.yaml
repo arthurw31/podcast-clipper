@@ -263,6 +263,7 @@ render:
   prereframe: true          # recadrage vertical fait par FFmpeg (Lanczos) au lieu du navigateur
   sharpen: 0.5              # accentuation après agrandissement (0 = aucune, 0.3–0.8 recommandé)
   intermediate_crf: 10      # vidéos intermédiaires quasi sans perte
+  max_source_height: 2160   # source gardée en 4K si disponible (un cadre 9:16 dans du 4K = 1215 px de large, net)
   lint: true
   # rendus HyperFrames lancés en même temps (chacun = un Chromium headless, ~2-3 cœurs).
   # auto = cœurs/4 (2 sur un PC 8 cœurs). Mesuré sur 8 cœurs sans GPU : 2 rendus en parallèle ≈ 1,6× plus vite.

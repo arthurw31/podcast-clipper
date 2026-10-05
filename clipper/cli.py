@@ -2,7 +2,11 @@
 
   python -m clipper run       --brand <slug> --input episode.mp4 [--guest "…" --company "…"] [--n 6] [--formats 9x16,16x9] [--no-render]
   python -m clipper transcribe --brand <slug> --input episode.mp4
-  python -m clipper select    --brand <slug> --input episode.mp4 [--force]        # (re)sélection LLM
+  python -m clipper propose   --brand <slug> --input episode.mp4 --guest … --company … [--n 10]  # passages candidats
+  python -m clipper pick      --brand <slug> --input episode.mp4 --ids 1,3,4,7,9                   # choix -> clips.json
+  python -m clipper find      --brand <slug> --input episode.mp4 "mots de la phrase"               # retrouver un passage
+  python -m clipper check     --brand <slug> --input episode.mp4                                   # contrôle des coupes
+  python -m clipper select    --brand <slug> --input episode.mp4 [--force]        # (re)sélection LLM directe
   python -m clipper build     --brand <slug> --input episode.mp4 [--only 1,3]     # projets HyperFrames
   python -m clipper render    --brand <slug> --input episode.mp4 [--only 1]       # MP4
   python -m clipper posts     --brand <slug> --input episode.mp4 [--episode-url URL] # post LinkedIn + description par clip
@@ -86,6 +90,122 @@ def cmd_select(a: argparse.Namespace) -> dict:
         return data
     return select_clips(transcript, brand, ep / "clips.json", n_clips=a.n, guest=a.guest, company=a.company,
                         force=a.force, extra_instructions=a.instructions or "", host_side=a.host_side)
+
+
+def _ts(t: float) -> str:
+    return f"{int(t // 60):02d}:{t % 60:04.1f}"
+
+
+def _clip_text(transcript: dict, clip: dict) -> str:
+    from .transcribe import words_between
+    parts = []
+    for sg in clip.get("segments") or [clip]:
+        parts.append(" ".join(w["w"] for w in words_between(transcript, float(sg["start"]), float(sg["end"]))))
+    return " […] ".join(parts)
+
+
+def cmd_propose(a: argparse.Namespace) -> dict:
+    """Étape 2 du workflow : ~10 passages candidats (thème, titre, timecodes, résumé) à soumettre à l'humain."""
+    brand = Brand(a.brand)
+    video = resolve_input(brand, a.input)
+    ep = episode_dir(brand, video)
+    transcript = transcribe(video, ep / "transcript.json", brand.cfg, ep / "work")
+    data = select_clips(transcript, brand, ep / "candidates.json", n_clips=a.n or 10, guest=a.guest, company=a.company,
+                        force=a.force or not (ep / "candidates.json").exists(), extra_instructions=a.instructions or "",
+                        host_side=a.host_side)
+    lines = [f"# Passages proposés — {data.get('guest', '')} ({data.get('company', '')})", "",
+             "Choisissez-en 5 : `python -m clipper pick … --ids 1,3,4,7,9`", ""]
+    for c in data["clips"]:
+        segs = " + ".join(f"{_ts(sg['start'])}→{_ts(sg['end'])}" for sg in c["segments"])
+        lines += [f"## {c['index']}. {c.get('hook_title') or c['title']}",
+                  f"- **Thème** : {c['title']} · angle : {c.get('angle', '').split(':')[0] or '—'}",
+                  f"- **Passages** : {segs} ({c['duration']:.0f} s) · score {c.get('score', '')}",
+                  f"- **Pourquoi** : {c.get('why', '')}",
+                  f"- **Ce qu'on entend** : « {_clip_text(transcript, c)[:420]}… »", ""]
+    (ep / "candidates.md").write_text("\n".join(lines), encoding="utf-8")
+    console.print(f"[green]{len(data['clips'])} passages proposés[/green] → {ep / 'candidates.md'}")
+    for c in data["clips"]:
+        console.print(f"  {c['index']:2d}. ({c['duration']:.0f}s) {c.get('hook_title') or c['title']}")
+    return data
+
+
+def cmd_pick(a: argparse.Namespace) -> dict:
+    """Étape 3 : garde les candidats choisis (dans l'ordre donné) -> clips.json, prêt pour build."""
+    brand = Brand(a.brand)
+    ep = episode_dir(brand, resolve_input(brand, a.input))
+    cand = json.loads((ep / "candidates.json").read_text(encoding="utf-8"))
+    by_id = {c["index"]: c for c in cand["clips"]}
+    ids = [int(x) for x in a.ids.split(",") if x.strip()]
+    missing = [i for i in ids if i not in by_id]
+    if missing:
+        sys.exit(f"Candidats inconnus : {missing} (disponibles : {sorted(by_id)})")
+    clips = [dict(by_id[i], index=n, candidate=i) for n, i in enumerate(ids, 1)]
+    out = dict(cand, clips=clips)
+    if (ep / "clips.json").exists():
+        shutil.copy2(ep / "clips.json", ep / "clips_previous.json")
+    (ep / "clips.json").write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
+    console.print(f"[green]{len(clips)} shorts retenus[/green] → {ep / 'clips.json'}")
+    for c in clips:
+        console.print(f"  #{c['index']} (candidat {c['candidate']}) {c.get('hook_title') or c['title']}")
+    return out
+
+
+def cmd_find(a: argparse.Namespace) -> None:
+    """Retrouve une phrase dans la transcription (demande du type « il faut le passage où il dit … »)."""
+    import re as _re
+    import unicodedata as _ud
+    from .transcribe import sentences
+
+    def norm(x: str) -> str:
+        x = _ud.normalize("NFD", x.lower())
+        return _re.sub(r"[^a-z0-9 ]", "", "".join(ch for ch in x if _ud.category(ch) != "Mn"))
+
+    brand = Brand(a.brand)
+    ep = episode_dir(brand, resolve_input(brand, a.input))
+    transcript = json.loads((ep / "transcript.json").read_text(encoding="utf-8"))
+    sents = sentences(transcript)
+    q = set(norm(a.text).split())
+    scored = []
+    for i in range(len(sents)):
+        window = " ".join(x["text"] for x in sents[i:i + 3])
+        scored.append((len(q & set(norm(window).split())) / max(1, len(q)), i))
+    scored.sort(reverse=True)
+    shown: list[int] = []
+    for score, i in scored:
+        if len(shown) >= a.n or score < 0.3:
+            break
+        if any(abs(i - j) <= 2 for j in shown):
+            continue
+        shown.append(i)
+        console.print(f"[bold]{_ts(sents[i]['start'])}[/bold] ({sents[i]['start']:.1f}s) · correspondance {score:.0%}")
+        for p in sents[max(0, i - 1): i + 3]:
+            console.print(f"   [{p['start']:.1f} → {p['end']:.1f}] {p['text']}")
+    if not shown:
+        console.print("[yellow]Aucun passage ne correspond (essayer d'autres mots-clés)[/yellow]")
+
+
+def cmd_check(a: argparse.Namespace) -> None:
+    """Contrôle « jamais couper une pensée » : mots juste avant / au début / à la fin / juste après chaque passage."""
+    from .transcribe import all_words
+    brand = Brand(a.brand)
+    ep = episode_dir(brand, resolve_input(brand, a.input))
+    transcript = json.loads((ep / "transcript.json").read_text(encoding="utf-8"))
+    W = all_words(transcript)
+    clips = json.loads((ep / "clips.json").read_text(encoding="utf-8"))
+    only = _parse_only(a.only)
+    for c in clips["clips"]:
+        if only and c["index"] not in only:
+            continue
+        console.rule(f"#{c['index']} {c.get('hook_title') or c['title']} ({c['duration']:.0f}s)")
+        for sg in c["segments"]:
+            before = [w["w"] for w in W if w["e"] <= sg["start"]][-6:]
+            inside = [w["w"] for w in W if w["s"] >= sg["start"] - 0.05 and w["e"] <= sg["end"] + 0.05]
+            after = [w["w"] for w in W if w["s"] >= sg["end"]][:6]
+            console.print(f"[dim]{sg['start']:.2f}→{sg['end']:.2f} ({sg['duration']:.1f}s) · silence après {sg.get('tail_silence', 0):.2f}s[/dim]")
+            console.print(f"  avant : …{' '.join(before)}")
+            console.print(f"  [green]début : {' '.join(inside[:10])}[/green]")
+            console.print(f"  [green]fin   : …{' '.join(inside[-10:])}[/green]")
+            console.print(f"  après : {' '.join(after)}…")
 
 
 def cmd_build(a: argparse.Namespace) -> list[Path]:
@@ -392,6 +512,15 @@ def main(argv: list[str] | None = None) -> None:
     sp = sub.add_parser("select"); common(sp); selection_args(sp); sp.set_defaults(fn=cmd_select)
     sp = sub.add_parser("build"); common(sp); build_args(sp); sp.set_defaults(fn=cmd_build)
     sp = sub.add_parser("render"); common(sp); build_args(sp); render_args(sp); sp.set_defaults(fn=cmd_render)
+    sp = sub.add_parser("propose", help="~10 passages candidats à soumettre (candidates.md)"); common(sp); selection_args(sp)
+    sp.set_defaults(fn=cmd_propose)
+    sp = sub.add_parser("pick", help="garde les candidats choisis -> clips.json"); common(sp)
+    sp.add_argument("--ids", required=True, help="numéros des candidats, ex: 1,3,4,7,9"); sp.set_defaults(fn=cmd_pick)
+    sp = sub.add_parser("find", help="retrouve une phrase dans la transcription"); common(sp)
+    sp.add_argument("text", help="mots de la phrase cherchée"); sp.add_argument("--n", type=int, default=5)
+    sp.set_defaults(fn=cmd_find)
+    sp = sub.add_parser("check", help="mots autour de chaque coupe (jamais couper une pensée)"); common(sp)
+    sp.add_argument("--only", default=""); sp.set_defaults(fn=cmd_check)
     sp = sub.add_parser("posts", help="post LinkedIn + description courte pour chaque clip"); common(sp); posts_args(sp)
     sp.add_argument("--only", default="", help="index de clips, ex: 1,3"); sp.set_defaults(fn=cmd_posts)
     sp = sub.add_parser("preview", help="ouvre le Studio HyperFrames sur un clip"); common(sp)

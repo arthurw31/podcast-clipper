@@ -35,14 +35,15 @@ Règles absolues :
   pas un résumé générique de l'épisode.
 - Ne jamais inventer un chiffre, un nom de client, une citation ou un fait absent de la transcription du clip.
   Une citation entre guillemets doit être mot pour mot dans la transcription.
-- Varie les structures entre les clips d'un même épisode (accroches, angles, variantes du brief) ; deux posts ne
-  doivent pas commencer de la même façon. Si le brief définit une variante « nouvel épisode », ne l'utilise
-  qu'une fois, pour le clip n° 1.
+- Suis la méthode « post d'un short » du brief si elle existe ; les formats d'annonce d'épisode (nouvel épisode,
+  preview) ne s'utilisent que si le contexte le demande explicitement.
+- Varie les structures entre les clips d'un même épisode (forme de l'accroche, place de l'invité, formulation du
+  CTA) ; deux posts ne doivent pas commencer de la même façon.
 - Si une URL d'épisode est fournie, elle apparaît en clair dans le CTA ; sinon applique la consigne du brief
   (« lien en commentaire » ou équivalent). Ne fabrique jamais d'URL.
 - Les sauts de ligne du post sont des `\\n` dans la chaîne JSON.
 - Réponds UNIQUEMENT avec un objet JSON valide de la forme :
-{"posts": [{"index": 1, "variant": "A", "linkedin_post": "…", "short_description": "…"}]}"""
+{"posts": [{"index": 1, "variant": "citation|constat|question", "linkedin_post": "…", "short_description": "…"}]}"""
 
 
 def _clip_text(transcript: dict, clip: dict) -> str:

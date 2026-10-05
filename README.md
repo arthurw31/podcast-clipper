@@ -14,6 +14,37 @@ Deux façons de l'utiliser :
   questions manquantes et fait tout ;
 - **en ligne de commande**, étape par étape.
 
+## Le workflow en 5 étapes
+
+```mermaid
+flowchart LR
+    A["1 · Dépôt<br/>épisode 4K dans depot/"] --> B["2 · Claude propose<br/>~10 passages"]
+    B --> C["3 · Vous en choisissez 5<br/>+ demandes particulières"]
+    C --> D["4 · Claude monte les 5 shorts<br/>et rédige les posts LinkedIn"]
+    D --> E["5 · 5 MP4 1080×1920<br/>+ 5 posts prêts à publier"]
+    classDef human fill:#258AF3,color:#fff,stroke:#151D53;
+    class C human;
+```
+
+Détails, schéma complet et « quel fichier modifier pour changer le format » : **[docs/FRAMEWORK.md](docs/FRAMEWORK.md)**.
+
+## Installation pour l'équipe (Windows ou Mac, ≈ 15 min)
+
+1. **Claude Code** : installez l'application desktop ([claude.com/download](https://claude.com/download)) et
+   connectez-vous avec votre compte Claude (abonnement Pro/Max ou Team).
+2. **Accès au projet** : le dépôt GitHub est privé — demandez à Arthur de vous inviter, puis acceptez
+   l'invitation reçue par e-mail (il faut un compte GitHub).
+3. Dans Claude Code, ouvrez un dossier de travail (ex. `Documents`) et écrivez :
+
+   > clone https://github.com/arthurw31/podcast-clipper et installe tout ce qu'il faut
+
+   Claude récupère le projet, installe Python, Node, FFmpeg et les dépendances (validez les fenêtres
+   d'installation si Windows en affiche), puis vérifie que tout est prêt.
+4. Ouvrez le dossier `podcast-clipper` dans Claude Code. C'est prêt : déposez un épisode dans `depot/` et
+   écrivez « fais-moi 5 shorts de ce podcast » (ou `/podcast-clips`).
+
+Pour récupérer les améliorations plus tard : « mets à jour le projet » (Claude fait un `git pull`).
+
 ---
 
 ## 1. Ce qu'il faut sur votre machine
@@ -59,21 +90,20 @@ La commande vérifie tout (FFmpeg, Node, HyperFrames, librairies Python, modèle
 clés, marques) et indique quoi corriger. Le modèle de transcription Whisper (~1,6 Go) se télécharge tout
 seul au premier lancement.
 
-## 3. Premier clip en 5 minutes (mode guidé)
+## 3. Premiers shorts (mode guidé)
 
 1. Ouvrez le dossier du projet dans **Claude Code**.
-2. Déposez votre épisode (mp4/mov) dans `brands/<votre-marque>/episodes/` — ou à la racine si la marque
-   n'existe pas encore.
+2. Déposez dans `depot/` l'épisode (de préférence la version **4K**) et le logo de l'entreprise invitée.
 3. Écrivez par exemple :
 
-   > Fais-moi 6 clips verticaux + LinkedIn de cet épisode. Invité : Thierry Champéroux, MAIF.
-   > L'animateur est à droite. Style sobre, comme les clips dans references/.
+   > Fais-moi 5 shorts de ce podcast. Invité : Quentin Amaudry, CEO de Mendo.
 
-4. Claude (skill `podcast-clips`) complète ce qui manque par quelques questions, crée la fiche marque si
-   besoin, vous montre la sélection (titres + timecodes), puis lance transcription → sélection → montage →
-   rendu et vous envoie les MP4 et les textes de publication.
+4. Claude (skill `podcast-clips`) range les fichiers, transcrit l'épisode, puis vous propose une dizaine de
+   passages (titre, timecodes, extrait). Vous répondez avec vos 5 numéros et vos demandes éventuelles
+   (« il faut absolument le passage où il parle de… »). Claude monte les 5 shorts, rédige les 5 posts
+   LinkedIn et vous envoie le tout.
 
-Vous pouvez aussi taper `/podcast-clips` pour lancer l'interview directement.
+Vous pouvez aussi taper `/podcast-clips` pour lancer le workflow directement.
 
 ## 4. Créer la fiche de votre podcast (marque)
 
@@ -128,6 +158,12 @@ Options les plus utiles de `brand.yaml` :
 # tout d'un coup
 python -m clipper run --brand mon-podcast --input episode-12.mp4 \
     --guest "Prénom Nom" --company "Entreprise" --host-side right --n 6
+
+# workflow « 10 propositions -> 5 choisies »
+python -m clipper propose    --brand mon-podcast --input episode-12.mp4 --guest "…" --company "…" --n 10   # candidates.md
+python -m clipper pick       --brand mon-podcast --input episode-12.mp4 --ids 1,3,4,7,9
+python -m clipper find       --brand mon-podcast --input episode-12.mp4 "mots d'une phrase à retrouver"
+python -m clipper check      --brand mon-podcast --input episode-12.mp4                                  # coupes mot à mot
 
 # ou étape par étape (chaque étape est mise en cache et reprend là où elle s'est arrêtée)
 python -m clipper transcribe --brand mon-podcast --input episode-12.mp4

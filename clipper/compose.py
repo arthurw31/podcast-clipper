@@ -405,7 +405,8 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
             dur = float(sg["duration"]) + (outro_d if last else 0.0)
             dur = min(dur, max(0.0, info["duration"] - float(sg["start"])))
             part = assets / (f"seg_{j+1}.mp4" if len(segments) > 1 else "source.mp4")
-            cut_segment(source, part, float(sg["start"]), dur, height=min(info["height"], 1080),
+            # source 4K conservée (jusqu'à render.max_source_height) : le recadrage vertical y puise sa netteté
+            cut_segment(source, part, float(sg["start"]), dur, height=min(info["height"], int(cfg.render.get("max_source_height", 2160))),
                         normalize_audio=bool(cfg.audio.normalize), fps=int(cfg.fps))
             parts.append(part)
         if len(parts) > 1:
