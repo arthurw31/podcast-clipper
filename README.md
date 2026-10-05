@@ -32,8 +32,8 @@ Détails, schéma complet et « quel fichier modifier pour changer le format » 
 
 1. **Claude Code** : installez l'application desktop ([claude.com/download](https://claude.com/download)) et
    connectez-vous avec votre compte Claude (abonnement Pro/Max ou Team).
-2. **Accès au projet** : le dépôt GitHub est privé — demandez à Arthur de vous inviter, puis acceptez
-   l'invitation reçue par e-mail (il faut un compte GitHub).
+2. **Accès au projet** : si le dépôt GitHub est privé, demandez à Arthur de vous inviter et acceptez l'invitation
+   reçue par e-mail (il faut un compte GitHub) ; s'il est public, rien à faire.
 3. Dans Claude Code, ouvrez un dossier de travail (ex. `Documents`) et écrivez :
 
    > clone https://github.com/arthurw31/podcast-clipper et installe tout ce qu'il faut
