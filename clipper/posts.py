@@ -33,7 +33,11 @@ tu rédiges le texte qui l'accompagne sur les réseaux :
 Règles absolues :
 - Le post porte L'IDÉE DU CLIP (ce que dit l'invité dans cet extrait précis), reformulée avec ses mots-clés,
   pas un résumé générique de l'épisode.
-- Ne jamais inventer un chiffre, un nom de client, une citation ou un fait absent de la transcription du clip.
+- Attribue chaque idée à la personne qui la dit dans la transcription (animateur ou invité). Quand c'est
+  l'animateur qui pose l'idée et l'invité qui réagit, le post le reflète (« Thomas Spitz asked… », « in our
+  conversation with … »), jamais « l'invité explique » pour des mots de l'animateur.
+- Ne jamais inventer un chiffre, un nom de client, une citation ou un fait absent de la transcription du clip, ni
+  une conclusion que personne ne formule dans le clip.
   Une citation entre guillemets doit être mot pour mot dans la transcription.
 - Suis la méthode « post d'un short » du brief si elle existe ; les formats d'annonce d'épisode (nouvel épisode,
   preview) ne s'utilisent que si le contexte le demande explicitement.
@@ -46,12 +50,35 @@ Règles absolues :
 {"posts": [{"index": 1, "variant": "citation|constat|question", "linkedin_post": "…", "short_description": "…"}]}"""
 
 
-def _clip_text(transcript: dict, clip: dict) -> str:
-    """Transcription du clip, segment par segment (les segments viennent d'endroits différents de l'épisode)."""
+def _clip_text(transcript: dict, clip: dict, host: str = "", guest: str = "") -> str:
+    """Transcription du clip, segment par segment, avec QUI parle (tours de parole du clip) : sans ça, le
+    modèle attribue à l'invité des idées lancées par l'animateur."""
+    turns = sorted(clip.get("turns") or [], key=lambda t: float(t["at"]))
+    names = {"host": f"{host or 'Animateur'} (animateur)", "guest": f"{guest or 'Invité'} (invité)"}
+
+    def speaker(t: float) -> str:
+        cur = turns[0]["speaker"] if turns else ""
+        for tr in turns:
+            if float(tr["at"]) <= t + 0.05:
+                cur = tr["speaker"]
+        return cur
+
+    def line(spk: str, words: list[str]) -> str:
+        return (f"{names.get(spk, '?')} : " if turns else "") + " ".join(words)
+
     parts = []
     for sg in clip.get("segments") or [{"start": clip["start"], "end": clip["end"]}]:
-        words = words_between(transcript, float(sg["start"]), float(sg["end"]))
-        parts.append(" ".join(w["w"] for w in words).strip())
+        lines, cur, buf = [], None, []
+        for w in words_between(transcript, float(sg["start"]), float(sg["end"])):
+            spk = speaker(w["s"])
+            if spk != cur and buf:
+                lines.append(line(cur, buf))
+                buf = []
+            cur = spk
+            buf.append(w["w"])
+        if buf:
+            lines.append(line(cur, buf))
+        parts.append("\n".join(lines))
     return "\n[…]\n".join(p for p in parts if p)
 
 
@@ -91,7 +118,7 @@ def write_posts(brand: Brand, ep: Path, clips: dict, transcript: dict, episode_u
             f"- accroche : {c.get('hook_title', '')}\n"
             f"- pourquoi cet extrait : {c.get('why', '')}\n"
             f"- durée : {c.get('duration', 0):.0f}s\n"
-            f"- transcription :\n{_clip_text(transcript, c)}\n"
+            f"- transcription (avec qui parle) :\n{_clip_text(transcript, c, str(pub.get('host_name') or ''), guest)}\n"
         )
     user = f"""## Brief posts de la marque « {cfg.name} »
 {brief}
