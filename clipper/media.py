@@ -113,3 +113,26 @@ def make_blurred_still(src_frame: Path, dst: Path, blur: int = 22, darken: float
     run([FFMPEG, "-y", "-v", "error", "-i", str(src_frame),
          "-vf", f"gblur=sigma={blur},eq=brightness=-{darken:.2f}", "-q:v", "3", str(dst)])
     return dst
+
+
+def prepare_outro_video(src: Path, dst: Path, width: int, height: int, duration: float,
+                        focus_x: float = 0.5, focus_y: float = 0.5, fps: int = 30) -> Path:
+    """Animation de fin de la charte -> clip muet au format du canvas, accéléré pour durer `duration` s.
+
+    Recadrage « cover » : on garde toute la hauteur (ou largeur) et on centre la fenêtre sur (focus_x, focus_y),
+    fractions de l'image source (ex. 0.62 = là où se trouve le motif)."""
+    info = probe(src)
+    sw, sh = info["width"], info["height"]
+    speed = max(1.0, info["duration"] / max(duration, 0.1))
+    if sw / sh > width / height:
+        ch, cw = sh, int(round(sh * width / height))
+    else:
+        cw, ch = sw, int(round(sw * height / width))
+    cw, ch = cw - cw % 2, ch - ch % 2
+    x = int(min(max(0, focus_x * sw - cw / 2), sw - cw))
+    y = int(min(max(0, focus_y * sh - ch / 2), sh - ch))
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    vf = f"setpts=PTS/{speed:.4f},crop={cw}:{ch}:{x}:{y},scale={width}:{height}:flags=lanczos,fps={fps},tpad=stop_mode=clone:stop_duration=1,format=yuv420p"
+    run([FFMPEG, "-y", "-v", "error", "-i", str(src), "-an", "-vf", vf, "-t", f"{duration:.3f}",
+         "-c:v", "libx264", "-preset", "medium", "-crf", "16", "-movflags", "+faststart", str(dst)])
+    return dst

@@ -130,7 +130,11 @@ montage:
 outro:
   enabled: true
   duration: 3.8
-  background: blur-freeze   # blur-freeze | color | image
+  background: blur-freeze   # blur-freeze | color | image | video
+  video: ""                 # background: video -> animation dans assets/ (recadrée au format, accélérée pour durer `duration`)
+  video_focus_x: 0.5        # centre du recadrage dans l'animation (fractions)
+  video_focus_y: 0.5
+  scrim: ""                 # voile CSS sur la vidéo pour la lisibilité (ex. linear-gradient(...))
   image: ""                 # background: image -> fichier dans assets/ (ex: outro_bg.png), zoom lent
   image_position: center    # cadrage de l'image (CSS object-position), ex: "70% 50%" pour garder le motif à droite
   layout: center            # center | left  (left = logo/texte alignés à gauche, comme une cover de charte)

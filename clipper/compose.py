@@ -18,7 +18,7 @@ from . import broll as broll_mod
 from .analysis import analyze
 from .captions import group_words
 from .config import FORMATS, TEMPLATES_DIR, Brand, Cfg, deep_merge
-from .media import concat_segments, cut_segment, extract_frame, make_blurred_still, probe
+from .media import concat_segments, cut_segment, extract_frame, make_blurred_still, prepare_outro_video, probe
 from .reframe import build_plan
 from .transcribe import words_between
 
@@ -546,6 +546,19 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
                                "css_pos": _pos_css(glc.get("position", "top-left"), int(W * float(glc.get("margin", lg.margin)))),
                                "opacity": float(glc.get("opacity", 1.0))})
         o = fcfg.outro
+        outro_video = None
+        if o.enabled and o.background == "video" and brand.asset(o.get("video")) and outro_d > 0.2:
+            # animation de la charte, recadrée au format et accélérée pour durer exactement la carte de fin
+            ov_dur = round(outro_d + D_speech - outro_start, 3)
+            outro_video = f"outro_{fmt}.mp4"
+            ov_path = assets / outro_video
+            stamp = f"{brand.asset(o.get('video')).stat().st_mtime}-{ov_dur}-{o.get('video_focus_x', 0.5)}-{o.get('video_focus_y', 0.5)}"
+            stamp_file = assets / f"outro_{fmt}.stamp"
+            if force or not ov_path.exists() or not stamp_file.exists() or stamp_file.read_text() != stamp:
+                prepare_outro_video(brand.asset(o.get("video")), ov_path, W, H, ov_dur,
+                                    focus_x=float(o.get("video_focus_x", 0.5)), focus_y=float(o.get("video_focus_y", 0.5)),
+                                    fps=int(cfg.fps))
+                stamp_file.write_text(stamp)
         outro_logo_w = int(W * float(o.logo_width))
         outro_ctx = dict(o)
         cta = dict(o.get("cta") or {})
@@ -568,8 +581,9 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
             "delay": float(cta.get("delay", 0.5)),
         })
         outro_ctx["cta"] = cta
-        outro_ctx.update({"enabled": bool(o.enabled) and outro_d > 0.2, "duration": round(outro_d + D_speech - outro_start, 3), "bg_file": outro_bg,
-                          "bg_is_image": bool(outro_bg) and o.background == "image", "layout": o.get("layout", "center"),
+        outro_ctx.update({"enabled": bool(o.enabled) and outro_d > 0.2, "duration": round(outro_d + D_speech - outro_start, 3), "bg_file": None if outro_video else outro_bg,
+                          "bg_is_image": bool(outro_bg) and o.background == "image" and not outro_video,
+                          "video_file": outro_video, "scrim": o.get("scrim", ""), "layout": o.get("layout", "center"),
                           "image_position": o.get("image_position", "center"),
                           "logo_file": outro_logo_file,
                           "company_italic": bool(o.get("company_italic", fcfg.captions.italic)),

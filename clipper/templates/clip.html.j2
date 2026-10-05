@@ -235,9 +235,18 @@
 {% endfor %}
 
       <!-- ===================== carte de fin ===================== -->
+{% if outro.enabled and outro.video_file %}
+      <!-- animation de fin : <video> timé sans ancêtre timé (wrapper non timé), sous la couche texte -->
+      <div class="layer" id="outro-video-wrap">
+        <video id="outro-video" class="outro-bg" src="assets/{{ outro.video_file }}" data-start="{{ outro_start }}" data-duration="{{ outro.duration }}" data-media-start="0" data-track-index="9" muted playsinline></video>
+      </div>
+{% endif %}
 {% if outro.enabled %}
       <div class="clip layer" id="outro" data-start="{{ outro_start }}" data-duration="{{ outro.duration }}" data-track-index="7">
-{% if outro.bg_file %}
+{% if outro.video_file %}
+{% if outro.scrim %}        <div class="outro-scrim" style="position:absolute;left:0;top:0;width:100%;height:100%;background:{{ outro.scrim }};"></div>
+{% endif %}
+{% elif outro.bg_file %}
         <div class="outro-bg-wrap"><img class="outro-bg" id="outro-bg" src="assets/{{ outro.bg_file }}" alt="" /></div>
 {% else %}
         <div class="outro-bg-color"></div>
@@ -351,7 +360,7 @@
 
       // ---- carte de fin + fondu audio ----
 {% if outro.enabled %}
-      tl.fromTo("#outro-content", { scale: 0.92, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "power3.out" }, {{ outro_start }});
+      tl.fromTo("#outro-content", { scale: 0.92, opacity: 0 }, { scale: 1, opacity: 1, duration: {{ 0.3 if outro.duration < 3 else 0.5 }}, ease: "power3.out" }, {{ outro_start }});
 {% if outro.bg_is_image %}
       tl.fromTo("#outro-bg", { scale: 1.0, xPercent: 0 }, { scale: 1.08, xPercent: -2, duration: {{ outro.duration }}, ease: "none" }, {{ outro_start }});
 {% endif %}

@@ -44,10 +44,11 @@ fonts:
 
 outro:
   enabled: true
-  duration: 4.0
-  background: image          # cover de la charte : fond noir + motif « mountain lines »
-  image: "outro_bg.png"
-  image_position: "72% 50%"  # en vertical, garder les lignes du motif dans le cadre
+  duration: 2.0              # fin rapide (demande d'Arthur) : l'animation de la charte accélérée ×5
+  background: video          # animation officielle AI Partners (lignes « montagne » qui se dessinent)
+  video: "outro_anim.mov"    # 2800×1122, 10 s -> recadrée au format et accélérée pour durer `duration`
+  video_focus_x: 0.62        # centre du recadrage vertical sur le motif
+  scrim: "linear-gradient(90deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.25) 55%, rgba(0,0,0,0) 80%)"
   layout: left               # logo et CTA alignés à gauche, motif à droite (comme les covers AI Partners)
   logo_file: "logo.png"      # logo horizontal blanc
   logo_width: 0.62
@@ -60,6 +61,7 @@ outro:
     subtext: "Lien en bio"
     pill_text_color: "#FFFFFF"
     font_size: 34
+    delay: 0.2               # carte de 2 s : le CTA arrive presque avec le logo
 
 broll:
   enabled: false             # aucun B-roll dans les clips du monteur
@@ -97,6 +99,7 @@ format_overrides:
     outro:
       logo_width: 0.34
       image_position: center
+      video_focus_x: 0.68
       cta:
         subtext: "Lien en description"
         font_size: 30

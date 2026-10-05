@@ -76,8 +76,10 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
    Fira Sans Condensed Bold, noir) pendant l'accroche (`hook.duration: auto`, 7,5–11,5 s) ; sous-titres blancs
    type Arial Bold sous la bulle, centrés, 1–3 lignes construites mot à mot (`reveal: word`, `reveal_reflow`,
    `word_fade`), même position en écran partagé (`split_center: false`) ; split sans séparateur ; light leak
-   aux raccords (`join_transition: leak`) ; 25–45 s ; pas de B-roll ; + carte de fin = cover de la charte
-   (fond noir + motif « mountain lines » + logo blanc + CTA). Bleu #258AF3, **jamais d'italique**.
+   aux raccords (`join_transition: leak`) ; 25–45 s ; pas de B-roll ; + carte de fin de **2 s** sur l'animation
+   officielle AI Partners (`assets/outro_anim.mov`, lignes « montagne » qui se dessinent, recadrée au format et
+   accélérée ×5 : `outro.background: video`, `media.prepare_outro_video`) + logo blanc + CTA. Bleu #258AF3,
+   **jamais d'italique**.
    L'ancien style LinkedIn 16:9 (`references/*.mp4`) reste disponible : preset `editorial`.
 5. **Clips multi-segments** (`selection.max_segments` > 1) : un clip = accroche + développement + conclusion
    pris à des endroits différents de l'épisode ; `clip["segments"]` (liste ordonnée), `compose` découpe chaque
