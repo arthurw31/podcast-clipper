@@ -51,9 +51,14 @@ hook:
   position_y: 0.545
 guest_logo:
   enabled: true
-  position: top-left
+  bar: true                # logo invité + logo AI PARTNERS centrés côte à côte, même hauteur, même ligne
+  bar_height: 0.040        # hauteur visée (fraction de H) ; réduite ensemble si ça dépasse bar_max_width
+  bar_gap: 0.055           # espace entre les deux logos (fraction de W)
+  bar_max_width: 0.88
+  bar_center_y: 0.064      # ligne médiane des logos (fraction de H), comme les shorts du monteur
+  position: top-left       # utilisés seulement sans barre (pas de logo invité)
   height: 0.036
-  max_width: 0.27          # ne jamais toucher le logo AI PARTNERS (logos très larges type Mendo)
+  max_width: 0.27
   margin: 0.088
 logo:
   mode: image

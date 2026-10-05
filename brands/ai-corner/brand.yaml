@@ -48,10 +48,10 @@ outro:
   background: video          # animation officielle AI Partners (lignes « montagne » qui se dessinent)
   video: "outro_anim.mov"    # 2800×1122, 10 s -> recadrée au format et accélérée pour durer `duration`
   video_focus_x: 0.62        # centre du recadrage vertical sur le motif
-  scrim: "linear-gradient(90deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.25) 55%, rgba(0,0,0,0) 80%)"
-  layout: left               # logo et CTA alignés à gauche, motif à droite (comme les covers AI Partners)
+  scrim: "radial-gradient(ellipse 75% 32% at 50% 50%, rgba(0,0,0,.72) 0%, rgba(0,0,0,.35) 60%, rgba(0,0,0,0) 100%)"
+  layout: center             # logo et CTA centrés sur l'animation (demande d'Arthur)
   logo_file: "logo.png"      # logo horizontal blanc
-  logo_width: 0.62
+  logo_width: 0.66
   show_guest: false          # le monteur n'affiche pas l'invité ; passer à true pour l'ajouter
   guest_color: "#FFFFFF"
   company_color: "#258AF3"

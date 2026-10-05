@@ -192,7 +192,14 @@
 {% endfor %}
 
       <!-- ===================== logo ===================== -->
-{% if logo.mode != "none" %}
+{% if guest_logo.bar %}
+      <div class="clip layer" id="logo-layer" data-start="0" data-duration="{{ D_speech }}" data-track-index="5">
+        <div id="logo-bar" style="position:absolute; left:0; right:0; top:{{ guest_logo.bar.center_y_px - guest_logo.bar.height_px // 2 }}px; height:{{ guest_logo.bar.height_px }}px; display:flex; justify-content:center; align-items:center; gap:{{ guest_logo.bar.gap_px }}px;">
+          <img id="guest-logo-img" src="assets/{{ guest_logo.file }}" alt="" style="height:{{ guest_logo.bar.height_px }}px; width:auto; opacity:{{ guest_logo.opacity }};" />
+          <img id="logo-img" src="assets/{{ logo.file }}" alt="" style="height:{{ guest_logo.bar.height_px }}px; width:auto; opacity:{{ logo.opacity }};" />
+        </div>
+      </div>
+{% elif logo.mode != "none" %}
       <div class="clip layer" id="logo-layer" data-start="0" data-duration="{{ D_speech }}" data-track-index="5">
 {% if logo.mode == "image" %}
         <img class="logo-img" id="logo-img" src="assets/{{ logo.file }}" alt="" />
@@ -202,7 +209,7 @@
       </div>
 {% endif %}
 
-{% if guest_logo.file %}
+{% if guest_logo.file and not guest_logo.bar %}
       <div class="clip layer" id="guest-logo-layer" data-start="0" data-duration="{{ D_speech }}" data-track-index="4">
         <img class="guest-logo-img" id="guest-logo-img" src="assets/{{ guest_logo.file }}" alt="" />
       </div>

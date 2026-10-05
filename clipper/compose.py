@@ -267,6 +267,39 @@ def _punch_junctions(plan: list[dict], junctions: list[float], fr: Cfg) -> list[
     return out
 
 
+def _img_aspect(path: Path) -> float:
+    """Rapport largeur / hauteur d'un logo (SVG : viewBox ou width/height ; sinon PIL)."""
+    try:
+        if path.suffix.lower() == ".svg":
+            txt = path.read_text(encoding="utf-8", errors="ignore")[:2000]
+            m = re.search(r'viewBox="\s*[-\d.]+[ ,]+[-\d.]+[ ,]+([\d.]+)[ ,]+([\d.]+)', txt)
+            if m:
+                return float(m.group(1)) / float(m.group(2))
+            w = re.search(r'width="([\d.]+)', txt)
+            h = re.search(r'height="([\d.]+)', txt)
+            return float(w.group(1)) / float(h.group(1))
+        from PIL import Image
+
+        with Image.open(path) as im:
+            return im.width / im.height
+    except Exception:  # noqa: BLE001
+        return 4.0
+
+
+def _logo_bar(W: int, H: int, files: list[Path], cfg: Cfg) -> dict:
+    """Barre de logos centrée en haut (style shorts AI Partners) : même hauteur, centrés sur une même ligne,
+    espacés de `gap`, réduits ensemble si la largeur totale dépasse `max_width`."""
+    h = H * float(cfg.get("bar_height", 0.036))
+    gap = W * float(cfg.get("bar_gap", 0.08))
+    aspects = [_img_aspect(f) for f in files]
+    total = sum(a * h for a in aspects) + gap * (len(files) - 1)
+    limit = W * float(cfg.get("bar_max_width", 0.86))
+    if total > limit:
+        h *= (limit - gap * (len(files) - 1)) / (total - gap * (len(files) - 1))
+    return {"height_px": int(round(h)), "gap_px": int(round(gap)),
+            "center_y_px": int(round(H * float(cfg.get("bar_center_y", 0.064))))}
+
+
 def _hook_duration(hk: Cfg, segments: list[dict], caps: list[dict], D_speech: float) -> float:
     """Durée du titre. `auto` (style shorts AI Partners) : le temps de l'accroche — fin du 1er segment,
     bornée à [min_duration, max_duration], puis calée sur la fin d'un bloc de sous-titres (jamais en plein mot)."""
@@ -296,9 +329,16 @@ def _copy_logo(src: Path, dst: Path, max_w: int = 2000) -> None:
         from PIL import Image
 
         im = Image.open(src)
+        if src.suffix.lower() in (".png", ".webp") and im.mode in ("RGBA", "LA", "P"):
+            # marges transparentes retirées : sinon le logo paraît décentré dans la barre de logos
+            im = im.convert("RGBA")
+            bbox = im.getchannel("A").getbbox()
+            if bbox and bbox != (0, 0, im.width, im.height):
+                im = im.crop(bbox)
         if im.width > max_w and src.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp"):
             im = im.convert("RGBA") if src.suffix.lower() == ".png" else im
             im.thumbnail((max_w, max_w * 4), Image.LANCZOS)
+        if im.size != Image.open(src).size:
             im.save(dst)
             return
     except Exception:  # noqa: BLE001
@@ -546,6 +586,10 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
                                "max_w_px": int(W * float(glc.get("max_width", 0.36))),
                                "css_pos": _pos_css(glc.get("position", "top-left"), int(W * float(glc.get("margin", lg.margin)))),
                                "opacity": float(glc.get("opacity", 1.0))})
+        # barre de logos centrée : logo de l'invité + logo de la marque côte à côte, même hauteur
+        guest_logo_ctx["bar"] = None
+        if glc.get("bar") and guest_logo_file and logo_mode == "image":
+            guest_logo_ctx["bar"] = _logo_bar(W, H, [assets / guest_logo_file, assets / logo_file], glc)
         o = fcfg.outro
         outro_video = None
         if o.enabled and o.background == "video" and brand.asset(o.get("video")) and outro_d > 0.2:

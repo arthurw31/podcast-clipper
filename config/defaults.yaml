@@ -114,6 +114,11 @@ logo:
 # ou clip["guest_logo"] dans clips.json.
 guest_logo:
   enabled: false
+  bar: false                # true : les deux logos centrés côte à côte en haut (même hauteur, même ligne)
+  bar_height: 0.036
+  bar_gap: 0.08
+  bar_max_width: 0.86
+  bar_center_y: 0.064
   position: top-left
   height: 0.036             # fraction de la hauteur du canvas
   max_width: 0.36           # fraction de la largeur
