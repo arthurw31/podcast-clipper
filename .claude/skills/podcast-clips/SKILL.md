@@ -90,7 +90,8 @@ python -m clipper preview --brand <marque> --input <fichier> --no-open
 ```
 
 `build` doit finir sur « lint OK ». `preview` lance un aperçu **instantané, sans rendu** pour chaque short
-(http://localhost:3002/#project/9x16 pour le n° 1, 3003 pour le n° 2, …) : ouvre-les dans le navigateur intégré
+(adresses affichées par la commande, port 3002 pour le n° 1, 3003 pour le n° 2, … — utilise-les telles quelles, avec
+leur `?v=…`, sinon le navigateur peut réafficher un ancien short gardé en cache) : ouvre-les dans le navigateur intégré
 (Claude Browser `navigate`), place-toi à 3 s pour vérifier logos / bulle / sous-titres, puis dis à l'utilisateur :
 « les 5 shorts sont prêts à être regardés à droite : ▶ pour lire, icône plein écran à côté ; dites-moi ce
 que vous voulez changer ». Si le navigateur intégré n'est pas disponible, relance `preview` sans `--no-open`

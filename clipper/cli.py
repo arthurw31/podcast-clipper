@@ -394,6 +394,8 @@ def cmd_preview(a: argparse.Namespace) -> None:
 
     Un serveur en arrière-plan par short (port 3002, 3003, …) ; ils se rechargent tout seuls après un
     `build --only N`. `--stop` les arrête tous. À valider avant le rendu final."""
+    import time
+
     from .render import _npx
     brand = Brand(a.brand)
     ep = episode_dir(brand, resolve_input(brand, a.input))
@@ -414,7 +416,9 @@ def cmd_preview(a: argparse.Namespace) -> None:
         res = _npx(["preview", str(target), "--background", "--port", str(port), "--no-open" if a.no_open else "--open"],
                    ROOT_DIR, timeout=180)
         ok = res.returncode == 0
-        console.print(f"  #{idx} {'[green]' if ok else '[red]'}http://localhost:{port}/#project/{fmt}{'[/green]' if ok else ' (échec)[/red]'}"
+        # ?v=… : le navigateur ne réaffiche jamais un ancien short servi auparavant sur le même port (cache)
+        url = f"http://localhost:{port}/?v={int(time.time())}#project/{fmt}"
+        console.print(f"  #{idx} {'[green]' if ok else '[red]'}{url}{'[/green]' if ok else ' (échec)[/red]'}"
                       f"  {proj.name}")
         if not ok:
             console.print(res.stdout[-800:] + res.stderr[-800:])
