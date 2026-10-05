@@ -92,9 +92,16 @@ python -m clipper preview --brand <marque> --input <fichier> --no-open
 `build` doit finir sur « lint OK ». `preview` lance un aperçu **instantané, sans rendu** pour chaque short
 (adresses affichées par la commande, port 3002 pour le n° 1, 3003 pour le n° 2, … — utilise-les telles quelles, avec
 leur `?v=…`, sinon le navigateur peut réafficher un ancien short gardé en cache) : ouvre-les dans le navigateur intégré
-(Claude Browser `navigate`), place-toi à 3 s pour vérifier logos / bulle / sous-titres, puis dis à l'utilisateur :
-« les 5 shorts sont prêts à être regardés à droite : ▶ pour lire, icône plein écran à côté ; dites-moi ce
-que vous voulez changer ». Si le navigateur intégré n'est pas disponible, relance `preview` sans `--no-open`
+(Claude Browser `navigate`), place-toi à 3 s pour vérifier logos / bulle / sous-titres, puis **donne toujours à
+l'utilisateur la liste des liens cliquables**, un par short, avec le titre de la bulle comme texte du lien :
+
+> 1. [Short 1 : <titre de la bulle>](http://localhost:3002/?v=…#project/9x16)
+> 2. [Short 2 : <titre de la bulle>](http://localhost:3003/?v=…#project/9x16)
+> …
+>
+> Sur chaque page : ▶ sous l'image pour lire, icône plein écran juste à droite. Dites-moi ce que vous voulez changer.
+
+(Le panneau du navigateur intégré peut être replié : les liens s'ouvrent aussi dans le navigateur habituel.) Si le navigateur intégré n'est pas disponible, relance `preview` sans `--no-open`
 (ouverture dans le navigateur du PC).
 
 Pendant qu'il regarde, rédige les posts (ils ne dépendent pas du rendu) :
