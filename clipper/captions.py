@@ -76,7 +76,7 @@ def _speaker_at(turns: list[dict] | None, t: float) -> str | None:
 
 
 def group_words(words: list[dict], clip_start: float, clip_end: float, cfg: Cfg, keywords: list[str],
-                turns_rel: list[dict] | None = None) -> list[dict]:
+                turns_rel: list[dict] | None = None, breaks: list[float] | None = None) -> list[dict]:
     """`words` : mots avec temps relatifs au clip (s/e) OU absolus (clip_start/clip_end servent alors à recaler).
     `turns_rel` : tours de parole en temps relatifs ([{"at", "speaker"}]) pour les tirets de dialogue."""
     cap = cfg.captions
@@ -112,7 +112,9 @@ def group_words(words: list[dict], clip_start: float, clip_end: float, cfg: Cfg,
         if not too_long and cur and max_lines >= 3:
             too_long = len(_fill_lines(cur + [w], max_chars, max_lines + 1)) > max_lines
         speaker_change = bool(cur) and w["spk"] != cur[-1]["spk"]
-        if cur and (too_long or gap > pause_break or ends_sentence or speaker_change):
+        # jonction de segments (passage pris ailleurs dans l'épisode) : toujours un nouveau bloc
+        crosses = bool(cur) and any(cur[-1]["s"] < bk <= w["s"] + 0.02 for bk in (breaks or []))
+        if cur and (too_long or gap > pause_break or ends_sentence or speaker_change or crosses):
             groups.append(cur)
             cur, cur_len = [], 0
         cur.append(w)

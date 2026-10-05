@@ -144,7 +144,24 @@ def _same_camera(a: dict, b: dict, tol: float = 0.25) -> bool:
             and abs(ca["y"] - cb["y"]) <= tol * ca["h"])
 
 
-def _smooth_plan(plan: list[dict], shots: list[dict], junctions: list[float], fr: Cfg) -> list[dict]:
+def _frame_diff(video: Path, t: float, dt: float = 0.12) -> float:
+    """Différence moyenne (0-255) entre deux vignettes en niveaux de gris de part et d'autre de `t` :
+    ~0-10 = même plan continu (fausse coupe détectée), > 30 = vraie coupe de la source."""
+    import numpy as np
+
+    def frame(tt: float):
+        r = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{max(0.0, tt):.3f}", "-i", str(video), "-frames:v", "1",
+                            "-vf", "scale=64:36", "-f", "rawvideo", "-pix_fmt", "gray", "-"], capture_output=True)
+        return np.frombuffer(r.stdout, dtype=np.uint8).astype(float)
+
+    a, b = frame(t - dt), frame(t + dt)
+    if a.size != b.size or a.size == 0:
+        return 255.0
+    return float(np.abs(a - b).mean())
+
+
+def _smooth_plan(plan: list[dict], shots: list[dict], junctions: list[float], fr: Cfg,
+                 frame_diff=None) -> list[dict]:
     """Fluidité : supprime les micro-coupes que l'œil perçoit comme des saccades.
 
     1. un plan de moins de `min_flash` s fusionne avec son voisin issu du même plan source (sinon : flash
@@ -166,7 +183,7 @@ def _smooth_plan(plan: list[dict], shots: list[dict], junctions: list[float], fr
 
     def merge(a: dict, b: dict, average: bool) -> dict:
         da, db = a["t1"] - a["t0"], b["t1"] - b["t0"]
-        keep = a if da >= db else b
+        keep = a if (da >= db or not average) else b
         out = dict(keep, t0=a["t0"], t1=b["t1"])
         if average:
             ca, cb = a["cams"][0]["crop"], b["cams"][0]["crop"]
@@ -185,7 +202,11 @@ def _smooth_plan(plan: list[dict], shots: list[dict], junctions: list[float], fr
             nxt = plan[k + 1] if k + 1 < len(plan) else None
             # 1. flash très court : avec le voisin du même plan source (le plus long des deux)
             if d < min_flash:
-                cands = [n for n in (prev, nxt) if n is not None and shot_of(n) == shot_of(e)] or [n for n in (prev, nxt) if n]
+                # seulement avec un voisin du même plan source : appliquer un cadrage calculé sur d'autres images
+                # décadrerait la personne (un vrai plan court du montage source est masqué ailleurs)
+                cands = [n for n in (prev, nxt) if n is not None and shot_of(n) == shot_of(e)]
+                if not cands:
+                    continue
                 n = max(cands, key=lambda x: x["t1"] - x["t0"])
                 if n is prev:
                     plan[k - 1:k + 1] = [merge(prev, e, False)]
@@ -193,14 +214,56 @@ def _smooth_plan(plan: list[dict], shots: list[dict], junctions: list[float], fr
                     plan[k:k + 2] = [dict(merge(e, nxt, False), cams=nxt["cams"], layout=nxt["layout"])]
                 changed = True
                 break
-            # 2. recadrage de la même caméra trop rapproché
-            if nxt is not None and _same_camera(e, nxt):
-                near_junction = any(abs(e["t1"] - j) <= jgap and abs(e["t1"] - j) > 0.05 for j in junctions)
+            if nxt is None:
+                continue
+            cut = e["t1"]
+            at_junction = any(abs(cut - j) <= 0.05 for j in junctions)
+            at_shot_cut = any(abs(cut - sh["t0"]) <= 0.05 for sh in shots)
+            # 2. fausse coupe : la détection a vu un changement de plan mais l'image source est continue
+            #    (différence d'image faible) -> un seul cadrage, sans saut
+            if at_shot_cut and not at_junction and frame_diff is not None and e["layout"] == nxt["layout"] == "single"                     and frame_diff(cut) < float(fr.get("false_cut_diff", 15)):
+                same_zoom = abs(e["cams"][0]["crop"]["w"] - nxt["cams"][0]["crop"]["w"]) <= 0.03 * e["cams"][0]["crop"]["w"]
+                plan[k:k + 2] = [merge(e, nxt, same_zoom)]
+                changed = True
+                break
+            # 3. recadrage de la même caméra trop rapproché (sans mesure d'image disponible)
+            if frame_diff is None and _same_camera(e, nxt) and not at_junction:
+                near_junction = any(abs(cut - j) <= jgap for j in junctions)
                 if d < min_reframe or (nxt["t1"] - nxt["t0"]) < min_reframe or near_junction:
                     plan[k:k + 2] = [merge(e, nxt, True)]
                     changed = True
                     break
-    return plan
+    return _punch_junctions(plan, junctions, fr)
+
+
+def _punch_junctions(plan: list[dict], junctions: list[float], fr: Cfg) -> list[dict]:
+    """Jonction de segments sur la même caméra = « jump cut » (même cadre, le visage saute). Comme un monteur,
+    on en fait un punch-in : le morceau après la jonction est resserré (`junction_punch`, ex. 1.15)."""
+    z = float(fr.get("junction_punch", 1.0))
+    if z <= 1.0:
+        return plan
+    out: list[dict] = []
+    for e in plan:
+        cut_js = [j for j in junctions if e["t0"] + 0.3 < j < e["t1"] - 0.3]
+        pieces = []
+        t = e["t0"]
+        for j in cut_js:
+            pieces.append(dict(e, t0=t, t1=j))
+            t = j
+        pieces.append(dict(e, t0=t, t1=e["t1"]))
+        out.extend(pieces)
+    for k in range(1, len(out)):
+        a, b = out[k - 1], out[k]
+        if not any(abs(b["t0"] - j) <= 0.05 for j in junctions) or not _same_camera(a, b):
+            continue
+        ca = a["cams"][0]["crop"]
+        cb = dict(b["cams"][0]["crop"])
+        nw, nh = cb["w"] / z, cb["h"] / z
+        cb.update(x=round(cb["x"] + (cb["w"] - nw) / 2, 1), y=round(cb["y"] + (cb["h"] - nh) * 0.3, 1),
+                  w=round(nw, 1), h=round(nh, 1))
+        if abs(ca["w"] - cb["w"]) > 0.03 * ca["w"]:
+            out[k] = dict(b, cams=[dict(b["cams"][0], crop=cb)])
+    return out
 
 
 def _hook_duration(hk: Cfg, segments: list[dict], caps: list[dict], D_speech: float) -> float:
@@ -439,12 +502,26 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
                     plan[k]["t1"] = j
                     plan[k + 1]["t0"] = j
         plan = [e for e in plan if e["t1"] - e["t0"] > 0.05]
-        plan = _smooth_plan(plan, analysis["shots"], junctions, fcfg.framing)
-        for e in plan:
+        diffs: dict[float, float] = {}
+
+        def frame_diff(t: float) -> float:
+            if t not in diffs:
+                diffs[t] = _frame_diff(src_clip, t)
+            return diffs[t]
+
+        plan = _smooth_plan(plan, analysis["shots"], junctions, fcfg.framing, frame_diff=frame_diff)
+        # dernier plan très court venu d'un autre plan source (ex. contrechamp de 0,3 s juste avant la fin) :
+        # la carte de fin démarre un peu plus tôt et le masque (la voix continue dessous)
+        outro_start = D_speech
+        if cfg.outro.enabled and len(plan) >= 2 and plan[-1]["t1"] - plan[-1]["t0"] < float(fcfg.framing.get("min_flash", 0.5)):
+            outro_start = round(plan[-1]["t0"], 3)
+            plan = plan[:-1]
+        for i, e in enumerate(plan):
+            e["id"] = i + 1   # renumérotation : le lissage fusionne / découpe des plans (ids uniques exigés)
             e["cams"] = [_cam_geometry(c, fmt, sw, sh) for c in e["cams"]]
         if plan:
             plan[-1]["t1"] = D_speech
-        caps = group_words(words_rel, 0.0, D_speech, fcfg, clip.get("keywords", []), turns_rel=turns_rel)
+        caps = group_words(words_rel, 0.0, D_speech, fcfg, clip.get("keywords", []), turns_rel=turns_rel, breaks=junctions)
 
         c = fcfg.captions
         margin_px = int(W * float(c.side_margin))
@@ -491,7 +568,7 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
             "delay": float(cta.get("delay", 0.5)),
         })
         outro_ctx["cta"] = cta
-        outro_ctx.update({"enabled": bool(o.enabled) and outro_d > 0.2, "duration": round(outro_d, 3), "bg_file": outro_bg,
+        outro_ctx.update({"enabled": bool(o.enabled) and outro_d > 0.2, "duration": round(outro_d + D_speech - outro_start, 3), "bg_file": outro_bg,
                           "bg_is_image": bool(outro_bg) and o.background == "image", "layout": o.get("layout", "center"),
                           "image_position": o.get("image_position", "center"),
                           "logo_file": outro_logo_file,
@@ -527,7 +604,7 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
             font={"family": cfg.fonts.family, "italic_file": italic.name, "upright_file": upright.name},
             colors=dict(cfg.colors), plan=plan, captions=caps, cap=Cfg(cap_ctx), logo=Cfg(logo_ctx),
             outro=Cfg(outro_ctx), hook=Cfg(hook_ctx), broll=Cfg(broll_ctx), brolls=brolls_fmt, music=music,
-            guest_logo=Cfg(guest_logo_ctx),
+            guest_logo=Cfg(guest_logo_ctx), outro_start=outro_start,
             guest=clip.get("guest", ""), company=clip.get("company", ""),
             junctions=junctions, join_transition=fcfg.montage.get("join_transition", "cut"), flash_color=fcfg.montage.get("flash_color", "#FFFFFF"),
             split_divider=int(fcfg.framing.get("split_divider", 0)), split_divider_color=fcfg.framing.get("split_divider_color", "#FFFFFF"),

@@ -215,6 +215,7 @@ framing:
   min_flash: 0.5            # un plan plus court fusionne avec son voisin (évite les flashs d'une autre personne)
   min_reframe_len: 1.2      # recadrage de la même caméra : chaque morceau doit durer au moins ça
   junction_gap: 1.5         # pas de recadrage de la même caméra à moins de x s d'une jonction de segments
+  junction_punch: 1.0       # >1 : à une jonction sur la même caméra, le 2e morceau est resserré (punch-in au lieu d'un jump cut)
   scene_threshold: 0.2      # sensibilité de détection des coupes (ffmpeg scene, plus bas = plus sensible)
   min_shot_len: 0.6
   sample_fps: 5             # fréquence d'analyse des visages

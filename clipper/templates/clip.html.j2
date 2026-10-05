@@ -236,7 +236,7 @@
 
       <!-- ===================== carte de fin ===================== -->
 {% if outro.enabled %}
-      <div class="clip layer" id="outro" data-start="{{ D_speech }}" data-duration="{{ outro.duration }}" data-track-index="7">
+      <div class="clip layer" id="outro" data-start="{{ outro_start }}" data-duration="{{ outro.duration }}" data-track-index="7">
 {% if outro.bg_file %}
         <div class="outro-bg-wrap"><img class="outro-bg" id="outro-bg" src="assets/{{ outro.bg_file }}" alt="" /></div>
 {% else %}
@@ -351,14 +351,14 @@
 
       // ---- carte de fin + fondu audio ----
 {% if outro.enabled %}
-      tl.fromTo("#outro-content", { scale: 0.92, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "power3.out" }, {{ D_speech }});
+      tl.fromTo("#outro-content", { scale: 0.92, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "power3.out" }, {{ outro_start }});
 {% if outro.bg_is_image %}
-      tl.fromTo("#outro-bg", { scale: 1.0, xPercent: 0 }, { scale: 1.08, xPercent: -2, duration: {{ outro.duration }}, ease: "none" }, {{ D_speech }});
+      tl.fromTo("#outro-bg", { scale: 1.0, xPercent: 0 }, { scale: 1.08, xPercent: -2, duration: {{ outro.duration }}, ease: "none" }, {{ outro_start }});
 {% endif %}
 {% if outro.cta.enabled and outro.cta.text_rendered %}
-      tl.fromTo("#outro-cta", { y: 26, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: "power3.out" }, {{ (D_speech + outro.cta.delay) | round(3) }});
+      tl.fromTo("#outro-cta", { y: 26, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: "power3.out" }, {{ (outro_start + outro.cta.delay) | round(3) }});
 {% if outro.cta.subtext_rendered %}
-      tl.fromTo("#outro-cta-sub", { y: 16, opacity: 0 }, { y: 0, opacity: 0.92, duration: 0.4, ease: "power3.out" }, {{ (D_speech + outro.cta.delay + 0.15) | round(3) }});
+      tl.fromTo("#outro-cta-sub", { y: 16, opacity: 0 }, { y: 0, opacity: 0.92, duration: 0.4, ease: "power3.out" }, {{ (outro_start + outro.cta.delay + 0.15) | round(3) }});
 {% endif %}
 {% endif %}
       tl.to("#a-main", { volume: 0, duration: {{ A_fade }}, ease: "power1.in" }, {{ D_speech }});

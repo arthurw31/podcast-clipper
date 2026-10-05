@@ -66,7 +66,8 @@ montage:
 framing:
   slow_zoom: false
   synthetic_cuts: true
-  max_shot_len: 6
+  max_shot_len: 10         # le monteur tient ses plans longtemps : peu de coupes ajoutées
+  junction_punch: 1.15     # jonction sur la même caméra -> punch-in (jamais de jump cut)
   split_divider: 0
 broll:
   enabled: false
