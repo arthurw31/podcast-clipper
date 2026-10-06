@@ -45,6 +45,35 @@ python -m clipper transcribe --brand <marque> --input <fichier> --guest "Prénom
    (`transcribe.corrections`). Jette quand même un œil aux noms dans les 10 propositions ; si un terme revient mal
    écrit, ajoute-le au lexique de la marque dans `brand.yaml`.
 
+## 1 bis. Les passages sont déjà choisis (fournis par l'équipe)
+
+Si l'utilisateur colle une liste de passages (timecodes + « De … jusqu'à … »), saute les étapes 2 et 3 :
+écris un fichier `output/<marque>/<episode>/passages.yaml` puis lance `passages` :
+
+```yaml
+- start: "00:18:17:09"          # HH:MM:SS(:images à 24 i/s) ou MM:SS ; « ~ » accepté
+  end: "00:18:50:19"
+  start_text: "Et donc, il y a un aspect humain qui est énorme"
+  end_text: "ils ont pas le temps et l'envie de le faire"
+  hook_title: "Pourquoi les équipes n'adoptent pas l'IA ?"   # à écrire s'il n'est pas fourni (style de la marque)
+  turns: [{at: "00:18:17", speaker: guest}]                  # qui parle : host (animateur) / guest (invité)
+```
+
+```bash
+python -m clipper passages --brand <marque> --input <fichier> --file output/<marque>/<episode>/passages.yaml --guest "…" --company "…" --guest-role "<Rôle> at <Entreprise>" --host-side left|right
+python -m clipper check    --brand <marque> --input <fichier>
+```
+
+- **Qui parle** : les `turns` servent au cadrage ET à l'attribution dans les posts (sans eux, le post attribue tout à
+  l'invité). Vérifie-le sur des images de l'épisode (`ffmpeg -ss <t> -i … -frames:v 1`, la source montre en général
+  celui qui parle) et complète `turns` dans `clips.json`.
+- Si la fin citée tombe au milieu d'une phrase, prolonge jusqu'à la fin de la phrase (règle absolue) et dis-le.
+- Si une phrase citée est introuvable, Whisper l'a peut-être ratée (deux personnes qui parlent en même temps) :
+  re-transcris 20 s autour (faster-whisper, `word_timestamps=True`) et insère les mots manquants dans
+  `transcript.json` à leurs horaires, puis coupe juste avant que l'autre personne enchaîne.
+
+Puis reprends à l'étape 4.
+
 ## 2. Proposer une dizaine de passages
 
 ```bash

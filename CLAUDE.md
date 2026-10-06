@@ -22,7 +22,8 @@ installe via « clone … et installe tout ce qu'il faut » dans Claude Code —
 1. Cloner le dépôt si ce n'est pas fait, puis lancer le script : Windows `powershell -ExecutionPolicy Bypass -File scripts\setup.ps1`,
    macOS/Linux `bash scripts/setup.sh`. Il installe Python/Node/FFmpeg s'ils manquent (winget / brew), les
    dépendances, crée `.env` et lance `python -m clipper doctor`.
-2. Demander à l'utilisateur sa clé Pexels (gratuite, pexels.com/api) et lui faire coller dans `.env`
+2. Clé Pexels **facultative** (B-roll seulement ; AI Corner n'en utilise pas — le doctor la signale sans bloquer). Si
+   une marque a du B-roll : demander la clé (gratuite, pexels.com/api) et la faire coller dans `.env`
    (ne jamais l'écrire dans un fichier versionné ni la demander en clair dans le chat si un gestionnaire
    de secrets est disponible). Sans clé, le B-roll est simplement désactivé (`broll.enabled: false`).
 3. La sélection des extraits utilise `claude -p` (l'abonnement Claude Code de l'utilisateur) si aucune
@@ -154,6 +155,12 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
   `window.__timelines["main"]` ; pas de `transform` CSS initial sur un élément tweené en `x/y/scale`.
 - Deux `<video>` identiques (src/start/durée) déclenchent `duplicate_media_discovery_risk` → la caméra du bas
   en écran partagé a `data-media-start` décalé de 0,001 s.
+- Passages fournis par l'équipe (timecodes + premiers/derniers mots) : commande `passages --file x.yaml` (calage par
+  `snap_to_quotes`), puis compléter `turns` (qui parle : cadrage ET attribution dans les posts) et `hook_title`.
+  Whisper peut rater une réplique quand deux personnes parlent en même temps (« C'est exactement ça », E21 44:38) :
+  re-transcrire 20 s autour et insérer les mots dans `transcript.json`.
+- Premier épisode en 4K pas encore testé (octobre 2026) : surveiller la durée de `build` (analyse des visages
+  sur la 4K) ; si c'est trop lent, analyser une copie réduite et ne garder la 4K que pour le recadrage.
 - Whisper coupe « c'est » en « c » + « 'est » → `transcribe.merge_fragments`. Il écorche les noms propres
   (« Modry » pour Amaudry, « iPartners ») : `transcribe --guest --company` + `transcribe.vocabulary` sont passés
   en `hotwords` à Whisper, puis `apply_corrections` (table `transcribe.corrections` + rapprochement approximatif

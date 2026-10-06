@@ -4,6 +4,7 @@
   python -m clipper transcribe --brand <slug> --input episode.mp4
   python -m clipper propose   --brand <slug> --input episode.mp4 --guest … --company … [--n 10]  # passages candidats
   python -m clipper pick      --brand <slug> --input episode.mp4 --ids 1,3,4,7,9                   # choix -> clips.json
+  python -m clipper passages  --brand <slug> --input episode.mp4 --file passages.yaml            # passages déjà choisis
   python -m clipper find      --brand <slug> --input episode.mp4 "mots de la phrase"               # retrouver un passage
   python -m clipper check     --brand <slug> --input episode.mp4                                   # contrôle des coupes
   python -m clipper select    --brand <slug> --input episode.mp4 [--force]        # (re)sélection LLM directe
@@ -149,6 +150,69 @@ def cmd_pick(a: argparse.Namespace) -> dict:
     console.print(f"[green]{len(clips)} shorts retenus[/green] → {ep / 'clips.json'}")
     for c in clips:
         console.print(f"  #{c['index']} (candidat {c['candidate']}) {c.get('hook_title') or c['title']}")
+    return out
+
+
+def _parse_tc(tc: str) -> float:
+    """« 01:29 », « 00:18:17 », « 00:18:17:09 » (HH:MM:SS:images, 24 i/s) ou « 1097.5 » -> secondes."""
+    tc = str(tc).strip().lstrip("~").strip()
+    parts = tc.split(":")
+    if len(parts) == 1:
+        return float(parts[0])
+    nums = [float(x) for x in parts]
+    if len(nums) == 4:
+        h, m, s, f = nums
+        return h * 3600 + m * 60 + s + f / 24.0
+    if len(nums) == 3:
+        h, m, s = nums
+        return h * 3600 + m * 60 + s
+    m, s = nums
+    return m * 60 + s
+
+
+def cmd_passages(a: argparse.Namespace) -> dict:
+    """Passages déjà choisis par l'équipe (timecodes approximatifs + premiers / derniers mots) -> clips.json.
+
+    Fichier YAML : liste de {start: "00:18:17:09", end: "00:18:50:19", start_text: "Et donc, il y a un aspect
+    humain", end_text: "le temps et l'envie de le faire", hook_title: "…" (facultatif), title: "…" (facultatif)}.
+    Les mots font foi : chaque passage est calé sur les mots cités, cherchés autour du timecode."""
+    import yaml
+    from .select_clips import _snap, snap_to_quotes
+    from .transcribe import all_words, sentences
+    brand = Brand(a.brand)
+    video = resolve_input(brand, a.input)
+    ep = episode_dir(brand, video)
+    transcript = transcribe(video, ep / "transcript.json", brand.cfg, ep / "work", names=[a.guest, a.company])
+    W, S = all_words(transcript), sentences(transcript)
+    spec = yaml.safe_load(Path(a.file).read_text(encoding="utf-8")) or []
+    clips = []
+    for i, p in enumerate(spec, 1):
+        s0, e0 = _parse_tc(p["start"]), _parse_tc(p.get("end") or p["start"]) or 0
+        if e0 <= s0:
+            e0 = s0 + 40
+        s1, e1, note = snap_to_quotes(W, S, s0, e0, str(p.get("start_text", "")), str(p.get("end_text", "")),
+                                      max(e0 - s0, 20) + 15)
+        ss, ee = _snap(W, s1, e1)
+        nxt = [w for w in W if w["s"] >= ee]
+        tail = round(max(0.0, (nxt[0]["s"] - ee) if nxt else 1.0), 3)
+        inside = [w["w"] for w in W if w["s"] >= ss - 0.05 and w["e"] <= ee + 0.05]
+        sg = {"start": ss, "end": ee, "duration": round(ee - ss, 3), "tail_silence": tail,
+              "start_text": " ".join(inside[:6]), "end_text": " ".join(inside[-6:]), "role": "passage"}
+        clips.append({"index": i, "title": p.get("title") or p.get("hook_title") or f"Short {i}",
+                      "hook_title": p.get("hook_title", ""), "start": ss, "end": ee, "duration": sg["duration"],
+                      "segments": [sg], "tail_silence": tail, "why": p.get("why", "passage choisi par l'équipe"),
+                      "score": 10, "start_text": sg["start_text"], "end_text": sg["end_text"], "keywords": [],
+                      "turns": [{"at": float(t["at"]) if not isinstance(t["at"], str) else _parse_tc(t["at"]), "speaker": t["speaker"]}
+                                for t in (p.get("turns") or [])],
+                      "broll": [], "angle": "choix de l'équipe", "guest": a.guest, "company": a.company})
+        console.print(f"  #{i} {ss:.2f}→{ee:.2f} ({ee - ss:.1f}s){'  · ' + note if note else ''}")
+    out = {"brand": brand.slug, "guest": a.guest, "company": a.company, "guest_role": a.guest_role,
+           "host_side": a.host_side or brand.cfg.framing.get("host_side", ""), "clips": clips}
+    if (ep / "clips.json").exists():
+        shutil.copy2(ep / "clips.json", ep / "clips_previous.json")
+    (ep / "clips.json").write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
+    console.print(f"[green]{len(clips)} passages[/green] → {ep / 'clips.json'} — vérifier avec `check`, compléter "
+                  f"hook_title et turns (qui parle) si absents")
     return out
 
 
@@ -468,7 +532,12 @@ def cmd_doctor(_: argparse.Namespace) -> None:
     for mod, pipname in [("faster_whisper", "faster-whisper"), ("cv2", "opencv-python"), ("jinja2", "jinja2"), ("yaml", "pyyaml"), ("rich", "rich"), ("requests", "requests"), ("dotenv", "python-dotenv")]:
         check(f"python: {pipname}", importlib.util.find_spec(mod) is not None, "", "pip install -r requirements.txt")
     check("modèle visages (YuNet)", (ROOT / "models" / "face_detection_yunet_2023mar.onnx").exists(), "", "fichier models/face_detection_yunet_2023mar.onnx manquant (voir README)")
-    check("PEXELS_API_KEY", bool(env("PEXELS_API_KEY")), "", "copier .env.example en .env et renseigner la clé (pexels.com/api)")
+    # Pexels ne sert qu'au B-roll : facultatif (AI Corner n'en utilise pas) — signalé sans bloquer
+    if env("PEXELS_API_KEY"):
+        check("PEXELS_API_KEY", True, "")
+    else:
+        console.print("  [yellow]--[/yellow]  PEXELS_API_KEY               facultatif : absent -> pas de B-roll "
+                      "(clé gratuite sur pexels.com/api, à mettre dans .env)")
     llm = "SDK Anthropic (ANTHROPIC_API_KEY)" if env("ANTHROPIC_API_KEY") else ("claude CLI" if shutil.which("claude") else "")
     check("LLM (sélection)", bool(llm), llm, "définir ANTHROPIC_API_KEY dans .env ou installer Claude Code (commande `claude`)")
     check("marques", bool(list_brands()), ", ".join(list_brands()), "python -m clipper new-brand <slug>")
@@ -542,6 +611,9 @@ def main(argv: list[str] | None = None) -> None:
     sp.set_defaults(fn=cmd_propose)
     sp = sub.add_parser("pick", help="garde les candidats choisis -> clips.json"); common(sp)
     sp.add_argument("--ids", required=True, help="numéros des candidats, ex: 1,3,4,7,9"); sp.set_defaults(fn=cmd_pick)
+    sp = sub.add_parser("passages", help="passages déjà choisis (fichier YAML) -> clips.json"); common(sp); selection_args(sp)
+    sp.add_argument("--file", required=True, help="YAML : start, end, start_text, end_text, hook_title, turns")
+    sp.add_argument("--guest-role", default="", help="rôle de l'invité, ex: 'CEO of Mendo'"); sp.set_defaults(fn=cmd_passages)
     sp = sub.add_parser("find", help="retrouve une phrase dans la transcription"); common(sp)
     sp.add_argument("text", help="mots de la phrase cherchée"); sp.add_argument("--n", type=int, default=5)
     sp.set_defaults(fn=cmd_find)
