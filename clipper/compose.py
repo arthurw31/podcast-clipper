@@ -491,6 +491,11 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
     hook_font = brand.font_path("hook")   # police propre au titre (fonts.hook), sinon celle de la marque
     if hook_font:
         shutil.copy2(hook_font, fonts_dir / hook_font.name)
+    # police propre aux sous-titres (fonts.captions_alt) : embarquée, sinon HyperFrames remplace une police
+    # système (« Arial ») par une autre au rendu
+    cap_font = brand.font_path("captions_alt")
+    if cap_font:
+        shutil.copy2(cap_font, fonts_dir / cap_font.name)
     # logo de l'invité / de son entreprise (style shorts AI Partners : en haut à gauche)
     guest_logo_file = None
     gl_cfg = cfg.get("guest_logo") or {}
@@ -572,6 +577,7 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
             "margin_px": margin_px,
             "top_px": int(H * float(c.position_y)),
             "font_px": int(c.font_size),
+            "font_file": cap_font.name if cap_font else "",
             "stagger_px": int(W * float(c.stagger_offset)),
         })
         lg = fcfg.logo

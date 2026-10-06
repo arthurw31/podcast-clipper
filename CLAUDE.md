@@ -81,7 +81,8 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
    logos centrée** en haut (`guest_logo.bar`) : logo de l'entreprise invitée (`assets/guests/<entreprise>.svg|png`)
    + logo AI PARTNERS blanc, même hauteur, même ligne, agrandis jusqu'à `bar_max_width` (marges PNG rognées) ; titre-question (`hook_title`) dans une bulle blanche translucide (`hook.style: pill`,
    Fira Sans Condensed Bold, noir) pendant l'accroche (`hook.duration: auto`, 7,5–11,5 s) ; sous-titres blancs
-   type Arial Bold sous la bulle, centrés, 1–3 lignes construites mot à mot (`reveal: word`, `reveal_reflow`,
+   Arimo Bold (= Arial, embarquée via `fonts.captions_alt`, sinon HyperFrames la remplace par Inter) 68 px + trait
+   épaissi 1,6 px + halo sombre marqué (retour de l'équipe, 06/10/2026 : « comme DUST, plus gros, bords ombrés ») sous la bulle, centrés, 1–3 lignes construites mot à mot (`reveal: word`, `reveal_reflow`,
    `word_fade`), même position en écran partagé (`split_center: false`) ; split sans séparateur ; light leak
    aux raccords (`join_transition: leak`) ; 25–45 s ; pas de B-roll ; + carte de fin de **2 s** sur l'animation
    officielle AI Partners (`assets/outro_anim.mov`, lignes « montagne » qui se dessinent, recadrée au format et

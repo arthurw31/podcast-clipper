@@ -12,11 +12,15 @@ captions:
   italic: false
   weight: 700
   font_family: '"Arial", "Helvetica Neue", Helvetica, "Liberation Sans", sans-serif'
-  font_size: 64
-  line_height: 1.0
+  # mesuré sur les shorts DUST : Arial Bold, « Il y a un vrai changement » = 825 px de large -> 68 px avec Arimo
+  # (même dessin et mêmes mesures qu'Arial, embarquée : fonts.captions_alt) ; halo sombre doux autour des lettres
+  font_size: 68
+  line_height: 0.95
   letter_spacing: "0"
   color: "#FFFFFF"
-  text_shadow: "0 2px 5px rgba(0,0,0,.55), 0 0 2px rgba(0,0,0,.35)"
+  text_shadow: "0 3px 12px rgba(0,0,0,.8), 0 1px 4px rgba(0,0,0,.85), 0 0 2px rgba(0,0,0,.7)"
+  stroke_width: 1.6          # épaissit légèrement le trait : les sous-titres DUST sont plus gras qu'un Arial Bold
+  stroke_color: "#FFFFFF"
   align: center
   stagger_lines: false
   highlight_keywords: false
@@ -26,7 +30,7 @@ captions:
   word_fade: 0.12
   reveal_reflow: true
   entrance: none
-  max_chars_per_line: 22
+  max_chars_per_line: 24
   max_lines: 3
   max_words_per_group: 11
   min_group_duration: 0.8

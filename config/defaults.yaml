@@ -62,6 +62,7 @@ fonts:
   caption_upright: "fonts/Montserrat[wght].ttf"
   display: "fonts/Montserrat[wght].ttf"
   family: "Montserrat"
+  captions_alt: ""          # police dédiée aux sous-titres (embarquée), ex. fonts/Arimo-VF.ttf ; vide = police de la marque
 
 # -------------------------------------------------------------- captions ---
 captions:

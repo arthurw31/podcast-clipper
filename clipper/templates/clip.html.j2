@@ -18,6 +18,14 @@
         font-style: normal;
         font-weight: 100 900;
       }
+{% if cap.font_file %}
+      @font-face {
+        font-family: "CaptionFont";
+        src: url("assets/fonts/{{ cap.font_file }}") format("{{ 'opentype' if cap.font_file.lower().endswith('.otf') else 'truetype' }}");
+        font-style: normal;
+        font-weight: 100 900;
+      }
+{% endif %}
 {% if hook.font_file %}
       @font-face {
         font-family: "HookFont";
@@ -46,7 +54,7 @@
         position: absolute;
         left: {{ cap.margin_px }}px; right: {{ cap.margin_px }}px;
         top: {{ cap.top_px }}px;
-        font-family: {{ cap.font_family if cap.font_family else '"' ~ font.family ~ '", system-ui, sans-serif' }};
+        font-family: {{ ('"CaptionFont", ' if cap.font_file else '') ~ (cap.font_family if cap.font_family else '"' ~ font.family ~ '", system-ui, sans-serif') }};
         font-weight: {{ cap.weight }};
         font-style: {{ "italic" if cap.italic else "normal" }};
         font-size: {{ cap.font_px }}px;

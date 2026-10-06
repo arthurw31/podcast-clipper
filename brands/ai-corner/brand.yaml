@@ -46,6 +46,7 @@ fonts:
   caption: "fonts/Metropolis-BoldItalic.ttf"      # jamais utilisé (italic: false) mais requis
   caption_upright: "fonts/Metropolis-Bold.ttf"
   display: "fonts/Metropolis-ExtraBold.ttf"
+  captions_alt: "fonts/Arimo-VF.ttf"                # sous-titres des shorts : Arimo = Arial (mêmes mesures)
   hook: "fonts/FiraSansCondensed-Bold.ttf"        # bulle-titre des shorts (police condensée du monteur)
 
 outro:
