@@ -152,6 +152,39 @@ def fix_segment(sg: dict, rep: dict, wav: Path) -> list[dict]:
     return out or [sg]
 
 
+def _onset(v: np.ndarray, sustain: int = 5, max_k: int = 40) -> int | None:
+    """Indice du démarrage de la vraie parole (≥ `sustain` trames voisées d'affilée) s'il est précédé d'au moins
+    0,2 s sans parole (blanc, souffle ou fin de mot trop faible pour le seuil mais audible) ; sinon None."""
+    for k in range(min(len(v) - sustain, max_k)):
+        if v[k:k + sustain].all():
+            return k if k >= 10 and not v[k - 10:k].any() else None
+    return None
+
+
+def trim_edges(sg: dict, wav: Path, look: float = 1.2) -> tuple[dict, list[str]]:
+    """Bord qui commence sur la FIN d'un mot (ou finit sur le DÉBUT d'un mot) : un bout de voix, puis un blanc ≥ 0,2 s,
+    puis la vraie parole -> on recale sur la parole (retour d'Arthur, teaser E22 : « il commence sur la fin d'un mot,
+    coupe la demi-seconde du début »). Mesuré sur l'énergie du micro (trames de 20 ms), pas sur la transcription."""
+    from .tighten import _rms
+    s0, s1 = float(sg["start"]), float(sg["end"])
+    notes = []
+    r = _rms(wav, s0, min(s1, s0 + look))
+    if len(r) > 15:
+        k = _onset(r > 0.35 * float(np.percentile(r, 75)))
+        if k is not None:
+            s0 += k * 0.02 - 0.1
+            notes.append(f"début sur une fin de mot ({k * 0.02 - 0.1:.2f} s retirées)")
+    r = _rms(wav, max(s0, s1 - look), s1)
+    if len(r) > 15:
+        k = _onset((r > 0.35 * float(np.percentile(r, 75)))[::-1])
+        if k is not None:
+            s1 -= k * 0.02 - 0.15
+            notes.append(f"fin sur un début de mot ({k * 0.02 - 0.15:.2f} s retirées)")
+    if notes:
+        sg = dict(sg, start=round(s0, 3), end=round(s1, 3), duration=round(s1 - s0, 3))
+    return sg, notes
+
+
 def check_and_fix(segs: list[dict], wav: Path, cfg=None, passes: int = 2, log=None, on_fail: str = "restore") -> list[dict]:
     """Contrôle + correction en `passes` passes (une correction peut révéler un défaut voisin). Deux morceaux issus du
     même passage ne se chevauchent jamais (sinon on entendrait deux fois la même syllabe)."""
@@ -177,6 +210,13 @@ def check_and_fix(segs: list[dict], wav: Path, cfg=None, passes: int = 2, log=No
         segs = [x for x in out if x["duration"] > 0.25]
         if not changed:
             break
+    trimmed = []
+    for sg in segs:
+        sg2, n = trim_edges(sg, wav)
+        if n and log:
+            log(f"{sg['start']:.1f}s : " + " ; ".join(n))
+        trimmed.append(sg2)
+    segs = trimmed
     # contrôle final : un passage qui garde un mot coupé (« euh » collé aux mots, sans silence où couper) n'est jamais
     # livré ainsi — teaser : on le retire (on_fail="drop") ; short : on revient à sa coupe d'origine (« restore »)
     bad = {sg["orig"] for sg in segs if any(m.startswith(("début coupé", "fin coupée"))

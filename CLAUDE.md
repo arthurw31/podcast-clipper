@@ -164,6 +164,9 @@ tôt, un bégaiement au début — rajoute une vérification »)
   (`on_fail="restore"`) ; teaser : extrait retiré et remplacé par la réserve du LLM (`backup`), enchaînement final en
   alternance animateur / invité (`teaser_clip`).
 - Shorts : `python -m clipper verify … --fix` après `tighten`, avant `build`. Coût ≈ 1,5× la durée contrôlée (CPU).
+- `trim_edges` (3e retour, 07/10/2026 : « il commence sur la fin d'un mot, coupe la demi-seconde du début ») : un bord
+  qui démarre par ≥ 0,2 s sans parole soutenue (blanc, souffle, fin de mot trop faible pour le seuil mais audible) est
+  recalé 0,1 s avant la parole (fin : 0,15 s après) — mesuré sur l'énergie du micro, appliqué après les 2 passes.
 - Whisper hallucine « Sous-titrage ST' 501 » sur le silence de fin : filtré (`HALLU`).
 
 ## « Euh » et blancs : `tighten` (demande d'Arthur, 07/10/2026 : « enlève les euh, sans couper trop, pas saccadé »)
