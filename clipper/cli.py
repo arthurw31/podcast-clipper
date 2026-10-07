@@ -695,6 +695,29 @@ def cmd_episode_render(a: argparse.Namespace) -> None:
     console.print(f"[green]✓ {out}[/green]  ({probe(out)['duration'] / 60:.1f} min)")
 
 
+def cmd_verify(a: argparse.Namespace) -> None:
+    """Contrôle verbatim des coupes (« euh », bégaiements, mots coupés) des shorts de clips.json ; --fix corrige."""
+    from .verify import verify_clip
+    brand = Brand(a.brand)
+    video = resolve_input(brand, a.input)
+    ep = episode_dir(brand, video)
+    spec = video.with_suffix(".multicam.json")
+    wav = (video.parent / json.loads(spec.read_text(encoding="utf-8"))["audio"]) if spec.exists() else video
+    data = json.loads((ep / "clips.json").read_text(encoding="utf-8"))
+    only = _parse_only(a.only)
+    if a.fix and not (ep / "clips_before_verify.json").exists():
+        shutil.copy2(ep / "clips.json", ep / "clips_before_verify.json")
+    for i, c in enumerate(data["clips"]):
+        if only and c["index"] not in only:
+            continue
+        c2, notes = verify_clip(c, wav, brand.cfg, fix=a.fix)
+        data["clips"][i] = c2
+        console.rule(f"#{c['index']} {c.get('hook_title') or c['title']}")
+        console.print("\n".join(notes) if notes else "RAS")
+    if a.fix:
+        (ep / "clips.json").write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
 def cmd_tighten(a: argparse.Namespace) -> None:
     """Retire les « euh » (cachés dans les trous entre mots) sans rendre le clip saccadé -> clips.json."""
     from .tighten import tighten_clip
@@ -802,6 +825,8 @@ def main(argv: list[str] | None = None) -> None:
         sp.add_argument("--proxy", action="store_true"); sp.add_argument("--minutes", type=int, default=0)
         sp.add_argument("--jobs", default="3"); sp.add_argument("--new-teaser", action="store_true")
         sp.set_defaults(fn=fn)
+    sp = sub.add_parser("verify", help="contrôle verbatim des coupes (euh, bégaiements, mots coupés) ; --fix corrige"); common(sp)
+    sp.add_argument("--only", default=""); sp.add_argument("--fix", action="store_true"); sp.set_defaults(fn=cmd_verify)
     sp = sub.add_parser("tighten", help="retire les « euh » et longs blancs (sans saccades) dans clips.json"); common(sp)
     sp.add_argument("--only", default=""); sp.add_argument("--min-gap", type=float, default=0.5)
     sp.set_defaults(fn=cmd_tighten)

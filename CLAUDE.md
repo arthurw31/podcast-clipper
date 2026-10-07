@@ -150,6 +150,22 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
 - E21 n'a ni teaser ni logo incrusté ; E20 a un teaser (~55 s, 4–5 phrases de l'invité) + sting logo : c'est ce
   modèle qui est reproduit.
 
+## Contrôle « à l'oreille » : `verify` (retour d'Arthur, 07/10/2026 : « des euh qui restent, des phrases coupées trop
+tôt, un bégaiement au début — rajoute une vérification »)
+
+- La transcription normale nettoie le texte : « euh », bégaiements, mots coupés y sont invisibles. `clipper/verify.py`
+  retranscrit chaque passage en VERBATIM (Whisper + `initial_prompt` plein d'hésitations, 0,4 s avant / 0,6 s après)
+  et repère : fillers (`FILLERS`), « enfin » entre virgules (`HEDGES`), mots répétés, mot à cheval sur le début ou
+  la fin. Sur E22 il a retrouvé exactement ce qu'Arthur avait entendu.
+- Correction (`fix_segment`, `check_and_fix`, 2 passes) : coupes posées au point le plus SILENCIEUX du micro
+  (`_quiet`) — les horodatages verbatim d'un « euh » bougent de ±0,1 s d'une passe à l'autre ; voisins pris dans
+  l'ordre des mots (un « euh » mal horodaté avait emporté « refonte ») ; morceaux d'un même passage jamais chevauchants.
+- Garde-fou : un passage qui garde un mot coupé (« euh » collé aux mots, aucun silence) -> short : coupe d'origine
+  (`on_fail="restore"`) ; teaser : extrait retiré et remplacé par la réserve du LLM (`backup`), enchaînement final en
+  alternance animateur / invité (`teaser_clip`).
+- Shorts : `python -m clipper verify … --fix` après `tighten`, avant `build`. Coût ≈ 1,5× la durée contrôlée (CPU).
+- Whisper hallucine « Sous-titrage ST' 501 » sur le silence de fin : filtré (`HALLU`).
+
 ## « Euh » et blancs : `tighten` (demande d'Arthur, 07/10/2026 : « enlève les euh, sans couper trop, pas saccadé »)
 
 - Whisper n'écrit jamais les « euh » : ils sont dans les trous entre mots. `python -m clipper tighten` (clipper/tighten.py)

@@ -124,6 +124,18 @@ python -m clipper tighten --brand <marque> --input <fichier>
 Seuls les vrais trous (> 0,6 s) sont retirés, pour ne pas rendre le short saccadé ; dis à l'utilisateur ce qui a été
 retiré et à quels instants écouter les raccords (tu ne peux pas écouter).
 
+Puis **contrôle « à l'oreille »** (obligatoire avant `build`) : chaque passage est retranscrit en VERBATIM (Whisper
+poussé à écrire les « euh », bégaiements et mots coupés), puis corrigé en 2 passes (« euh », « enfin » entre virgules
+et répétitions retirés, début qui mange un mot avancé, fin coupée trop tôt prolongée — chaque coupe posée au point le
+plus silencieux du son). Un passage qui garde un mot coupé revient à sa coupe d'origine (jamais de mot amputé) :
+
+```bash
+python -m clipper verify --brand <marque> --input <fichier> --fix
+```
+
+Le teaser de l'épisode complet passe par le même contrôle automatiquement (`episode-plan`) ; ses extraits fautifs
+sont remplacés par la réserve. Dis à l'utilisateur ce qui a été corrigé et ce qui reste (« après correction : … »).
+
 Puis **vérifie chaque coupe mot à mot** (règle absolue : ne jamais couper une pensée) :
 
 ```bash

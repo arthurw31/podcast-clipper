@@ -374,7 +374,9 @@ dynamiques qui donnent envie de regarder l'épisode. On te donne la transcriptio
 phrase, avec `[début → fin]` et QUI parle (ANIMATEUR / INVITÉ).
 
 Rends UNIQUEMENT un JSON : {"teaser": [ {"start": <s>, "end": <s>, "start_text": "<premiers mots EXACTS>",
-"end_text": "<derniers mots EXACTS>", "speaker": "host|guest", "why": "<pourquoi c'est percutant>"} ]}
+"end_text": "<derniers mots EXACTS>", "speaker": "host|guest", "why": "<pourquoi c'est percutant>"} ],
+"backup": [ <même format : 5 à 6 autres extraits de réserve, au moins 3 de l'invité et 2 de l'animateur> ]}
+(Les extraits sont ensuite contrôlés à l'oreille ; ceux qui ont un défaut sont remplacés par la réserve.)
 
 Règles (retour d'Arthur, 07/10/2026 : « plus dynamique, qu'on voie les deux interlocuteurs, des passages où ils
 disent des trucs impactants ») :
@@ -422,58 +424,94 @@ def make_teaser(transcript: dict, words: list[dict], ranges: list[tuple[float, f
     return data
 
 
-def teaser_clip(words: list[dict], plan: dict, guest: str, company: str, wav: Path | None = None,
-                transcript: dict | None = None, reaction: float = 1.2, seed: int = 3) -> dict:
-    """Clip « teaser » (format de clips.json) : extraits calés sur les mots, « euh » et blancs retirés (`tighten`,
-    réglage serré : c'est un teaser), gros plan de la personne qui parle + courte réaction de l'autre dans les extraits
-    longs (`cams`, lu par cut_multicam) : on voit les deux interlocuteurs."""
+def _extract(words: list[dict], x: dict, orig: int) -> dict | None:
+    """Un extrait du LLM calé sur les mots (jusqu'à la fin de la phrase si la citation est approximative)."""
     from .select_clips import _snap
+    a = _word_at(words, x.get("start_text", ""), float(x["start"]), last=False)
+    b = _word_at(words, x.get("end_text", ""), float(x["end"]), last=True)
+    if a is None or b is None or b < a:
+        return None
+    k = b
+    while (k + 1 < len(words) and k - b < 8 and words[k]["w"][-1:] not in ".?!…"
+           and words[k + 1]["s"] - words[k]["e"] < 0.5 and words[k + 1].get("spk") == words[b].get("spk")):
+        k += 1
+    if words[k]["w"][-1:] in ".?!…":
+        b = k
+    s, e = _snap(words, words[a]["s"], words[b]["e"], pad_in=0.08, pad_out=0.25)
+    nxt = words[b + 1]["s"] if b + 1 < len(words) else e + 1
+    e = round(min(e, nxt - 0.03), 3)   # _snap garde 0,12 s après le dernier mot, même si le suivant enchaîne
+    return {"start": s, "end": e, "duration": round(e - s, 3), "tail_silence": round(max(0.0, nxt - words[b]["e"]), 3),
+            "start_text": x.get("start_text", ""), "end_text": x.get("end_text", ""), "role": "teaser", "orig": orig}
+
+
+def teaser_clip(words: list[dict], plan: dict, guest: str, company: str, wav: Path | None = None,
+                transcript: dict | None = None, reaction: float = 1.2, seed: int = 3, target: float = 55.0) -> dict:
+    """Clip « teaser » (format de clips.json).
+
+    1. extraits du LLM (+ réserve) calés sur les mots ; 2. « euh » et blancs retirés (`tighten`, réglage serré) ;
+    3. contrôle verbatim (`verify`, 2 passes) — un extrait qui garde un défaut est écarté ; 4. enchaînement final :
+    ordre du LLM, en ALTERNANT animateur / invité (la réserve comble les trous), jusqu'à ~`target` s ;
+    5. plans : gros plan de celui qui parle + au milieu de chaque extrait, tour à tour un plan large ou la réaction de
+    l'autre (`cams`, lu par cut_multicam) — les 3 caméras."""
     rng = random.Random(seed)
-    segs = []
-    for x in plan.get("teaser", []):
-        a = _word_at(words, x.get("start_text", ""), float(x["start"]), last=False)
-        b = _word_at(words, x.get("end_text", ""), float(x["end"]), last=True)
-        if a is None or b is None or b < a:
-            continue
-        # citation approximative (« vendeur » pour « vendeurs. ») : on va jusqu'à la fin de la phrase, jamais au-delà
-        k = b
-        while (k + 1 < len(words) and k - b < 8 and words[k]["w"][-1:] not in ".?!…"
-               and words[k + 1]["s"] - words[k]["e"] < 0.5 and words[k + 1].get("spk") == words[b].get("spk")):
-            k += 1
-        if words[k]["w"][-1:] in ".?!…":
-            b = k
-        s, e = _snap(words, words[a]["s"], words[b]["e"], pad_in=0.08, pad_out=0.25)
-        nxt = words[b + 1]["s"] if b + 1 < len(words) else e + 1
-        e = round(min(e, nxt - 0.03), 3)   # _snap garde 0,12 s après le dernier mot, même si le suivant enchaîne
-        segs.append({"start": s, "end": e, "duration": round(e - s, 3),
-                     "tail_silence": round(max(0.0, nxt - words[b]["e"]), 3),
-                     "start_text": x.get("start_text", ""), "end_text": x.get("end_text", ""), "role": "teaser"})
+    main = [e for i, x in enumerate(plan.get("teaser", [])) if (e := _extract(words, x, i))]
+    backup = [e for i, x in enumerate(plan.get("backup", [])) if (e := _extract(words, x, 100 + i))]
+    segs = main + backup
     if wav is not None and transcript is not None:
         from .tighten import tighten_segment
+        from .verify import check_and_fix
         tight = []
         for sg in segs:
-            tight += tighten_segment(sg, transcript, wav, min_gap=0.35, keep=0.12, max_silence=0.45, min_cut=0.3)
-        segs = tight
+            tight += [dict(p, orig=sg["orig"]) for p in
+                      tighten_segment(sg, transcript, wav, min_gap=0.35, keep=0.12, max_silence=0.45, min_cut=0.3)]
+        segs = check_and_fix(tight, wav, log=lambda m: console.print(f"  teaser {m}"), on_fail="drop")
+
+    def who(pieces):
+        ws = [w for p in pieces for w in words if p["start"] - 0.05 <= w["s"] <= p["end"]]
+        return max(("host", "guest"), key=lambda k: sum(w["spk"] == k for w in ws))
+
+    groups = {}
+    for p in segs:
+        groups.setdefault(p["orig"], []).append(p)
+    ext = [{"orig": o, "pieces": ps, "spk": who(ps), "dur": sum(p["duration"] for p in ps)} for o, ps in groups.items()]
+    mains = [e for e in ext if e["orig"] < 100]
+    spare = [e for e in ext if e["orig"] >= 100]
+    seq, total = [], 0.0
+    while mains or spare:
+        want = None if not seq else ("guest" if seq[-1]["spk"] == "host" else "host")
+        pick = next((e for e in mains if want is None or e["spk"] == want), None) \
+            or next((e for e in spare if e["spk"] == want), None) or (mains[0] if mains else None)
+        if pick is None or total + pick["dur"] > target + 6:
+            break
+        (mains if pick in mains else spare).remove(pick)
+        seq.append(pick)
+        total += pick["dur"]
+        if total >= target:
+            break
+    segs = [p for e in seq for p in e["pieces"]]
+
     turns, cams = [], []
     n_ins = 0
-    for sg in segs:
-        ws = [w for w in words if sg["start"] - 0.05 <= w["s"] <= sg["end"]]
+    for e in seq:
+        ws = [w for p in e["pieces"] for w in words if p["start"] - 0.05 <= w["s"] <= p["end"]]
         for w in ws:
             if not turns or turns[-1]["speaker"] != w["spk"]:
                 turns.append({"at": round(w["s"], 3), "speaker": w["spk"]})
         if not ws:
             continue
-        who = max(("host", "guest"), key=lambda k: sum(w["spk"] == k for w in ws))
-        cams.append({"at": round(sg["start"], 3), "speaker": who, "force": True})
-        # les 3 caméras (retour d'Arthur) : au milieu de chaque extrait, tour à tour un plan large (2 s) ou la
-        # réaction de l'autre (1,2 s), posé dans un silence entre deux mots, puis retour sur celui qui parle
-        if sg["duration"] >= 4.0:
-            insert = ("wide", 2.0) if n_ins % 2 == 0 else ("guest" if who == "host" else "host", reaction)
+        cams.append({"at": round(e["pieces"][0]["start"], 3), "speaker": e["spk"], "force": True})
+        longest = max(e["pieces"], key=lambda p: p["duration"])
+        if longest["duration"] >= 4.0:
+            insert = ("wide", 2.0) if n_ins % 2 == 0 else ("guest" if e["spk"] == "host" else "host", reaction)
             n_ins += 1
-            mid = sg["start"] + sg["duration"] * rng.uniform(0.4, 0.55)
-            r = _snap_gap(ws, mid, sg["start"] + 1.5, sg["end"] - insert[1] - 1.0)
+            lw = [w for w in ws if longest["start"] <= w["s"] <= longest["end"]]
+            mid = longest["start"] + longest["duration"] * rng.uniform(0.4, 0.55)
+            r = _snap_gap(lw, mid, longest["start"] + 1.5, longest["end"] - insert[1] - 1.0)
             cams += [{"at": round(r, 3), "speaker": insert[0], "force": True},
-                     {"at": round(r + insert[1], 3), "speaker": who, "force": True}]
+                     {"at": round(r + insert[1], 3), "speaker": e["spk"], "force": True}]
+        for p in e["pieces"][1:]:   # chaque morceau reprend sur celui qui parle
+            cams.append({"at": round(p["start"], 3), "speaker": e["spk"], "force": True})
+    cams.sort(key=lambda c: c["at"])
     return {"index": 99, "title": "teaser", "hook_title": "", "segments": segs, "turns": turns, "cams": cams,
             "start": segs[0]["start"] if segs else 0, "end": segs[-1]["end"] if segs else 0,
             "duration": round(sum(s["duration"] for s in segs), 2), "guest": guest, "company": company,
