@@ -448,23 +448,35 @@ def teaser_clip(words: list[dict], plan: dict, guest: str, company: str, wav: Pa
                 transcript: dict | None = None, reaction: float = 1.2, seed: int = 3, target: float = 55.0) -> dict:
     """Clip « teaser » (format de clips.json).
 
-    1. extraits du LLM (+ réserve) calés sur les mots ; 2. « euh » et blancs retirés (`tighten`, réglage serré) ;
-    3. contrôle verbatim (`verify`, 2 passes) — un extrait qui garde un défaut est écarté ; 4. enchaînement final :
+    1. extraits du LLM (+ réserve) calés sur les mots ; 2-3. `verify.snap_extract` : une transcription VERBATIM de la
+    zone -> phrases entières, « euh » / répétitions retirés, coupes dans les silences ; `trim_edges` sur les bords
+    (fin de mot parasite) ; un extrait sans fin de phrase propre est écarté ; 4. enchaînement final :
     ordre du LLM, en ALTERNANT animateur / invité (la réserve comble les trous), jusqu'à ~`target` s ;
     5. plans : gros plan de celui qui parle + au milieu de chaque extrait, tour à tour un plan large ou la réaction de
     l'autre (`cams`, lu par cut_multicam) — les 3 caméras."""
     rng = random.Random(seed)
     main = [e for i, x in enumerate(plan.get("teaser", [])) if (e := _extract(words, x, i))]
     backup = [e for i, x in enumerate(plan.get("backup", [])) if (e := _extract(words, x, 100 + i))]
-    segs = main + backup
-    if wav is not None and transcript is not None:
-        from .tighten import tighten_segment
-        from .verify import check_and_fix
-        tight = []
-        for sg in segs:
-            tight += [dict(p, orig=sg["orig"]) for p in
-                      tighten_segment(sg, transcript, wav, min_gap=0.35, keep=0.12, max_silence=0.45, min_cut=0.3)]
-        segs = check_and_fix(tight, wav, log=lambda m: console.print(f"  teaser {m}"), on_fail="drop")
+    segs = []
+    if wav is not None:
+        # découpe sur une transcription verbatim unique : phrases entières, sans « euh », coupes dans les silences
+        from .verify import snap_extract, trim_edges
+        for x in main + backup:
+            ia = next(i for i, w in enumerate(words) if w["s"] >= x["start"] - 0.05)
+            ib = max(i for i, w in enumerate(words) if w["e"] <= x["end"] + 0.05)
+            pieces, notes = snap_extract(words, ia, ib, wav)
+            if notes:
+                console.print(f"  teaser {x['start']:.1f}s : " + " ; ".join(notes))
+            if not pieces:
+                continue
+            pieces[0], n0 = trim_edges(pieces[0], wav)
+            pieces[-1], n1 = trim_edges(pieces[-1], wav)
+            for k, p in enumerate(pieces):
+                segs.append(dict(x, start=p["start"], end=p["end"], duration=round(p["end"] - p["start"], 3),
+                                 start_text=x["start_text"] if k == 0 else "",
+                                 end_text=x["end_text"] if k == len(pieces) - 1 else ""))
+    else:
+        segs = main + backup
 
     def who(pieces):
         ws = [w for p in pieces for w in words if p["start"] - 0.05 <= w["s"] <= p["end"]]
@@ -472,7 +484,8 @@ def teaser_clip(words: list[dict], plan: dict, guest: str, company: str, wav: Pa
 
     groups = {}
     for p in segs:
-        groups.setdefault(p["orig"], []).append(p)
+        if not p.get("incomplete"):          # phrase inachevée : jamais dans le teaser
+            groups.setdefault(p["orig"], []).append(p)
     ext = [{"orig": o, "pieces": ps, "spk": who(ps), "dur": sum(p["duration"] for p in ps)} for o, ps in groups.items()]
     mains = [e for e in ext if e["orig"] < 100]
     spare = [e for e in ext if e["orig"] >= 100]

@@ -631,6 +631,11 @@ def cmd_episode_plan(a: argparse.Namespace) -> None:
     teaser_plan = make_teaser(transcript, words, ranges, brand, ep / "teaser_plan.json", a.guest, a.company, a.host,
                               force=a.force or a.new_teaser)
     teaser = teaser_clip(words, teaser_plan, a.guest, a.company, wav=spec["audio"], transcript=transcript)
+    # écoute finale : ce que le spectateur entendra, mot pour mot (‖ = raccord)
+    from .verify import audit, audit_flags
+    heard = audit(teaser["segments"], spec["audio"], ep / "work" / "teaser_audit.wav")
+    (ep / "teaser_audit.txt").write_text(heard + "\n", encoding="utf-8")
+    teaser["audit_flags"] = audit_flags(heard)
     (ep / "teaser_clip.json").write_text(json.dumps(teaser, ensure_ascii=False, indent=1), encoding="utf-8")
     q = quantize(shots, 24)
     L = np.array([s["frames"] / 24 for s in q])
@@ -640,7 +645,8 @@ def cmd_episode_plan(a: argparse.Namespace) -> None:
              f"(+ teaser {teaser['duration']:.0f} s) · {len(q)} plans (médiane {np.median(L):.1f} s)", "",
              "## Dérushage", ""]
     lines += [f"- {n}" for n in notes] or ["- aucune coupe"]
-    lines += ["", "## Teaser", ""]
+    lines += ["", "## Teaser (ce qu'on entend, ‖ = raccord)", "", heard, ""]
+    lines += [f"- ⚠ {f}" for f in teaser.get("audit_flags", [])]
     lines += [f"- {_ts(sg['start'])} « {sg['start_text']} … {sg['end_text']} »" for sg in teaser["segments"]]
     lines += ["", "## Plans", ""]
     lines += [f"- {c} : {100 * sum(s['frames'] for s in q if s['cam'] == c) / tot:.0f} %" for c in ("host", "guest", "wide", "split")]
@@ -704,16 +710,26 @@ def cmd_verify(a: argparse.Namespace) -> None:
     spec = video.with_suffix(".multicam.json")
     wav = (video.parent / json.loads(spec.read_text(encoding="utf-8"))["audio"]) if spec.exists() else video
     data = json.loads((ep / "clips.json").read_text(encoding="utf-8"))
+    from .transcribe import all_words
+    transcript = json.loads((ep / "transcript.json").read_text(encoding="utf-8"))
+    dw = ep / "work" / "diarized_words.json"   # qui parle (si déjà calculé) : un changement d'orateur est une fin naturelle
+    words = json.loads(dw.read_text(encoding="utf-8")) if dw.exists() else all_words(transcript)
     only = _parse_only(a.only)
     if a.fix and not (ep / "clips_before_verify.json").exists():
         shutil.copy2(ep / "clips.json", ep / "clips_before_verify.json")
     for i, c in enumerate(data["clips"]):
         if only and c["index"] not in only:
             continue
-        c2, notes = verify_clip(c, wav, brand.cfg, fix=a.fix)
+        c2, notes = verify_clip(c, wav, brand.cfg, fix=a.fix, words=words)
         data["clips"][i] = c2
         console.rule(f"#{c['index']} {c.get('hook_title') or c['title']}")
         console.print("\n".join(notes) if notes else "RAS")
+        # écoute finale : ce que le spectateur entendra, mot pour mot (‖ = raccord)
+        from .verify import audit, audit_flags
+        heard = audit(c2["segments"], wav, ep / "work" / f"audit_{c['index']:02d}.wav", brand.cfg)
+        console.print(f"[bold]On entend[/bold] : {heard}")
+        for f in audit_flags(heard):
+            console.print(f"[yellow]⚠ {f}[/yellow]")
     if a.fix:
         (ep / "clips.json").write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
 

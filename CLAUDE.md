@@ -167,6 +167,20 @@ tôt, un bégaiement au début — rajoute une vérification »)
 - `trim_edges` (3e retour, 07/10/2026 : « il commence sur la fin d'un mot, coupe la demi-seconde du début ») : un bord
   qui démarre par ≥ 0,2 s sans parole soutenue (blanc, souffle, fin de mot trop faible pour le seuil mais audible) est
   recalé 0,1 s avant la parole (fin : 0,15 s après) — mesuré sur l'énergie du micro, appliqué après les 2 passes.
+- Fins de phrase (4e retour, 07/10/2026 : « des fois ça coupe avant qu'il ait terminé sa phrase ») : 2 extraits du
+  teaser finissaient sur une virgule (« …de loin le leader, ‖ en tout cas, nous… »). Le verbatim seul NE SUFFIT PAS
+  pour décider où une phrase finit : sa ponctuation et ses « euh » changent d'une transcription à l'autre (« venir. »
+  puis « venir, et »). Méthode retenue (`verify.is_boundary` / `sentence_bounds` / `snap_extract`) : une frontière =
+  ponctuation finale dans la transcription NORMALE (stable) + vraie pause mesurée dans le son (`pause_after` ≥ 0,25 s,
+  silence = < 25 % du niveau de parole voisin, fenêtre élargie car les horodatages normaux sont décalés de 0,2–0,3 s)
+  + mot suivant qui ne prolonge pas (et/donc/parce que… si pause < 0,5 s) ; changement d'orateur = frontière dès
+  0,08 s de blanc. Extrait prolongé jusqu'à la prochaine frontière (≤ 8 s) ou ramené à la précédente, sinon écarté
+  (teaser) / coupe d'origine (short). Cas de référence E22 : « venir ‖ et » non, « leader ‖ En tout cas » non,
+  « l'autre ‖ Donc » oui, « productivité ‖ Le » oui, « réinternaliser ‖ Mais » oui, « consommateurs ‖ (1,6 s) donc » oui.
+  Le verbatim (une seule transcription par extrait) ne sert qu'à retirer les « euh » à l'intérieur.
+- Écoute finale (`verify.audit`) : l'audio est assemblé exactement comme au montage puis retranscrit d'un bloc ->
+  « ce qu'on entend », ‖ à chaque raccord (`teaser_audit.txt`, `episode_plan.md`, sortie de `verify`) ; `audit_flags`
+  signale un « euh » entendu ou un raccord au milieu d'un mot. C'est ce texte qu'on montre à Arthur.
 - Whisper hallucine « Sous-titrage ST' 501 » sur le silence de fin : filtré (`HALLU`).
 
 ## « Euh » et blancs : `tighten` (demande d'Arthur, 07/10/2026 : « enlève les euh, sans couper trop, pas saccadé »)
