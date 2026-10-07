@@ -140,6 +140,8 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
   interlocuteurs, des passages impactants » -> `make_teaser` (TEASER_PROMPT, appel dédié avec Opus :
   `episode.teaser_model`) : 6–9 extraits de 2,5–8 s, alternance animateur/invité, début et fin de phrase ;
   `teaser_clip` : `tighten` serré + réaction de 1 s de l'autre (`clip["cams"]`, lu par `cut_multicam`, `force`).
+  2e retour : « phrases un peu plus longues, que chacun parle, des plans des 3 caméras » -> 5–7 extraits de 5–12 s
+  en alternance ; dans chaque extrait, tour à tour un plan large de 2 s ou la réaction de l'autre (1,2 s).
   « Logo plus gros en haut à droite » -> `episode_logo` (0,20 de la largeur, comme E20 ≈ 0,22) dans chaque plan
   du corps + même réglage pour le teaser (`teaser.format_overrides.16x9.logo`).
 - L'épisode entier n'est PAS rendu par HyperFrames (≈ 12× la durée = 9–10 h) : corps en FFmpeg, teaser en

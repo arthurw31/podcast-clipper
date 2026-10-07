@@ -118,6 +118,7 @@ def diarize(words: list[dict], wav: Path, host_ref: tuple[float, float], win: fl
     host_k = int(np.argmax((emb[ref] @ cent.T).mean(0))) if ref.any() else 0
     sim = emb @ cent.T                       # (fenêtres, 2)
     margin = sim[:, host_k] - sim[:, 1 - host_k]   # > 0 : animateur
+    margin = np.nan_to_num(margin)   # fenêtre sans empreinte valide (NaN du modèle) : sans avis
     # chaque mot : moyenne des marges des fenêtres qui le recouvrent (pondérée par le recouvrement)
     starts = np.array([a for a, _ in spans])
     vals = []
@@ -131,9 +132,12 @@ def diarize(words: list[dict], wav: Path, host_ref: tuple[float, float], win: fl
     v = np.array(vals)
     if smooth > 1 and len(v) >= smooth:
         v = np.convolve(v, np.ones(smooth) / smooth, mode="same")
-    for w, x in zip(words, v):
-        w["spk"] = "host" if x > 0 else "guest"
+    prev = "host"
+    for w, x in zip(words, np.nan_to_num(v)):
+        # sans avis (0) : même orateur que le mot précédent (avant : NaN -> « guest » en pleine phrase de l'animateur)
+        w["spk"] = prev if x == 0 else ("host" if x > 0 else "guest")
         w["spk_conf"] = round(float(abs(x)), 3)
+        prev = w["spk"]
     return words
 
 

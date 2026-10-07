@@ -34,6 +34,8 @@ transcribe:
   corrections:
     iPartners: "AI Partners"
     IPartners: "AI Partners"
+    post-Lindin: "post LinkedIn"   # E22 (07/10/2026)
+    Lindin: "LinkedIn"
 
 colors:
   primary: "#258AF3"         # Blue Primaire — accents, CTA

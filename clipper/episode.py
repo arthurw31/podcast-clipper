@@ -369,7 +369,7 @@ def out_time(shots: list[dict], t_src: float, fps: int = 24) -> float | None:
 
 # ------------------------------------------------------------------------------------------------ teaser
 
-TEASER_PROMPT = """Tu montes le TEASER d'ouverture d'un podcast vidéo B2B (AI Corner) : 40 à 50 secondes très
+TEASER_PROMPT = """Tu montes le TEASER d'ouverture d'un podcast vidéo B2B (AI Corner) : 45 à 60 secondes très
 dynamiques qui donnent envie de regarder l'épisode. On te donne la transcription de l'épisode monté, phrase par
 phrase, avec `[début → fin]` et QUI parle (ANIMATEUR / INVITÉ).
 
@@ -378,11 +378,12 @@ Rends UNIQUEMENT un JSON : {"teaser": [ {"start": <s>, "end": <s>, "start_text":
 
 Règles (retour d'Arthur, 07/10/2026 : « plus dynamique, qu'on voie les deux interlocuteurs, des passages où ils
 disent des trucs impactants ») :
-- 6 à 9 extraits COURTS : 2,5 à 8 s chacun (jamais plus de 9 s), total 40 à 50 s.
+- 5 à 7 extraits de 5 à 12 s chacun (une vraie phrase complète, pas un fragment), total 45 à 60 s
+  (retour d'Arthur : « des phrases un peu plus longues, il faut que chacun parle »).
 - Uniquement de l'impact : chiffre frappant, formule choc, prise de position tranchée, contre-intuition, image
   forte. Pas de contexte, pas d'explication, pas de mise en place.
-- Les DEUX interlocuteurs : au moins 2 extraits de l'animateur (question qui pique, réaction forte, punchline) qui
-  alternent avec ceux de l'invité, pour un effet de dialogue.
+- Les DEUX interlocuteurs parlent à tour de rôle : alterne animateur / invité (au moins 2 extraits de l'animateur :
+  question qui pique, réaction forte, punchline), pour un effet de dialogue.
 - Ordre de montage = ordre de la liste : ouvrir sur le plus fort, faire monter la tension, finir sur une phrase
   qui donne envie de la suite.
 - Chaque extrait COMMENCE au début d'une phrase et FINIT sur une fin de phrase (. ? !) — jamais sur une virgule,
@@ -422,7 +423,7 @@ def make_teaser(transcript: dict, words: list[dict], ranges: list[tuple[float, f
 
 
 def teaser_clip(words: list[dict], plan: dict, guest: str, company: str, wav: Path | None = None,
-                transcript: dict | None = None, reaction: float = 1.0, seed: int = 3) -> dict:
+                transcript: dict | None = None, reaction: float = 1.2, seed: int = 3) -> dict:
     """Clip « teaser » (format de clips.json) : extraits calés sur les mots, « euh » et blancs retirés (`tighten`,
     réglage serré : c'est un teaser), gros plan de la personne qui parle + courte réaction de l'autre dans les extraits
     longs (`cams`, lu par cut_multicam) : on voit les deux interlocuteurs."""
@@ -454,6 +455,7 @@ def teaser_clip(words: list[dict], plan: dict, guest: str, company: str, wav: Pa
             tight += tighten_segment(sg, transcript, wav, min_gap=0.35, keep=0.12, max_silence=0.45, min_cut=0.3)
         segs = tight
     turns, cams = [], []
+    n_ins = 0
     for sg in segs:
         ws = [w for w in words if sg["start"] - 0.05 <= w["s"] <= sg["end"]]
         for w in ws:
@@ -463,12 +465,15 @@ def teaser_clip(words: list[dict], plan: dict, guest: str, company: str, wav: Pa
             continue
         who = max(("host", "guest"), key=lambda k: sum(w["spk"] == k for w in ws))
         cams.append({"at": round(sg["start"], 3), "speaker": who, "force": True})
-        if sg["duration"] >= 4.5:   # réaction de l'autre, au milieu, dans un silence entre deux mots
-            mid = sg["start"] + sg["duration"] * rng.uniform(0.45, 0.6)
-            r = _snap_gap(ws, mid, sg["start"] + 1.5, sg["end"] - reaction - 1.0)
-            other = "guest" if who == "host" else "host"
-            cams += [{"at": round(r, 3), "speaker": other, "force": True},
-                     {"at": round(r + reaction, 3), "speaker": who, "force": True}]
+        # les 3 caméras (retour d'Arthur) : au milieu de chaque extrait, tour à tour un plan large (2 s) ou la
+        # réaction de l'autre (1,2 s), posé dans un silence entre deux mots, puis retour sur celui qui parle
+        if sg["duration"] >= 4.0:
+            insert = ("wide", 2.0) if n_ins % 2 == 0 else ("guest" if who == "host" else "host", reaction)
+            n_ins += 1
+            mid = sg["start"] + sg["duration"] * rng.uniform(0.4, 0.55)
+            r = _snap_gap(ws, mid, sg["start"] + 1.5, sg["end"] - insert[1] - 1.0)
+            cams += [{"at": round(r, 3), "speaker": insert[0], "force": True},
+                     {"at": round(r + insert[1], 3), "speaker": who, "force": True}]
     return {"index": 99, "title": "teaser", "hook_title": "", "segments": segs, "turns": turns, "cams": cams,
             "start": segs[0]["start"] if segs else 0, "end": segs[-1]["end"] if segs else 0,
             "duration": round(sum(s["duration"] for s in segs), 2), "guest": guest, "company": company,
