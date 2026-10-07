@@ -72,6 +72,8 @@ def lint(proj: Path) -> tuple[bool, list[dict]]:
 
 def render(proj: Path, output: Path, quality: str = "looks", fps: int | None = None, crf: int | None = None,
            frame_format: str = "") -> Path:
+    # absolu : npx tourne dans le dossier du projet, un chemin relatif y serait écrit (teaser E22, 07/10/2026)
+    output = Path(output).resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
     args = ["render", "--output", str(output)]
     args += ["--crf", str(crf)] if crf else ["--quality", quality]
