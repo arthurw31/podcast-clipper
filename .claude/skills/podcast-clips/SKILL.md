@@ -181,6 +181,13 @@ python -m clipper preview --brand <marque> --input <fichier> --stop   # arrête 
 - Colle dans le chat, pour chaque short : le titre, la durée, puis son **post LinkedIn** prêt à copier.
 - Donne le chemin du dossier.
 
+## Épisode complet (rushs multicam -> épisode monté + teaser)
+
+Sur demande (« monte l'épisode en entier ») : `python -m clipper episode-plan --brand <m> --input <ep>.mp4 --guest … --company … --host "…"`,
+présente `episode_plan.md` (durée, coupes du dérushage, extraits du teaser) et demande validation ; puis
+`episode-render … --proxy` (aperçu 540p, ~15 min, à envoyer avec SendUserFile) ; après validation seulement,
+`episode-render …` (1080p, ~1 h, arrière-plan). Joindre `episode/description_youtube.md` (titre + chapitres).
+
 ## Retouches courantes
 
 | Demande | Action |

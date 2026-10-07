@@ -12,6 +12,7 @@
   python -m clipper preview   --brand <slug> --input episode.mp4 [--stop]         # aperçu instantané, sans rendu
   python -m clipper render    --brand <slug> --input episode.mp4 [--only 1]       # MP4
   python -m clipper posts     --brand <slug> --input episode.mp4 [--episode-url URL] # post LinkedIn + description par clip
+  python -m clipper episode-plan|episode-render --brand <slug> --input E.mp4 [--proxy]   # épisode complet (rushs)
   python -m clipper fetch     <lien Dropbox> [--dest depot]                       # rushs : reprise auto, tailles vérifiées
   python -m clipper new-brand <slug>
   python -m clipper brands
@@ -587,6 +588,105 @@ def cmd_fetch(a: argparse.Namespace) -> None:
         sys.exit(1)
 
 
+def _episode_inputs(a: argparse.Namespace):
+    from .multicam import load_spec
+    brand = Brand(a.brand)
+    video = resolve_input(brand, a.input)
+    ep = episode_dir(brand, video)
+    spec = load_spec(video)
+    if not spec:
+        sys.exit(f"Pas de {video.with_suffix('.multicam.json').name} : le montage complet part des rushs multicam")
+    transcript = transcribe(spec.get("audio") or video, ep / "transcript.json", brand.cfg, ep / "work",
+                            names=[a.guest, a.company])
+    return brand, video, ep, spec, transcript
+
+
+def cmd_episode_plan(a: argparse.Namespace) -> None:
+    """Montage complet, étape 1 : dérushage (LLM), qui parle (voix), liste de plans, teaser, chapitres -> à relire."""
+    import numpy as np
+
+    from .diarize import diarize
+    from .episode import _refine_boundaries, _ts, build_edl, keep_ranges, make_plan, quantize, teaser_clip
+    from .transcribe import all_words
+    brand, video, ep, spec, transcript = _episode_inputs(a)
+    plan = make_plan(transcript, brand, ep / "episode_plan.json", a.guest, a.company, a.host, force=a.force)
+    wf = ep / "work" / "diarized_words.json"
+    if wf.exists() and not a.force:
+        words = json.loads(wf.read_text(encoding="utf-8"))
+    else:
+        console.print("Qui parle (empreintes vocales)…")
+        t0 = float(plan["start"]["t"])
+        words = diarize(all_words(transcript), spec["audio"], host_ref=(t0, t0 + 15))
+        wf.write_text(json.dumps(words, ensure_ascii=False), encoding="utf-8")
+    _refine_boundaries(words)
+    ranges, notes = keep_ranges(words, plan)
+    shots = build_edl(words, ranges)
+    (ep / "work" / "edl.json").write_text(json.dumps({"ranges": ranges, "shots": shots}, indent=0), encoding="utf-8")
+    teaser = teaser_clip(words, plan, a.guest, a.company)
+    (ep / "teaser_clip.json").write_text(json.dumps(teaser, ensure_ascii=False, indent=1), encoding="utf-8")
+    q = quantize(shots, 24)
+    L = np.array([s["frames"] / 24 for s in q])
+    tot = max(1, sum(s["frames"] for s in q))
+    lines = [f"# Montage complet — {plan.get('youtube_title', '')}", "",
+             f"Épisode : {_ts(ranges[0][0])} → {_ts(ranges[-1][1])} des rushs · durée montée {_ts(L.sum())} "
+             f"(+ teaser {teaser['duration']:.0f} s) · {len(q)} plans (médiane {np.median(L):.1f} s)", "",
+             "## Dérushage", ""]
+    lines += [f"- {n}" for n in notes] or ["- aucune coupe"]
+    lines += ["", "## Teaser", ""]
+    lines += [f"- {_ts(sg['start'])} « {sg['start_text']} … {sg['end_text']} »" for sg in teaser["segments"]]
+    lines += ["", "## Plans", ""]
+    lines += [f"- {c} : {100 * sum(s['frames'] for s in q if s['cam'] == c) / tot:.0f} %" for c in ("host", "guest", "wide", "split")]
+    (ep / "episode_plan.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    console.print("\n".join(lines))
+
+
+def cmd_episode_render(a: argparse.Namespace) -> None:
+    """Montage complet, étape 2 : teaser (HyperFrames) + corps (plans) + fin -> un MP4. --proxy = aperçu 540p rapide."""
+    from .episode import _normalize, assemble, description, end_card, render_body, teaser_brand
+    from .media import FFMPEG, probe
+    from .media import run as _run
+    from .render import render as hf_render
+    brand, video, ep, spec, transcript = _episode_inputs(a)
+    edl = json.loads((ep / "work" / "edl.json").read_text(encoding="utf-8"))
+    plan = json.loads((ep / "episode_plan.json").read_text(encoding="utf-8"))
+    words = json.loads((ep / "work" / "diarized_words.json").read_text(encoding="utf-8"))
+    teaser = json.loads((ep / "teaser_clip.json").read_text(encoding="utf-8"))
+    proxy, fps = a.proxy, 24
+    size = (960, 540) if proxy else (1920, 1080)
+    work = (ep / "work" / "episode").resolve()
+    work.mkdir(parents=True, exist_ok=True)
+    tag = "_apercu" if proxy else ""
+    shots = edl["shots"]
+    if a.minutes:
+        shots = [s for s in shots if s["start"] < edl["ranges"][0][0] + 60 * a.minutes]
+    # teaser : HyperFrames (sous-titres de la charte), puis aux réglages des plans du corps
+    tb = teaser_brand(brand)
+    proj = build_clip(tb, video, transcript, teaser, ep, formats=["16x9"], force=a.force)
+    t_mp4 = ep / "renders" / f"teaser{tag}.mp4"
+    if a.force or not t_mp4.exists():
+        console.print("Rendu du teaser (HyperFrames)…")
+        hf_render(proj / "16x9", t_mp4, quality="draft" if proxy else tb.cfg.render.quality, fps=fps,
+                  crf=None if proxy else (int(tb.cfg.render.get("crf") or 0) or None),
+                  frame_format="" if proxy else str(tb.cfg.render.get("video_frame_format") or ""))
+    t_v = _normalize(t_mp4, work / f"teaser_v{tag}.mp4", size, fps, proxy)
+    t_a = work / f"teaser_a{tag}.wav"
+    _run([FFMPEG, "-y", "-v", "error", "-i", str(t_mp4), "-vn", "-ar", "48000", "-ac", "2", str(t_a)])
+    console.print("Corps de l'épisode…")
+    body_v = render_body(spec, shots, edl["ranges"], work, None, fps=fps, proxy=proxy, jobs=int(a.jobs or 3),
+                         split_order=("host", "guest") if a.host_side != "right" else ("guest", "host"),
+                         audio_delay=float(spec.get("audio_delay", 0)))
+    end = end_card(brand, work / f"end{tag}.mp4", size, fps, proxy)
+    out_dir = ep / "episode"
+    out_dir.mkdir(exist_ok=True)
+    suffix = f"_{a.minutes}min" if a.minutes else ""
+    out = out_dir / f"{video.stem}_episode{tag}{suffix}.mp4"
+    assemble([t_v, body_v, end], [t_a, work / "body_audio.wav", 4.0], out, work)
+    t_len = float(probe(t_v)["duration"])
+    (out_dir / "description_youtube.md").write_text(description(plan, edl["shots"], words, t_len, a.guest, a.company),
+                                                   encoding="utf-8")
+    console.print(f"[green]✓ {out}[/green]  ({probe(out)['duration'] / 60:.1f} min)")
+
+
 def cmd_tighten(a: argparse.Namespace) -> None:
     """Retire les « euh » (cachés dans les trous entre mots) sans rendre le clip saccadé -> clips.json."""
     from .tighten import tighten_clip
@@ -685,6 +785,14 @@ def main(argv: list[str] | None = None) -> None:
     sp.set_defaults(fn=cmd_preview)
     sp = sub.add_parser("new-brand"); sp.add_argument("slug"); sp.set_defaults(fn=cmd_new_brand)
     sp = sub.add_parser("brands"); sp.set_defaults(fn=cmd_brands)
+    for name, fn, hlp in (("episode-plan", cmd_episode_plan, "montage complet depuis les rushs : dérushage, voix, plans, teaser"),
+                          ("episode-render", cmd_episode_render, "montage complet : rendu (--proxy = aperçu 540p)")):
+        sp = sub.add_parser(name, help=hlp); common(sp)
+        sp.add_argument("--guest", default=""); sp.add_argument("--company", default="")
+        sp.add_argument("--host", default="", help="animateur, ex: 'Thomas Spitz (CEO AI Partners)'")
+        sp.add_argument("--host-side", default="left", choices=["left", "right"], help="côté de l'animateur dans le plan large")
+        sp.add_argument("--proxy", action="store_true"); sp.add_argument("--minutes", type=int, default=0)
+        sp.add_argument("--jobs", default="3"); sp.set_defaults(fn=fn)
     sp = sub.add_parser("tighten", help="retire les « euh » et longs blancs (sans saccades) dans clips.json"); common(sp)
     sp.add_argument("--only", default=""); sp.add_argument("--min-gap", type=float, default=0.5)
     sp.set_defaults(fn=cmd_tighten)

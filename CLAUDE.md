@@ -116,6 +116,29 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
   séparation des voix par canal.
 - Rendu 1080p seulement (rushs 1080p) ; coût ≈ 3 min de découpe par minute de short (3 flux H.264 lus).
 
+## Épisode complet depuis les rushs (demande d'Arthur, 07/10/2026 : « monte le podcast en entier + le teaser »)
+
+`python -m clipper episode-plan …` puis `episode-render … --proxy` (aperçu 540p, ~15 min) -> validation -> `episode-render`
+(1080p). Fichiers : `clipper/episode.py`, `clipper/diarize.py`, section `teaser:` de brand.yaml. Sorties :
+`output/<m>/<ep>/episode_plan.md` (à relire : coupes, teaser, % de plans), `episode/<ep>_episode[_apercu].mp4`,
+`episode/description_youtube.md` (titre + chapitres aux temps du montage).
+- Style mesuré sur les montages du monteur (E20 MAIF, E21 Mendo — même studio que E22) : plan médian ≈ 10 s ;
+  gros plans 76 %, large 14 %, écran partagé (2 gros plans côte à côte, animateur du côté où il est dans le large) 10 % ;
+  sur la personne qui parle 97 % du temps ; respiration large/split (~7 s) toutes les 15–24 s dans les longues
+  réponses ; ~1 réaction de 1,5 s par minute sur l'écoutant. `build_edl` reproduit ces proportions (E22 : 78/11/10 %).
+- Dérushage par le LLM (`PLAN_PROMPT`) : dernière prise de l'intro, au revoir, coupes hors antenne / question reposée
+  (citations calées sur les mots) ; jonction de dérushage = changement de plan forcé (jamais de jump cut).
+- Qui parle : `diarize` = empreintes vocales WeSpeaker ResNet34 (ONNX, `models/`, téléchargé au 1er usage) + k-moyennes
+  à 2 voix, nommées par l'intro de l'animateur ; ~2 min pour 52 min, exact sur les échanges questions/réponses.
+  Pas de sherpa-onnx (DLL bloquée par le contrôle des applications Windows) ni speechbrain (pas de torchaudio pour
+  torch 2.14). Changements d'orateur recalés sur le plus grand silence voisin (`_refine_boundaries`).
+- Rendu du corps : un morceau H.264 par plan (`-frames:v` exact, 24 i/s, `-video_track_timescale 12288`), concat sans
+  réencodage ; audio = micro sur les mêmes images (aucune dérive) ; volume normalisé sur tout l'épisode (-16 LUFS :
+  E22, le micro de l'invité baisse de 2,5 dB entre 26 et 41 min). Teaser = clip HyperFrames 16:9 (sous-titres de la
+  charte) via `teaser_brand` ; fin = animation AI Partners + logo (4 s), comme E20.
+- E21 n'a ni teaser ni logo incrusté ; E20 a un teaser (~55 s, 4–5 phrases de l'invité) + sting logo : c'est ce
+  modèle qui est reproduit.
+
 ## « Euh » et blancs : `tighten` (demande d'Arthur, 07/10/2026 : « enlève les euh, sans couper trop, pas saccadé »)
 
 - Whisper n'écrit jamais les « euh » : ils sont dans les trous entre mots. `python -m clipper tighten` (clipper/tighten.py)

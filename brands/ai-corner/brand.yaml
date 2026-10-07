@@ -109,3 +109,17 @@ format_overrides:
       cta:
         subtext: "Lien en description"
         font_size: 30
+
+# Teaser d'ouverture de l'épisode complet (commande episode, 07/10/2026) — calqué sur E20 MAIF : ~50 s de phrases fortes
+# sous-titrées, puis le logo AI Partners sur l'animation de la charte. Appliqué PAR-DESSUS la config ci-dessus.
+teaser:
+  formats: ["16x9"]
+  fps: 24                    # = rushs et corps de l'épisode (concaténation sans réencodage)
+  hook:
+    enabled: false
+  guest_logo:
+    enabled: false
+  outro:
+    duration: 3.0            # « sting » : animation AI Partners + logo, sans bouton
+    cta:
+      enabled: false

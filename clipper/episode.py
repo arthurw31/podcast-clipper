@@ -1,0 +1,463 @@
+"""Montage de l'épisode COMPLET à partir des rushs multicam (3 caméras + micro) — + teaser d'ouverture.
+
+Demande d'Arthur (07/10/2026) : « monte le podcast en entier à partir des 3 longs rushs et de la piste audio, fais aussi
+le teaser ». Style mesuré sur les épisodes montés par le monteur (E20 MAIF, E21 Mendo — même studio que E22) :
+
+- E21 : plan médian ≈ 10 s ; gros plans 76 % du temps, plan large 14 %, écran partagé (deux gros plans côte à côte)
+  10 %. Quand quelqu'un parle, on est sur SON gros plan 97 % du temps ; les longues réponses sont aérées par un
+  plan large (~7 s) et/ou un écran partagé (~7 s) toutes les 15–25 s ; ~1 fois par minute, un plan de réaction de
+  1,5 s sur la personne qui écoute (sourire, hochement), puis retour.
+- E20 : teaser d'ouverture ≈ 55 s (4–5 phrases fortes de l'invité, sous-titrées) + logo AI Partners, puis
+  l'accroche et l'introduction de l'animateur ; fin sur l'animation AI Partners.
+
+Étapes (`episode-plan` puis `episode-render`) :
+1. dérushage par le LLM (vrai début = dernière prise de l'intro, vraie fin = au revoir, passages hors micro / prises
+   ratées / relances à retirer, extraits du teaser, chapitres YouTube) — citations calées sur les mots ;
+2. qui parle : `diarize` (empreintes vocales) sur les mots gardés ;
+3. liste de plans (EDL) selon les règles ci-dessus, coupes posées dans les silences, alignées sur les images (24 i/s) ;
+4. rendu : un morceau H.264 par plan (en parallèle), concaténés sans réencodage ; audio = micro, mêmes intervalles ;
+   teaser rendu par HyperFrames (sous-titres de la charte) ; logo de fin.
+"""
+from __future__ import annotations
+
+import json
+import random
+import subprocess
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+
+import numpy as np
+from rich.console import Console
+
+from .config import Brand
+from .media import FFMPEG, probe, run
+from .select_clips import _find_phrase
+from .transcribe import all_words, sentences, to_timed_text
+
+console = Console()
+
+PLAN_PROMPT = """Tu es le monteur d'un podcast vidéo B2B (AI Corner, AI Partners). On te donne la transcription
+COMPLÈTE de l'enregistrement brut (rushs), phrase par phrase avec `[début → fin]` (mm:ss.s). L'enregistrement
+contient des réglages avant le début, des prises ratées, des discussions hors antenne, et la suite après l'au revoir.
+
+Rends UNIQUEMENT un JSON :
+{
+  "start": {"t": <secondes>, "start_text": "<6 à 10 premiers mots EXACTS de la 1re phrase de l'épisode>"},
+  "end":   {"t": <secondes>, "end_text": "<6 à 10 derniers mots EXACTS de la dernière phrase de l'épisode>"},
+  "cuts": [ {"start": <s>, "end": <s>, "start_text": "<premiers mots EXACTS retirés>", "end_text": "<derniers mots
+             EXACTS retirés>", "reason": "<pourquoi>"} ],
+  "teaser": [ {"start": <s>, "end": <s>, "start_text": "<premiers mots EXACTS>", "end_text": "<derniers mots EXACTS>",
+               "why": "<pourquoi c'est fort>"} ],
+  "chapters": [ {"t": <s>, "start_text": "<premiers mots EXACTS>", "title": "<titre court>"} ],
+  "youtube_title": "<titre YouTube>"
+}
+
+Règles :
+- start : la DERNIÈRE prise complète de l'introduction de l'animateur (« Bonjour à tous, bienvenue… »). Tout ce qui
+  précède (réglages, prises ratées, consignes) est retiré.
+- end : la dernière phrase de l'épisode (remerciements / au revoir). Tout ce qui suit est retiré.
+- cuts : à l'intérieur de l'épisode, uniquement ce qui n'est PAS destiné au public : discussion technique ou hors
+  antenne (« tu peux recommencer », « on pourra couper ici », l'heure, le son), question reposée (garder la MEILLEURE
+  prise, en général la dernière), phrase abandonnée puis reprise à l'identique. Ne retire JAMAIS du contenu, des
+  hésitations normales, des digressions intéressantes. Chaque coupe commence au DÉBUT d'une phrase et finit à la
+  FIN d'une phrase ; ce qui reste doit s'enchaîner naturellement (une question suivie de sa réponse). Peu de coupes.
+- teaser : 3 à 5 extraits, chacun 6 à 20 s, total 40 à 60 s, ordre d'enchaînement voulu (le plus fort en premier) :
+  phrases fortes, tranchées ou surprenantes de l'invité (au plus une de l'animateur), compréhensibles hors contexte,
+  qui donnent envie de regarder. Phrases complètes, jamais dans une partie retirée.
+- chapters : 6 à 10 chapitres YouTube (le premier au début de l'épisode), titres courts et concrets.
+- Les textes cités sont recopiés MOT POUR MOT depuis la transcription (ils servent à caler les coupes)."""
+
+
+def _ts(t: float) -> str:
+    m, s = divmod(max(0.0, t), 60)
+    h, m = divmod(int(m), 60)
+    return f"{h}:{m:02d}:{int(s):02d}" if h else f"{m:d}:{int(s):02d}"
+
+
+# ------------------------------------------------------------------------------------------------ 1. dérushage
+
+def _word_at(words: list[dict], text: str, around: float, last: bool) -> int | None:
+    hit = _find_phrase(words, text or "", around, window=40) or _find_phrase(words, text or "", around, window=1e9)
+    return None if hit is None else hit[1 if last else 0]
+
+
+def keep_ranges(words: list[dict], plan: dict) -> tuple[list[tuple[float, float]], list[str]]:
+    """Intervalles gardés (temps des rushs) à partir du plan du LLM, calés sur les mots."""
+    notes = []
+    i0 = _word_at(words, plan["start"].get("start_text", ""), float(plan["start"]["t"]), last=False)
+    i1 = _word_at(words, plan["end"].get("end_text", ""), float(plan["end"]["t"]), last=True)
+    if i0 is None or i1 is None:
+        raise SystemExit("Début ou fin de l'épisode introuvable dans la transcription (voir episode_plan.json)")
+    removed = []
+    for c in plan.get("cuts", []):
+        a = _word_at(words, c.get("start_text", ""), float(c["start"]), last=False)
+        b = _word_at(words, c.get("end_text", ""), float(c["end"]), last=True)
+        if a is None or b is None or b < a:
+            notes.append(f"coupe ignorée (citation introuvable) : {c.get('reason', '')}")
+            continue
+        removed.append((a, b))
+        notes.append(f"coupe {_ts(words[a]['s'])}–{_ts(words[b]['e'])} ({words[b]['e'] - words[a]['s']:.0f} s) : {c.get('reason', '')}")
+    keep_idx = []
+    cur = i0
+    for a, b in sorted(removed):
+        if b < cur or a > i1:
+            continue
+        if a > cur:
+            keep_idx.append((cur, a - 1))
+        cur = max(cur, b + 1)
+    if cur <= i1:
+        keep_idx.append((cur, i1))
+    ranges = []
+    for a, b in keep_idx:
+        prev_e = words[a - 1]["e"] if a > 0 else 0.0
+        next_s = words[b + 1]["s"] if b + 1 < len(words) else words[b]["e"] + 1.0
+        s = max(words[a]["s"] - 0.12, (prev_e + words[a]["s"]) / 2)
+        e = min(words[b]["e"] + 0.35, (words[b]["e"] + next_s) / 2)
+        ranges.append((round(s, 3), round(e, 3)))
+    return ranges, notes
+
+
+def make_plan(transcript: dict, brand: Brand, out: Path, guest: str = "", company: str = "", host: str = "",
+              force: bool = False) -> dict:
+    from .llm import ask_json
+    if out.exists() and not force:
+        return json.loads(out.read_text(encoding="utf-8"))
+    sel = brand.cfg.selection
+    user = (f"Animateur : {host}. Invité : {guest} ({company}).\n\nTRANSCRIPTION :\n{to_timed_text(transcript)}")
+    plan = ask_json(PLAN_PROMPT, user, model=sel.llm_model, backend=sel.llm_backend, max_tokens=12000)
+    out.write_text(json.dumps(plan, ensure_ascii=False, indent=1), encoding="utf-8")
+    return plan
+
+
+# -------------------------------------------------------------------------------------- 2-3. qui parle + plans
+
+def _refine_boundaries(words: list[dict], reach: int = 3) -> None:
+    """Un changement d'orateur détecté avec 1–2 mots de retard (lissage) est recalé sur le plus grand silence voisin."""
+    i = 1
+    while i < len(words):
+        if words[i]["spk"] != words[i - 1]["spk"]:
+            new_spk = words[i]["spk"]
+            lo, hi = max(1, i - reach), min(len(words) - 1, i + reach)
+            j = max(range(lo, hi + 1), key=lambda k: words[k]["s"] - words[k - 1]["e"])
+            for k in range(min(i, j), max(i, j)):
+                words[k]["spk"] = new_spk if j < i else words[i - 1]["spk"]
+            i = max(i, j) + 1
+        else:
+            i += 1
+
+
+def _snap_gap(words: list[dict], t: float, lo: float, hi: float) -> float:
+    """Instant de coupe dans le silence entre deux mots le plus proche de t (dans [lo, hi])."""
+    best, score = t, 1e9
+    for a, b in zip(words, words[1:]):
+        mid = (a["e"] + b["s"]) / 2
+        if lo <= mid <= hi:
+            sc = abs(mid - t) - 2.0 * min(0.5, b["s"] - a["e"])   # préfère les vraies pauses
+            if sc < score:
+                best, score = mid, sc
+    return best
+
+
+def build_edl(words: list[dict], ranges: list[tuple[float, float]], seed: int = 7,
+              break_every: tuple[float, float] = (15.0, 24.0), break_len: tuple[float, float] = (5.5, 8.0),
+              reaction_len: float = 1.5, reaction_rate: float = 1 / 60, min_shot: float = 2.0) -> list[dict]:
+    """Liste de plans [{start, end, cam}] en temps des rushs ; cam ∈ host | guest | wide | split.
+
+    Gros plan de la personne qui parle ; changement d'orateur -> coupe 0,15 s avant son premier mot (dans le silence) ;
+    réponse longue -> respiration large / split toutes les 15–24 s ; ~1 réaction de 1,5 s par minute ; jonction de
+    dérushage -> changement de plan forcé (jamais de jump cut sur le même cadre)."""
+    rng = random.Random(seed)
+    shots: list[dict] = []
+    cycle = [["wide"], ["split"], ["wide", "split"], ["split"], ["wide"]]
+    ci = 0
+    for r0, r1 in ranges:
+        ws = [w for w in words if w["s"] >= r0 - 0.01 and w["e"] <= r1 + 0.01]
+        if not ws:
+            continue
+        # tours de parole dans l'intervalle (réactions < 1,2 s rattachées au tour en cours)
+        turns = []
+        for w in ws:
+            if turns and turns[-1]["spk"] == w["spk"]:
+                turns[-1]["e"] = w["e"]
+            else:
+                turns.append({"spk": w["spk"], "s": w["s"], "e": w["e"]})
+        merged = []
+        for t in turns:
+            if merged and (t["e"] - t["s"] < 1.2 or merged[-1]["spk"] == t["spk"]):
+                merged[-1]["e"] = t["e"]
+            else:
+                merged.append(dict(t))
+        first_of_range = True
+        for k, t in enumerate(merged):
+            a = r0 if k == 0 else _snap_gap(ws, t["s"] - 0.15, t["s"] - 0.6, t["s"])
+            b = r1 if k == len(merged) - 1 else None   # fixé par le tour suivant
+            spk, other = t["spk"], ("guest" if t["spk"] == "host" else "host")
+            end = b if b is not None else _snap_gap(ws, merged[k + 1]["s"] - 0.15, merged[k + 1]["s"] - 0.6,
+                                                     merged[k + 1]["s"])
+            cur = a
+            # jonction de dérushage : le premier plan ne doit pas reprendre le cadre du dernier plan
+            if first_of_range and shots and shots[-1]["cam"] == spk:
+                cut = min(end, cur + rng.uniform(4.0, 6.0))
+                shots.append({"start": cur, "end": cut, "cam": "wide"})
+                cur = cut
+            first_of_range = False
+            nxt_break = cur + rng.uniform(*break_every)
+            while nxt_break + break_len[0] + 4.0 < end:
+                bs = _snap_gap(ws, nxt_break, nxt_break - 2.5, nxt_break + 2.5)
+                stretch = bs - cur
+                # réaction sur l'écoutant au milieu d'un long gros plan (~1 par minute)
+                if stretch > 12 and rng.random() < min(1.0, stretch * reaction_rate * 1.6):
+                    rs = _snap_gap(ws, cur + stretch * rng.uniform(0.4, 0.6), cur + 5, bs - 5)
+                    shots.append({"start": cur, "end": rs, "cam": spk})
+                    shots.append({"start": rs, "end": rs + reaction_len, "cam": other, "reaction": True})
+                    cur = rs + reaction_len
+                shots.append({"start": cur, "end": bs, "cam": spk})
+                cur = bs
+                for cam in cycle[ci % len(cycle)]:
+                    be = min(end - 3.0, _snap_gap(ws, cur + rng.uniform(*break_len), cur + break_len[0] - 1,
+                                                  cur + break_len[1] + 1.5))
+                    if be - cur < min_shot:
+                        break
+                    shots.append({"start": cur, "end": be, "cam": cam})
+                    cur = be
+                ci += 1
+                nxt_break = cur + rng.uniform(*break_every)
+            shots.append({"start": cur, "end": end, "cam": spk})
+    # nettoyage : plans trop courts fusionnés dans le précédent, plans contigus identiques réunis
+    clean: list[dict] = []
+    for s in shots:
+        if s["end"] - s["start"] <= 0.04:
+            continue
+        if clean and clean[-1]["cam"] == s["cam"] and abs(clean[-1]["end"] - s["start"]) < 0.05:
+            clean[-1]["end"] = s["end"]
+        elif clean and s["end"] - s["start"] < min_shot and not s.get("reaction") and abs(clean[-1]["end"] - s["start"]) < 0.05:
+            clean[-1]["end"] = s["end"]
+        else:
+            clean.append(dict(s))
+    return clean
+
+
+# ------------------------------------------------------------------------------------------------ 4. rendu
+
+def _face_x(video: Path, at: float) -> float:
+    """Centre horizontal (0–1) du plus grand visage d'un gros plan (pour l'écran partagé)."""
+    import cv2
+
+    from .analysis import _detector
+    raw = subprocess.run([FFMPEG, "-v", "error", "-ss", f"{at:.2f}", "-i", str(video), "-frames:v", "1", "-vf",
+                          "scale=640:360", "-f", "rawvideo", "-pix_fmt", "bgr24", "-"], capture_output=True).stdout
+    img = np.frombuffer(raw, np.uint8).reshape(360, 640, 3)
+    _, faces = _detector(640, 360).detect(img)
+    if faces is None or not len(faces):
+        return 0.5
+    f = max(faces, key=lambda f: f[2] * f[3])
+    return float((f[0] + f[2] / 2) / 640)
+
+
+def render_piece(spec: dict, shot: dict, dst: Path, fps: int, size: tuple[int, int], proxy: bool,
+                 split_order: tuple[str, str], face_x: dict[str, float]) -> Path:
+    cams = spec["cams"]
+    n = int(shot["frames"])
+    t0 = shot["f0"] / fps
+    W, H = size
+    enc = (["-c:v", "libx264", "-preset", "ultrafast", "-crf", "28"] if proxy else
+           ["-c:v", "libx264", "-preset", "medium", "-crf", "16"])
+    common = ["-an", "-frames:v", str(n), "-r", str(fps), "-pix_fmt", "yuv420p", "-g", str(fps * 2), *enc,
+              "-video_track_timescale", "12288", str(dst)]
+    if shot["cam"] == "split":
+        L, R = split_order
+        def crop(name: str) -> str:
+            x = min(max(face_x.get(name, 0.5) - 0.25, 0.0), 0.5)
+            return f"crop=iw/2:ih:{x:.4f}*iw:0"
+        graph = (f"[0:v]{crop(L)},scale={W // 2}:{H}[l];[1:v]{crop(R)},scale={W // 2}:{H}[r];"
+                 f"[l][r]hstack=2,setsar=1[v]")
+        run([FFMPEG, "-y", "-v", "error", "-ss", f"{t0:.4f}", "-i", str(cams[L]), "-ss", f"{t0:.4f}", "-i", str(cams[R]),
+             "-filter_complex", graph, "-map", "[v]", *common])
+    else:
+        run([FFMPEG, "-y", "-v", "error", "-ss", f"{t0:.4f}", "-i", str(cams[shot["cam"]]),
+             "-vf", f"scale={W}:{H},setsar=1", *common])
+    return dst
+
+
+def quantize(shots: list[dict], fps: int) -> list[dict]:
+    """Bornes sur la grille d'images ; les plans d'un même intervalle restent jointifs (aucune dérive audio/vidéo)."""
+    out = []
+    for s in shots:
+        f0, f1 = int(round(s["start"] * fps)), int(round(s["end"] * fps))
+        if f1 > f0:
+            out.append(dict(s, f0=f0, frames=f1 - f0))
+    return out
+
+
+def render_body(spec: dict, shots: list[dict], ranges: list[tuple[float, float]], work: Path, out: Path | None,
+                fps: int = 24, proxy: bool = False, jobs: int = 3, split_order: tuple[str, str] = ("host", "guest"),
+                audio_delay: float = 0.0) -> Path:
+    """Vidéo du corps de l'épisode (plans concaténés) + audio du micro sur les mêmes intervalles (images entières)."""
+    work = work.resolve()
+    pieces_dir = work / ("pieces_proxy" if proxy else "pieces")
+    pieces_dir.mkdir(parents=True, exist_ok=True)
+    size = (960, 540) if proxy else (1920, 1080)
+    mid = sum(r[0] + r[1] for r in ranges[:1]) / 2 if ranges else 600
+    face_x = {k: _face_x(spec["cams"][k], mid + 30) for k in ("host", "guest")}
+    q = quantize(shots, fps)
+    todo = []
+    for i, s in enumerate(q):
+        p = pieces_dir / f"{i:04d}_{s['cam']}_{s['f0']}_{s['frames']}.mp4"
+        if not p.exists():
+            todo.append((s, p))
+    console.print(f"  {len(q)} plans, {len(todo)} à encoder ({'aperçu 540p' if proxy else '1080p'})…")
+    done = [0]
+
+    def one(arg):
+        s, p = arg
+        tmp = p.with_suffix(".tmp.mp4")
+        render_piece(spec, s, tmp, fps, size, proxy, split_order, face_x)
+        tmp.replace(p)
+        done[0] += 1
+        if done[0] % 25 == 0:
+            console.print(f"    {done[0]}/{len(todo)}")
+
+    with ThreadPoolExecutor(max_workers=jobs) as ex:
+        list(ex.map(one, todo))
+    lst = work / ("concat_proxy.txt" if proxy else "concat.txt")
+    lst.write_text("".join(f"file '{(pieces_dir / f'{i:04d}_{s['cam']}_{s['f0']}_{s['frames']}.mp4').as_posix()}'\n"
+                           for i, s in enumerate(q)), encoding="utf-8")
+    video = work / ("body_video_proxy.mp4" if proxy else "body_video.mp4")
+    run([FFMPEG, "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(lst), "-c", "copy", str(video)])
+    # audio : intervalles = union des plans (images entières), micro décalé de audio_delay
+    spans = []
+    for s in q:
+        a, b = s["f0"] / fps, (s["f0"] + s["frames"]) / fps
+        if spans and abs(spans[-1][1] - a) < 1e-6:
+            spans[-1][1] = b
+        else:
+            spans.append([a, b])
+    parts = []
+    for i, (a, b) in enumerate(spans):
+        parts.append(f"[0:a]atrim={max(0.0, a - audio_delay):.4f}:{b - audio_delay:.4f},asetpts=PTS-STARTPTS,"
+                     f"afade=t=in:d=0.012,afade=t=out:st={max(0.0, b - a - 0.012):.4f}:d=0.012[a{i}]")
+    graph = ";".join(parts) + ";" + "".join(f"[a{i}]" for i in range(len(spans))) + f"concat=n={len(spans)}:v=0:a=1[a]"
+    gfile = work / "body_audio_graph.txt"
+    gfile.write_text(graph, encoding="utf-8")
+    audio = work / "body_audio.wav"
+    run([FFMPEG, "-y", "-v", "error", "-i", str(spec["audio"]), "-/filter_complex", str(gfile), "-map", "[a]",
+         "-ar", "48000", "-ac", "2", str(audio)])
+    if out is None:
+        return video
+    run([FFMPEG, "-y", "-v", "error", "-i", str(video), "-i", str(audio), "-map", "0:v", "-map", "1:a", "-c:v", "copy",
+         "-c:a", "aac", "-b:a", "256k", "-shortest", "-movflags", "+faststart", str(out)])
+    return out
+
+
+def out_time(shots: list[dict], t_src: float, fps: int = 24) -> float | None:
+    """Temps dans l'épisode monté correspondant à un instant des rushs (None s'il est coupé)."""
+    acc = 0
+    for s in quantize(shots, fps):
+        a, b = s["f0"] / fps, (s["f0"] + s["frames"]) / fps
+        if a <= t_src < b:
+            return (acc + (t_src - a) * fps) / fps
+        acc += s["frames"]
+    return None
+
+
+# ------------------------------------------------------------------------------------------------ teaser
+
+def teaser_clip(words: list[dict], plan: dict, guest: str, company: str) -> dict:
+    """Clip « teaser » (format de clips.json) : extraits du plan calés sur les mots, tours de parole de `diarize`."""
+    from .select_clips import _snap
+    segs = []
+    for x in plan.get("teaser", []):
+        a = _word_at(words, x.get("start_text", ""), float(x["start"]), last=False)
+        b = _word_at(words, x.get("end_text", ""), float(x["end"]), last=True)
+        if a is None or b is None or b < a:
+            continue
+        s, e = _snap(words, words[a]["s"], words[b]["e"], pad_in=0.12, pad_out=0.35)
+        nxt = words[b + 1]["s"] if b + 1 < len(words) else e + 1
+        segs.append({"start": s, "end": e, "duration": round(e - s, 3), "tail_silence": round(max(0.0, nxt - words[b]["e"]), 3),
+                     "start_text": x.get("start_text", ""), "end_text": x.get("end_text", ""), "role": "teaser"})
+    turns = []
+    for sg in segs:
+        for w in words:
+            if sg["start"] - 0.05 <= w["s"] <= sg["end"] and (not turns or turns[-1]["speaker"] != w["spk"]):
+                turns.append({"at": round(w["s"], 3), "speaker": w["spk"]})
+    return {"index": 99, "title": "teaser", "hook_title": "", "segments": segs, "turns": turns,
+            "start": segs[0]["start"] if segs else 0, "end": segs[-1]["end"] if segs else 0,
+            "duration": round(sum(s["duration"] for s in segs), 2), "guest": guest, "company": company,
+            "keywords": [], "broll": []}
+
+
+def teaser_brand(brand: Brand) -> Brand:
+    """La marque, avec la section `teaser:` de brand.yaml appliquée par-dessus (16:9, pas de bulle, fin = logo)."""
+    import copy
+
+    from .config import Cfg, deep_merge
+    b = copy.copy(brand)
+    b.cfg = Cfg(deep_merge(dict(brand.cfg), dict(brand.cfg.get("teaser") or {})))
+    return b
+
+
+# ------------------------------------------------------------------------------------------------ assemblage
+
+def _normalize(src: Path, dst: Path, size: tuple[int, int], fps: int, proxy: bool) -> Path:
+    """Vidéo (sans son) aux mêmes réglages que les plans du corps -> concaténation sans réencodage."""
+    W, H = size
+    enc = ["-preset", "ultrafast", "-crf", "28"] if proxy else ["-preset", "medium", "-crf", "16"]
+    run([FFMPEG, "-y", "-v", "error", "-i", str(src), "-an", "-vf", f"scale={W}:{H},setsar=1,fps={fps}",
+         "-r", str(fps), "-pix_fmt", "yuv420p", "-g", str(fps * 2), "-c:v", "libx264", *enc,
+         "-video_track_timescale", "12288", str(dst)])
+    return dst
+
+
+def end_card(brand: Brand, dst: Path, size: tuple[int, int], fps: int, proxy: bool, duration: float = 4.0) -> Path:
+    """Fin de l'épisode (comme E20) : l'animation AI Partners + logo blanc centré."""
+    from .media import prepare_outro_video
+    o = brand.cfg.outro
+    W, H = size
+    anim = dst.with_name("end_anim.mp4")
+    prepare_outro_video(brand.asset(o.get("video")), anim, W, H, duration, focus_x=0.68, fps=fps)
+    logo = brand.asset(o.get("logo_file") or "logo.png")
+    lw = int(W * 0.34)
+    enc = ["-preset", "ultrafast", "-crf", "28"] if proxy else ["-preset", "medium", "-crf", "16"]
+    run([FFMPEG, "-y", "-v", "error", "-i", str(anim), "-i", str(logo), "-filter_complex",
+         f"[1:v]scale={lw}:-1,format=rgba,fade=t=in:st=0.4:d=0.6:alpha=1[l];[0:v][l]overlay=(W-w)/2:(H-h)/2,format=yuv420p[v]",
+         "-map", "[v]", "-an", "-r", str(fps), "-g", str(fps * 2), "-c:v", "libx264", *enc,
+         "-video_track_timescale", "12288", str(dst)])
+    return dst
+
+
+def assemble(parts_video: list[Path], parts_audio: list[Path | float], dst: Path, work: Path) -> Path:
+    """Concatène les vidéos (sans réencodage) ; audio = morceaux concaténés (un nombre = silence de n s), volume
+    normalisé sur l'ensemble (-16 LUFS, le niveau de l'invité qui baisse quand son micro « tombe » est rattrapé)."""
+    lst = work / "final_concat.txt"
+    lst.write_text("".join(f"file '{p.resolve().as_posix()}'\n" for p in parts_video), encoding="utf-8")
+    vid = work / "final_video.mp4"
+    run([FFMPEG, "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(lst), "-c", "copy", str(vid)])
+    inputs, chain = [], []
+    for i, a in enumerate(parts_audio):
+        if isinstance(a, (int, float)):
+            inputs += ["-f", "lavfi", "-t", f"{a:.3f}", "-i", "anullsrc=r=48000:cl=stereo"]
+        else:
+            inputs += ["-i", str(a)]
+        chain.append(f"[{i}:a]aresample=48000,aformat=channel_layouts=stereo[x{i}]")
+    n = len(parts_audio)
+    graph = ";".join(chain) + ";" + "".join(f"[x{i}]" for i in range(n)) + \
+        f"concat=n={n}:v=0:a=1,loudnorm=I=-16:TP=-1.5:LRA=11[a]"
+    aud = work / "final_audio.wav"
+    run([FFMPEG, "-y", "-v", "error", *inputs, "-filter_complex", graph, "-map", "[a]", "-ar", "48000", str(aud)])
+    run([FFMPEG, "-y", "-v", "error", "-i", str(vid), "-i", str(aud), "-map", "0:v", "-map", "1:a", "-c:v", "copy",
+         "-c:a", "aac", "-b:a", "256k", "-shortest", "-movflags", "+faststart", str(dst)])
+    return dst
+
+
+def description(plan: dict, shots: list[dict], words: list[dict], offset: float, guest: str, company: str,
+                fps: int = 24) -> str:
+    """Titre + chapitres YouTube (temps de l'épisode monté, teaser compris) pour la description."""
+    lines = [f"# {plan.get('youtube_title', '')}", "", f"Invité : {guest} ({company})", "", "## Chapitres", "",
+             "0:00 Teaser"]
+    for c in plan.get("chapters", []):
+        i = _word_at(words, c.get("start_text", ""), float(c["t"]), last=False)
+        t = words[i]["s"] if i is not None else float(c["t"])
+        o = out_time(shots, t, fps)
+        if o is not None:
+            lines.append(f"{_ts(o + offset)} {c['title']}")
+    return "\n".join(lines) + "\n"
