@@ -255,7 +255,7 @@ def _face_x(video: Path, at: float) -> float:
 
 
 def render_piece(spec: dict, shot: dict, dst: Path, fps: int, size: tuple[int, int], proxy: bool,
-                 split_order: tuple[str, str], face_x: dict[str, float]) -> Path:
+                 split_order: tuple[str, str], face_x: dict[str, float], logo: dict | None = None) -> Path:
     cams = spec["cams"]
     n = int(shot["frames"])
     t0 = shot["f0"] / fps
@@ -264,18 +264,25 @@ def render_piece(spec: dict, shot: dict, dst: Path, fps: int, size: tuple[int, i
            ["-c:v", "libx264", "-preset", "medium", "-crf", "16"])
     common = ["-an", "-frames:v", str(n), "-r", str(fps), "-pix_fmt", "yuv420p", "-g", str(fps * 2), *enc,
               "-video_track_timescale", "12288", str(dst)]
+    # logo en haut à droite (dernière entrée) : largeur et marge en fraction de la largeur de l'image
+    lg_in, lg_tail = [], ""
+    if logo:
+        lw, mg = int(W * float(logo["width"])), int(W * float(logo["margin"]))
+        lg_in = ["-i", str(logo["file"])]
+        lg_tail = f";[{{li}}:v]scale={lw}:-1,format=rgba[lg];[v0][lg]overlay=W-w-{mg}:{mg},format=yuv420p[v]"
     if shot["cam"] == "split":
         L, R = split_order
         def crop(name: str) -> str:
             x = min(max(face_x.get(name, 0.5) - 0.25, 0.0), 0.5)
             return f"crop=iw/2:ih:{x:.4f}*iw:0"
         graph = (f"[0:v]{crop(L)},scale={W // 2}:{H}[l];[1:v]{crop(R)},scale={W // 2}:{H}[r];"
-                 f"[l][r]hstack=2,setsar=1[v]")
+                 f"[l][r]hstack=2,setsar=1[{'v0' if logo else 'v'}]" + lg_tail.replace("{li}", "2"))
         run([FFMPEG, "-y", "-v", "error", "-ss", f"{t0:.4f}", "-i", str(cams[L]), "-ss", f"{t0:.4f}", "-i", str(cams[R]),
-             "-filter_complex", graph, "-map", "[v]", *common])
+             *lg_in, "-filter_complex", graph, "-map", "[v]", *common])
     else:
-        run([FFMPEG, "-y", "-v", "error", "-ss", f"{t0:.4f}", "-i", str(cams[shot["cam"]]),
-             "-vf", f"scale={W}:{H},setsar=1", *common])
+        graph = f"[0:v]scale={W}:{H},setsar=1[{'v0' if logo else 'v'}]" + lg_tail.replace("{li}", "1")
+        run([FFMPEG, "-y", "-v", "error", "-ss", f"{t0:.4f}", "-i", str(cams[shot["cam"]]), *lg_in,
+             "-filter_complex", graph, "-map", "[v]", *common])
     return dst
 
 
@@ -291,10 +298,10 @@ def quantize(shots: list[dict], fps: int) -> list[dict]:
 
 def render_body(spec: dict, shots: list[dict], ranges: list[tuple[float, float]], work: Path, out: Path | None,
                 fps: int = 24, proxy: bool = False, jobs: int = 3, split_order: tuple[str, str] = ("host", "guest"),
-                audio_delay: float = 0.0) -> Path:
+                audio_delay: float = 0.0, logo: dict | None = None) -> Path:
     """Vidéo du corps de l'épisode (plans concaténés) + audio du micro sur les mêmes intervalles (images entières)."""
     work = work.resolve()
-    pieces_dir = work / ("pieces_proxy" if proxy else "pieces")
+    pieces_dir = work / (("pieces_proxy" if proxy else "pieces") + (f"_logo{float(logo['width']):.3f}" if logo else ""))
     pieces_dir.mkdir(parents=True, exist_ok=True)
     size = (960, 540) if proxy else (1920, 1080)
     mid = sum(r[0] + r[1] for r in ranges[:1]) / 2 if ranges else 600
@@ -311,7 +318,7 @@ def render_body(spec: dict, shots: list[dict], ranges: list[tuple[float, float]]
     def one(arg):
         s, p = arg
         tmp = p.with_suffix(".tmp.mp4")
-        render_piece(spec, s, tmp, fps, size, proxy, split_order, face_x)
+        render_piece(spec, s, tmp, fps, size, proxy, split_order, face_x, logo)
         tmp.replace(p)
         done[0] += 1
         if done[0] % 25 == 0:
@@ -362,25 +369,107 @@ def out_time(shots: list[dict], t_src: float, fps: int = 24) -> float | None:
 
 # ------------------------------------------------------------------------------------------------ teaser
 
-def teaser_clip(words: list[dict], plan: dict, guest: str, company: str) -> dict:
-    """Clip « teaser » (format de clips.json) : extraits du plan calés sur les mots, tours de parole de `diarize`."""
+TEASER_PROMPT = """Tu montes le TEASER d'ouverture d'un podcast vidéo B2B (AI Corner) : 40 à 50 secondes très
+dynamiques qui donnent envie de regarder l'épisode. On te donne la transcription de l'épisode monté, phrase par
+phrase, avec `[début → fin]` et QUI parle (ANIMATEUR / INVITÉ).
+
+Rends UNIQUEMENT un JSON : {"teaser": [ {"start": <s>, "end": <s>, "start_text": "<premiers mots EXACTS>",
+"end_text": "<derniers mots EXACTS>", "speaker": "host|guest", "why": "<pourquoi c'est percutant>"} ]}
+
+Règles (retour d'Arthur, 07/10/2026 : « plus dynamique, qu'on voie les deux interlocuteurs, des passages où ils
+disent des trucs impactants ») :
+- 6 à 9 extraits COURTS : 2,5 à 8 s chacun (jamais plus de 9 s), total 40 à 50 s.
+- Uniquement de l'impact : chiffre frappant, formule choc, prise de position tranchée, contre-intuition, image
+  forte. Pas de contexte, pas d'explication, pas de mise en place.
+- Les DEUX interlocuteurs : au moins 2 extraits de l'animateur (question qui pique, réaction forte, punchline) qui
+  alternent avec ceux de l'invité, pour un effet de dialogue.
+- Ordre de montage = ordre de la liste : ouvrir sur le plus fort, faire monter la tension, finir sur une phrase
+  qui donne envie de la suite.
+- Chaque extrait COMMENCE au début d'une phrase et FINIT sur une fin de phrase (. ? !) — jamais sur une virgule,
+  jamais en milieu de phrase. Pas de mot d'appui en tête (« ouais », « donc », « et », « en fait ») : commence
+  l'extrait juste après. Il se comprend seul, sans contexte.
+- Animateur : uniquement une question qui interpelle ou une affirmation forte (pas une relance, une transition, un
+  accord, une reformulation molle).
+- Textes cités MOT POUR MOT depuis la transcription (ils servent à caler les coupes)."""
+
+
+def speaker_text(words: list[dict], transcript: dict, ranges: list[tuple[float, float]]) -> str:
+    """Transcription des parties gardées, phrase par phrase, avec qui parle (pour le LLM du teaser)."""
+    from .transcribe import _ts as ts
+    spk = {round(w["s"], 3): w.get("spk", "") for w in words}
+    out = []
+    for p in sentences(transcript):
+        if not any(a <= p["start"] < b for a, b in ranges):
+            continue
+        votes = [spk.get(round(w["s"], 3), "") for w in p["words"]]
+        who = "ANIMATEUR" if votes.count("host") > len(votes) / 2 else "INVITÉ"
+        out.append(f"[{ts(p['start'])} → {ts(p['end'])}] {who} : {p['text']}")
+    return "\n".join(out)
+
+
+def make_teaser(transcript: dict, words: list[dict], ranges: list[tuple[float, float]], brand: Brand, out: Path,
+                guest: str = "", company: str = "", host: str = "", force: bool = False) -> dict:
+    from .llm import ask_json
+    if out.exists() and not force:
+        return json.loads(out.read_text(encoding="utf-8"))
+    sel = brand.cfg.selection
+    user = f"Animateur : {host}. Invité : {guest} ({company}).\n\nTRANSCRIPTION :\n{speaker_text(words, transcript, ranges)}"
+    # choix éditorial court mais décisif : modèle plus fort que pour la sélection (episode.teaser_model)
+    model = str((brand.cfg.get("episode") or {}).get("teaser_model") or "claude-opus-5")
+    data = ask_json(TEASER_PROMPT, user, model=model, backend=sel.llm_backend, max_tokens=6000)
+    out.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+    return data
+
+
+def teaser_clip(words: list[dict], plan: dict, guest: str, company: str, wav: Path | None = None,
+                transcript: dict | None = None, reaction: float = 1.0, seed: int = 3) -> dict:
+    """Clip « teaser » (format de clips.json) : extraits calés sur les mots, « euh » et blancs retirés (`tighten`,
+    réglage serré : c'est un teaser), gros plan de la personne qui parle + courte réaction de l'autre dans les extraits
+    longs (`cams`, lu par cut_multicam) : on voit les deux interlocuteurs."""
     from .select_clips import _snap
+    rng = random.Random(seed)
     segs = []
     for x in plan.get("teaser", []):
         a = _word_at(words, x.get("start_text", ""), float(x["start"]), last=False)
         b = _word_at(words, x.get("end_text", ""), float(x["end"]), last=True)
         if a is None or b is None or b < a:
             continue
-        s, e = _snap(words, words[a]["s"], words[b]["e"], pad_in=0.12, pad_out=0.35)
+        # citation approximative (« vendeur » pour « vendeurs. ») : on va jusqu'à la fin de la phrase, jamais au-delà
+        k = b
+        while (k + 1 < len(words) and k - b < 8 and words[k]["w"][-1:] not in ".?!…"
+               and words[k + 1]["s"] - words[k]["e"] < 0.5 and words[k + 1].get("spk") == words[b].get("spk")):
+            k += 1
+        if words[k]["w"][-1:] in ".?!…":
+            b = k
+        s, e = _snap(words, words[a]["s"], words[b]["e"], pad_in=0.08, pad_out=0.25)
         nxt = words[b + 1]["s"] if b + 1 < len(words) else e + 1
-        segs.append({"start": s, "end": e, "duration": round(e - s, 3), "tail_silence": round(max(0.0, nxt - words[b]["e"]), 3),
+        e = round(min(e, nxt - 0.03), 3)   # _snap garde 0,12 s après le dernier mot, même si le suivant enchaîne
+        segs.append({"start": s, "end": e, "duration": round(e - s, 3),
+                     "tail_silence": round(max(0.0, nxt - words[b]["e"]), 3),
                      "start_text": x.get("start_text", ""), "end_text": x.get("end_text", ""), "role": "teaser"})
-    turns = []
+    if wav is not None and transcript is not None:
+        from .tighten import tighten_segment
+        tight = []
+        for sg in segs:
+            tight += tighten_segment(sg, transcript, wav, min_gap=0.35, keep=0.12, max_silence=0.45, min_cut=0.3)
+        segs = tight
+    turns, cams = [], []
     for sg in segs:
-        for w in words:
-            if sg["start"] - 0.05 <= w["s"] <= sg["end"] and (not turns or turns[-1]["speaker"] != w["spk"]):
+        ws = [w for w in words if sg["start"] - 0.05 <= w["s"] <= sg["end"]]
+        for w in ws:
+            if not turns or turns[-1]["speaker"] != w["spk"]:
                 turns.append({"at": round(w["s"], 3), "speaker": w["spk"]})
-    return {"index": 99, "title": "teaser", "hook_title": "", "segments": segs, "turns": turns,
+        if not ws:
+            continue
+        who = max(("host", "guest"), key=lambda k: sum(w["spk"] == k for w in ws))
+        cams.append({"at": round(sg["start"], 3), "speaker": who, "force": True})
+        if sg["duration"] >= 4.5:   # réaction de l'autre, au milieu, dans un silence entre deux mots
+            mid = sg["start"] + sg["duration"] * rng.uniform(0.45, 0.6)
+            r = _snap_gap(ws, mid, sg["start"] + 1.5, sg["end"] - reaction - 1.0)
+            other = "guest" if who == "host" else "host"
+            cams += [{"at": round(r, 3), "speaker": other, "force": True},
+                     {"at": round(r + reaction, 3), "speaker": who, "force": True}]
+    return {"index": 99, "title": "teaser", "hook_title": "", "segments": segs, "turns": turns, "cams": cams,
             "start": segs[0]["start"] if segs else 0, "end": segs[-1]["end"] if segs else 0,
             "duration": round(sum(s["duration"] for s in segs), 2), "guest": guest, "company": company,
             "keywords": [], "broll": []}

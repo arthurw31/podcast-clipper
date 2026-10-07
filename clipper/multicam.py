@@ -188,7 +188,7 @@ def window_edl(turns: list[dict], start: float, duration: float, names: list[str
         if at <= 0 or at >= duration:
             continue
         c = cam(t["speaker"])
-        if c == edl[-1][1] or at - edl[-1][0] < min_shot:
+        if c == edl[-1][1] or (at - edl[-1][0] < min_shot and not t.get("force")):  # force : réaction voulue
             continue
         edl.append((at, c))
     return edl

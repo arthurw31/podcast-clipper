@@ -136,6 +136,15 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
   réencodage ; audio = micro sur les mêmes images (aucune dérive) ; volume normalisé sur tout l'épisode (-16 LUFS :
   E22, le micro de l'invité baisse de 2,5 dB entre 26 et 41 min). Teaser = clip HyperFrames 16:9 (sous-titres de la
   charte) via `teaser_brand` ; fin = animation AI Partners + logo (4 s), comme E20.
+- Retours d'Arthur sur le 1er montage (07/10/2026) : « teaser plus dynamique, enlever les euh, qu'on voie les deux
+  interlocuteurs, des passages impactants » -> `make_teaser` (TEASER_PROMPT, appel dédié avec Opus :
+  `episode.teaser_model`) : 6–9 extraits de 2,5–8 s, alternance animateur/invité, début et fin de phrase ;
+  `teaser_clip` : `tighten` serré + réaction de 1 s de l'autre (`clip["cams"]`, lu par `cut_multicam`, `force`).
+  « Logo plus gros en haut à droite » -> `episode_logo` (0,20 de la largeur, comme E20 ≈ 0,22) dans chaque plan
+  du corps + même réglage pour le teaser (`teaser.format_overrides.16x9.logo`).
+- L'épisode entier n'est PAS rendu par HyperFrames (≈ 12× la durée = 9–10 h) : corps en FFmpeg, teaser en
+  HyperFrames. Toujours montrer l'aperçu (Studio pour le teaser : `preview --clip 99 --formats 16x9`, 540p pour le
+  corps) et attendre la confirmation d'Arthur avant tout MP4 final.
 - E21 n'a ni teaser ni logo incrusté ; E20 a un teaser (~55 s, 4–5 phrases de l'invité) + sting logo : c'est ce
   modèle qui est reproduit.
 

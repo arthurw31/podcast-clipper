@@ -601,12 +601,18 @@ def _episode_inputs(a: argparse.Namespace):
     return brand, video, ep, spec, transcript
 
 
+def _episode_logo(brand: Brand) -> dict | None:
+    lg = brand.cfg.get("episode_logo") or {}
+    f = brand.asset(lg.get("file")) if lg else None
+    return {"file": f, "width": lg.get("width", 0.12), "margin": lg.get("margin", 0.03)} if f else None
+
+
 def cmd_episode_plan(a: argparse.Namespace) -> None:
     """Montage complet, étape 1 : dérushage (LLM), qui parle (voix), liste de plans, teaser, chapitres -> à relire."""
     import numpy as np
 
     from .diarize import diarize
-    from .episode import _refine_boundaries, _ts, build_edl, keep_ranges, make_plan, quantize, teaser_clip
+    from .episode import _refine_boundaries, _ts, build_edl, keep_ranges, make_plan, make_teaser, quantize, teaser_clip
     from .transcribe import all_words
     brand, video, ep, spec, transcript = _episode_inputs(a)
     plan = make_plan(transcript, brand, ep / "episode_plan.json", a.guest, a.company, a.host, force=a.force)
@@ -622,7 +628,9 @@ def cmd_episode_plan(a: argparse.Namespace) -> None:
     ranges, notes = keep_ranges(words, plan)
     shots = build_edl(words, ranges)
     (ep / "work" / "edl.json").write_text(json.dumps({"ranges": ranges, "shots": shots}, indent=0), encoding="utf-8")
-    teaser = teaser_clip(words, plan, a.guest, a.company)
+    teaser_plan = make_teaser(transcript, words, ranges, brand, ep / "teaser_plan.json", a.guest, a.company, a.host,
+                              force=a.force or a.new_teaser)
+    teaser = teaser_clip(words, teaser_plan, a.guest, a.company, wav=spec["audio"], transcript=transcript)
     (ep / "teaser_clip.json").write_text(json.dumps(teaser, ensure_ascii=False, indent=1), encoding="utf-8")
     q = quantize(shots, 24)
     L = np.array([s["frames"] / 24 for s in q])
@@ -674,7 +682,7 @@ def cmd_episode_render(a: argparse.Namespace) -> None:
     console.print("Corps de l'épisode…")
     body_v = render_body(spec, shots, edl["ranges"], work, None, fps=fps, proxy=proxy, jobs=int(a.jobs or 3),
                          split_order=("host", "guest") if a.host_side != "right" else ("guest", "host"),
-                         audio_delay=float(spec.get("audio_delay", 0)))
+                         audio_delay=float(spec.get("audio_delay", 0)), logo=_episode_logo(brand))
     end = end_card(brand, work / f"end{tag}.mp4", size, fps, proxy)
     out_dir = ep / "episode"
     out_dir.mkdir(exist_ok=True)
@@ -792,7 +800,8 @@ def main(argv: list[str] | None = None) -> None:
         sp.add_argument("--host", default="", help="animateur, ex: 'Thomas Spitz (CEO AI Partners)'")
         sp.add_argument("--host-side", default="left", choices=["left", "right"], help="côté de l'animateur dans le plan large")
         sp.add_argument("--proxy", action="store_true"); sp.add_argument("--minutes", type=int, default=0)
-        sp.add_argument("--jobs", default="3"); sp.set_defaults(fn=fn)
+        sp.add_argument("--jobs", default="3"); sp.add_argument("--new-teaser", action="store_true")
+        sp.set_defaults(fn=fn)
     sp = sub.add_parser("tighten", help="retire les « euh » et longs blancs (sans saccades) dans clips.json"); common(sp)
     sp.add_argument("--only", default=""); sp.add_argument("--min-gap", type=float, default=0.5)
     sp.set_defaults(fn=cmd_tighten)

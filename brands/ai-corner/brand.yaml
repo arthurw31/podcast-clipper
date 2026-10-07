@@ -123,3 +123,19 @@ teaser:
     duration: 3.0            # « sting » : animation AI Partners + logo, sans bouton
     cta:
       enabled: false
+  format_overrides:          # le 16:9 des shorts n'affiche pas de logo : le teaser, si (même réglage que l'épisode)
+    "16x9":
+      logo:
+        enabled: true
+        mode: image
+        position: top-right
+        width: 0.20             # E20 MAIF : ≈ 0,22 de la largeur
+        margin: 0.02
+        opacity: 1.0
+
+# Logo incrusté en haut à droite pendant tout l'épisode complet (retour d'Arthur, 07/10/2026 : « plus gros en haut à
+# droite » — E20 l'avait, en tout petit). Fractions de la largeur de l'image ; même réglage que le teaser ci-dessus.
+episode_logo:
+  file: "logo.png"
+  width: 0.20
+  margin: 0.02

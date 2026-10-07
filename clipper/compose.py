@@ -402,9 +402,10 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
     stale = (src_clip.exists() and probe(src_clip)["duration"] < D_total - 0.05
              and info["duration"] - float(segments[-1]["start"]) > float(segments[-1]["duration"]) + outro_d - 0.05)
     # rushs multicam (E22+) : gros plan de la personne qui parle, selon les tours de parole du clip
+    # (ou `cams` : plans imposés [{at, speaker: host|guest|wide}] — teaser : alternance + réactions)
     multicam = load_multicam(source)
     if multicam:
-        stamp = json.dumps([segments, clip.get("turns", []), outro_d], sort_keys=True, default=str)
+        stamp = json.dumps([segments, clip.get("cams") or clip.get("turns", []), outro_d], sort_keys=True, default=str)
         stamp_f = assets / "source.multicam.stamp"
         stale = stale or not stamp_f.exists() or stamp_f.read_text(encoding="utf-8") != stamp
     if force or stale or not src_clip.exists():
@@ -418,7 +419,7 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
             # source 4K conservée (jusqu'à render.max_source_height) : le recadrage vertical y puise sa netteté
             h_max = min(info["height"], int(cfg.render.get("max_source_height", 2160)))
             if multicam:
-                cut_multicam(multicam, part, float(sg["start"]), dur, clip.get("turns", []), height=h_max,
+                cut_multicam(multicam, part, float(sg["start"]), dur, clip.get("cams") or clip.get("turns", []), height=h_max,
                              normalize_audio=bool(cfg.audio.normalize), fps=int(cfg.fps))
             else:
                 cut_segment(source, part, float(sg["start"]), dur, height=h_max,
