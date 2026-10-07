@@ -23,7 +23,20 @@ Si un point est KO : suis les indications (`-> …`), ou lance `scripts\setup.ps
 
 ## 1. Récupérer et ranger l'épisode
 
-1. Regarde `depot/` (sinon les fichiers récents de Téléchargements). Range chaque fichier et dis où tu l'as mis :
+0. **Lien Dropbox** (cas habituel depuis octobre 2026 : rushs de 13–14 Go par caméra) : ne demande jamais de
+   télécharger dans le navigateur — il coupe les gros fichiers au bout d'environ 50 min et garde un fichier tronqué
+   illisible (« moov atom not found »). Lance toi-même, en arrière-plan (≈ 40 Go en 1 h 30) :
+
+   ```bash
+   python -m clipper fetch "<lien Dropbox>" --dest brands/<marque>/episodes/rushes/<E-numéro>
+   ```
+
+   Reprise automatique après coupure (y compris d'un fichier partiel déjà présent : `--dest` vers son dossier),
+   fichier déclaré complet seulement à la taille exacte annoncée par Dropbox ; si un fichier reste incomplet, relancer
+   la même commande. Puis renomme les caméras (`cam1_<personne>.mp4`, `cam2_large.mp4`…) et l'audio en
+   `brands/<marque>/episodes/<E-numéro>_<invite>.wav` (la transcription part de l'audio, sans attendre les vidéos).
+1. Regarde `depot/` (sinon les fichiers récents de Téléchargements). Vérifie toujours qu'une vidéo s'ouvre
+   (`ffprobe`) : « moov atom not found » = téléchargement tronqué -> `fetch` (avec le lien) pour la compléter. Range chaque fichier et dis où tu l'as mis :
    épisode → `brands/<marque>/episodes/<E-numéro>_<invite>_<entreprise>.mp4` ; logo de l'entreprise invitée →
    `brands/<marque>/assets/guests/<entreprise>.svg|png` ; clips de référence → `references/` ; logos/polices → `assets/`.
 2. Préfère toujours la **version 4K** de l'épisode si elle existe (bien plus net en vertical). Vérifie avec
@@ -102,6 +115,15 @@ Pour chaque demande particulière :
 - « pas ce sujet / pas ce chiffre » → retire ou recoupe le segment concerné.
 - un changement de titre de bulle → `hook_title` dans `clips.json`.
 
+Puis **retire les « euh »** (jamais coupés par Whisper, donc invisibles dans le texte) :
+
+```bash
+python -m clipper tighten --brand <marque> --input <fichier>
+```
+
+Seuls les vrais trous (> 0,6 s) sont retirés, pour ne pas rendre le short saccadé ; dis à l'utilisateur ce qui a été
+retiré et à quels instants écouter les raccords (tu ne peux pas écouter).
+
 Puis **vérifie chaque coupe mot à mot** (règle absolue : ne jamais couper une pensée) :
 
 ```bash
@@ -150,7 +172,7 @@ Ne lance jamais le rendu final avant cette validation explicite.
 ## 5. Rendu final et livraison
 
 ```bash
-python -m clipper render  --brand <marque> --input <fichier>          # ≈ 6-8 min/short, 2 en parallèle : arrière-plan
+python -m clipper render  --brand <marque> --input <fichier> --formats 9x16   # ≈ 6-8 min/short, 2 en parallèle : arrière-plan
 python -m clipper preview --brand <marque> --input <fichier> --stop   # arrête les aperçus
 ```
 

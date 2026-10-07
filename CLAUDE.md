@@ -8,7 +8,9 @@ ce fichier résume ce qu'il faut savoir pour **modifier** le projet sans casser 
 
 Arthur dépose ses fichiers (épisodes, clips de référence, logos, posts) dans `depot/` (non versionné) : les ranger
 dans `brands/<marque>/episodes|references|assets|assets/guests/` (voir `depot/README.md`). S'il est vide, regarder
-les fichiers récents de `~/Downloads`.
+les fichiers récents de `~/Downloads`. Depuis E22 (06/10/2026), Arthur envoie surtout un **lien Dropbox** vers les
+rushs (3 caméras 1080p de 13–14 Go + 1 WAV) : `python -m clipper fetch "<lien>" --dest brands/<marque>/episodes/rushes/<E>`
+(jamais via le navigateur : coupure vers 50 min, fichier tronqué gardé sous son nom final).
 
 Le skill `.claude/skills/podcast-clips/SKILL.md` décrit le **workflow en 5 étapes** voulu par Arthur (05/10/2026) :
 dépôt de l'épisode (4K) → `propose` (~10 passages) → l'humain en choisit 5 + demandes particulières (`pick`,
@@ -42,6 +44,7 @@ python -m clipper build|render … --jobs N          # parallélisme (défaut : 
 python -m clipper propose|pick|find|check … --brand <slug> --input …   # workflow 10 propositions -> 5 choisies (skill)
 python -m clipper preview … [--clip all|N] [--stop]   # aperçu instantané (Studio en arrière-plan, ports 3002+), validé AVANT render
 python -m clipper new-brand <slug>   # copie brands/_template
+python -m clipper fetch "<lien Dropbox>" [--dest dossier] [--skip MIC]   # rushs : reprise auto, taille exacte vérifiée
 npx hyperframes lint|check|snapshot --at 3,10 --no-end -o <dir>   # dans output/<brand>/<ep>/clips/<clip>/<format>/
 ```
 
@@ -84,9 +87,9 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
    Arimo Bold (= Arial, embarquée via `fonts.captions_alt`, sinon HyperFrames la remplace par Inter) 68 px + trait
    épaissi 1,6 px + halo sombre marqué (retour de l'équipe, 06/10/2026 : « comme DUST, plus gros, bords ombrés ») sous la bulle, centrés, 1–3 lignes construites mot à mot (`reveal: word`, `reveal_reflow`,
    `word_fade`), même position en écran partagé (`split_center: false`) ; split sans séparateur ; light leak
-   aux raccords (`join_transition: leak`) ; 25–45 s ; pas de B-roll ; + carte de fin de **2 s** sur l'animation
+   aux raccords (`join_transition: leak`) ; 25–45 s ; pas de B-roll ; + carte de fin de **3,5 s** sur l'animation
    officielle AI Partners (`assets/outro_anim.mov`, lignes « montagne » qui se dessinent, recadrée au format et
-   accélérée ×5 : `outro.background: video`, `media.prepare_outro_video`) + logo blanc + CTA **centrés** (`outro.layout: center`, voile radial). Bleu #258AF3,
+   accélérée ×2,9 — ×5 sur 2 s jugé trop rapide, 06/10/2026 : `outro.background: video`, `media.prepare_outro_video`) + logo blanc + CTA **centrés** (`outro.layout: center`, voile radial). Bleu #258AF3,
    **jamais d'italique**.
    L'ancien style LinkedIn 16:9 (`references/*.mp4`) reste disponible : preset `editorial`.
 5. **Clips multi-segments** (`selection.max_segments` > 1) : un clip = accroche + développement + conclusion
@@ -100,6 +103,34 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
    contraste, invité « Prénom Nom, Rôle at Entreprise », développement concret, chute en 1 ligne, CTA 🎬/🎙️ + lien) ;
    anglais, voix de la page AI Partners, sans hashtags. Les formats « nouvel épisode / preview » seulement sur demande. Sortie : `output/…/posts/clip_NN_<titre>.md` + champs
    `linkedin_post` / `short_description` dans `clips.json` + `summary.md`.
+
+## Rushs multicam (E22, 06/10/2026 : l'équipe livre 3 caméras + 1 WAV au lieu de l'épisode monté)
+
+- `clipper/multicam.py` : si `brands/<m>/episodes/<ep>.multicam.json` existe, `compose` découpe chaque passage avec
+  `cut_multicam` (gros plan de la personne qui parle, d'après les `turns` de clips.json — la vérité du pipeline ; coupe
+  0,15 s avant la prise de parole, plans ≥ 2 s) au lieu de `cut_segment`. `<ep>.mp4` = lien dur vers le plan large
+  (probe/analyse), `cams` = {host, guest, wide}, audio = WAV du micro (`audio_delay` mesuré par corrélation : 0,037 s).
+  Les caméras sont déjà synchronisées entre elles (même durée à l'image près).
+- Le signal bouche des gros plans (`multicam.speaker_turns`) est trop bruité sur 52 min (net pour l'invité, faux
+  pour l'animateur) : ne pas s'en servir seul ; les `turns` relus font foi. Le micro est mono (L = R) : pas de
+  séparation des voix par canal.
+- Rendu 1080p seulement (rushs 1080p) ; coût ≈ 3 min de découpe par minute de short (3 flux H.264 lus).
+
+## « Euh » et blancs : `tighten` (demande d'Arthur, 07/10/2026 : « enlève les euh, sans couper trop, pas saccadé »)
+
+- Whisper n'écrit jamais les « euh » : ils sont dans les trous entre mots. `python -m clipper tighten` (clipper/tighten.py)
+  mesure l'énergie du micro dans chaque trou ≥ 0,5 s, ne retire que les retraits ≥ 0,6 s (en dessous = respiration
+  normale, retirer ferait saccadé), coupe dans des creux en gardant ~0,15 s, et crée un nouveau segment (zoom de
+  jonction + nouveau bloc de sous-titres). Sauvegarde : `clips_before_tighten.json`. À lancer après `pick`/`check`, avant `build`.
+- Limite connue : un « euh » collé au mot suivant (aucun creux entre les deux) n'est pas retiré.
+- Vérifier à l'oreille les raccords (l'agent ne peut pas écouter) : le dire à Arthur avec les instants.
+
+## Retours d'Arthur = améliorations du process
+
+Chaque modification demandée par Arthur se généralise : la traduire en réglage de marque/preset ou en code, la noter ici
+(avec date et verbatim) et dans la mémoire, pour que les prochains épisodes en profitent sans qu'il ait à le redemander.
+Exemples du 07/10/2026 : fin trop rapide -> `outro.duration: 3,5` ; « euh » -> `tighten` ; lien d'aperçu vers un autre
+short -> `preview` libère le port ; 16:9 inutile -> `formats: ["9x16"]` ; téléchargement coupé -> `fetch`.
 
 ## Fluidité des coupes (demande d'Arthur, 05/10/2026 : « moins de cuts, pas trop couper, plus fluide »)
 
@@ -141,6 +172,14 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
   sélection : les clips multi-segments ont besoin de l'épisode entier.
 
 ## Pièges connus (déjà résolus — ne pas réintroduire)
+
+- Téléchargements Dropbox : dans le navigateur, les fichiers de 13 Go se coupent vers 50 min (E22 : deux fois, les
+  3 caméras à ~70 %) et restent sous leur nom final, illisibles (« moov atom not found »). `clipper/fetch.py` liste
+  le dossier via `list_shared_link_folder_entries` (cookie CSRF `t`), puis télécharge en HTTP Range avec reprise.
+  Les requêtes de téléchargement partent **sans** User-Agent de navigateur (sinon Dropbox renvoie sa page HTML).
+- `claude -p` qui échoue avec un message vide : la cause est dans stdout (ex. « OAuth session expired » ->
+  lancer `claude` dans un terminal puis `/login`). `TemporaryDirectory(ignore_cleanup_errors=True)` dans `llm.py` :
+  sous Windows le dossier temporaire peut rester verrouillé à la sortie de `claude`.
 
 - Windows (Smart App Control / contrôle des applications) peut bloquer le `chrome-headless-shell` téléchargé par
   HyperFrames (`spawn UNKNOWN`, doctor « Chrome failed ») : ne pas toucher au réglage de sécurité ;

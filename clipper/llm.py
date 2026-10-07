@@ -73,7 +73,8 @@ def _ask_claude_cli(system: str, user: str, model: str) -> dict:
     alias = {"claude-sonnet-5": "sonnet", "claude-opus-5": "opus", "claude-haiku-4-5-20251001": "haiku"}.get(model, model)
     prompt = f"{system}\n\n---\n\n{user}"
     # cwd neutre pour ne pas charger le contexte d'un projet Claude Code
-    with tempfile.TemporaryDirectory() as tmp:
+    # ignore_cleanup_errors : sous Windows, un process fils de `claude` peut encore verrouiller le dossier à la sortie
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         prompt_file = Path(tmp) / "prompt.txt"
         prompt_file.write_text(prompt, encoding="utf-8")
         cmd = ["claude", "-p", "--output-format", "json", "--model", alias, "--tools", ""]
@@ -81,7 +82,8 @@ def _ask_claude_cli(system: str, user: str, model: str) -> dict:
             res = subprocess.run(cmd, stdin=fh, capture_output=True, text=True, encoding="utf-8",
                                  errors="replace", cwd=tmp, shell=(os.name == "nt"))
     if res.returncode != 0:
-        raise RuntimeError(f"claude CLI a échoué ({res.returncode}) :\n{res.stderr[:1500]}")
+        # en --output-format json, la cause (ex. « OAuth session expired » -> relancer `claude` puis /login) est dans stdout
+        raise RuntimeError(f"claude CLI a échoué ({res.returncode}) :\n{(res.stderr or res.stdout)[:1500]}")
     try:
         payload = json.loads(res.stdout)
         text = payload.get("result", "")

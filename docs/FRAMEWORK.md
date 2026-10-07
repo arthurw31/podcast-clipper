@@ -26,7 +26,7 @@ flowchart TD
 
 | Étape | Qui | Durée (PC sans GPU, épisode de 50 min) |
 | --- | --- | --- |
-| 1. Dépôt + transcription | vous déposez, Claude transcrit | ≈ 20 min (automatique) |
+| 1. Dépôt + transcription | vous déposez (ou collez le lien Dropbox), Claude télécharge et transcrit | ≈ 20 min (automatique) + téléchargement |
 | 2. 10 propositions | Claude | ≈ 8 min |
 | 3. Choix + demandes | **vous** | 2 min |
 | 4. Montage + aperçu + posts | Claude monte, **vous regardez et validez** | ≈ 4 min de montage (≈ 10 en 4K), aperçu instantané, ≈ 1 min par retouche |

@@ -95,6 +95,8 @@ seul au premier lancement.
 
 1. Ouvrez le dossier du projet dans **Claude Code**.
 2. Déposez dans `depot/` l'épisode (de préférence la version **4K**) et le logo de l'entreprise invitée.
+   Rushs ou épisode sur **Dropbox** : collez simplement le lien à Claude, qui les télécharge lui-même
+   (`python -m clipper fetch "<lien>"` : reprise automatique après coupure, taille vérifiée).
 3. Écrivez par exemple :
 
    > Fais-moi 5 shorts de ce podcast. Invité : Quentin Amaudry, CEO de Mendo.

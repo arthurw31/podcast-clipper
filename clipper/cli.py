@@ -12,6 +12,7 @@
   python -m clipper preview   --brand <slug> --input episode.mp4 [--stop]         # aperçu instantané, sans rendu
   python -m clipper render    --brand <slug> --input episode.mp4 [--only 1]       # MP4
   python -m clipper posts     --brand <slug> --input episode.mp4 [--episode-url URL] # post LinkedIn + description par clip
+  python -m clipper fetch     <lien Dropbox> [--dest depot]                       # rushs : reprise auto, tailles vérifiées
   python -m clipper new-brand <slug>
   python -m clipper brands
   python -m clipper doctor
@@ -453,6 +454,22 @@ def _write_summary(ep: Path, clips: dict, projects: list[Path] | None = None) ->
     (ep / "summary.md").write_text("\n".join(lines), encoding="utf-8")
 
 
+def _free_port(port: int, target: Path) -> None:
+    """Un aperçu d'un AUTRE short (autre épisode…) peut occuper le port : on l'arrête, sinon le lien afficherait l'ancien
+    short (bug du 07/10/2026 : lien E22 -> short E21 resté ouvert sur 3002)."""
+    import urllib.request
+    try:
+        with urllib.request.urlopen(f"http://localhost:{port}/api/projects", timeout=2) as r:
+            projects = json.loads(r.read().decode("utf-8")).get("projects", [])
+    except Exception:  # noqa: BLE001 — rien n'écoute sur ce port
+        return
+    from .render import _npx
+    for pr in projects:
+        d = Path(pr.get("dir", ""))
+        if d and d.resolve() != target.resolve():
+            _npx(["preview", str(d), "--stop"], ROOT_DIR, timeout=60)
+
+
 def cmd_preview(a: argparse.Namespace) -> None:
     """Aperçu instantané (sans rendu) : le short est joué en direct dans le navigateur par HyperFrames Studio.
 
@@ -477,6 +494,7 @@ def cmd_preview(a: argparse.Namespace) -> None:
             console.print(f"  #{idx} aperçu arrêté")
             continue
         port = int(a.port) + idx - 1
+        _free_port(port, target)
         res = _npx(["preview", str(target), "--background", "--port", str(port), "--no-open" if a.no_open else "--open"],
                    ROOT_DIR, timeout=180)
         ok = res.returncode == 0
@@ -561,6 +579,43 @@ def cmd_new_brand(a: argparse.Namespace) -> None:
     console.print(f"[green]Marque créée[/green] : {dst}\n  → éditez brand.yaml, guidelines.md et déposez logo.png dans assets/")
 
 
+def cmd_fetch(a: argparse.Namespace) -> None:
+    from .fetch import fetch
+    dest = Path(a.dest) if a.dest else ROOT_DIR / "depot"
+    done = fetch(a.url, dest, skip=[x for x in a.skip.split(",") if x], jobs=a.jobs)
+    if not done:
+        sys.exit(1)
+
+
+def cmd_tighten(a: argparse.Namespace) -> None:
+    """Retire les « euh » (cachés dans les trous entre mots) sans rendre le clip saccadé -> clips.json."""
+    from .tighten import tighten_clip
+    from .transcribe import all_words
+    brand = Brand(a.brand)
+    video = resolve_input(brand, a.input)
+    ep = episode_dir(brand, video)
+    spec = video.with_suffix(".multicam.json")
+    wav = (video.parent / json.loads(spec.read_text(encoding="utf-8"))["audio"]) if spec.exists() else video
+    transcript = json.loads((ep / "transcript.json").read_text(encoding="utf-8"))
+    W = all_words(transcript)
+    data = json.loads((ep / "clips.json").read_text(encoding="utf-8"))
+    only = _parse_only(a.only)
+    if not (ep / "clips_before_tighten.json").exists():
+        shutil.copy2(ep / "clips.json", ep / "clips_before_tighten.json")
+    for i, c in enumerate(data["clips"]):
+        if only and c["index"] not in only:
+            continue
+        old = c["duration"]
+        c2, removed = tighten_clip(c, transcript, wav, min_gap=a.min_gap)
+        data["clips"][i] = c2
+        console.print(f"#{c['index']} {c.get('hook_title') or c['title']} : {len(removed)} retrait(s), {old:.1f}s -> {c2['duration']:.1f}s")
+        for t0, t1, _ in removed:
+            before = " ".join(w["w"] for w in W if w["e"] <= t0 + 0.1)[-40:]
+            after = " ".join(w["w"] for w in W if w["s"] >= t1 - 0.1)[:40]
+            console.print(f"    {t0:.2f}→{t1:.2f} ({t1 - t0:.2f}s) …{before} | {after}…")
+    (ep / "clips.json").write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
 def cmd_brands(_: argparse.Namespace) -> None:
     for b in list_brands():
         brand = Brand(b)
@@ -630,6 +685,15 @@ def main(argv: list[str] | None = None) -> None:
     sp.set_defaults(fn=cmd_preview)
     sp = sub.add_parser("new-brand"); sp.add_argument("slug"); sp.set_defaults(fn=cmd_new_brand)
     sp = sub.add_parser("brands"); sp.set_defaults(fn=cmd_brands)
+    sp = sub.add_parser("tighten", help="retire les « euh » et longs blancs (sans saccades) dans clips.json"); common(sp)
+    sp.add_argument("--only", default=""); sp.add_argument("--min-gap", type=float, default=0.5)
+    sp.set_defaults(fn=cmd_tighten)
+    sp = sub.add_parser("fetch", help="télécharge les rushs d'un lien Dropbox (reprise automatique, tailles vérifiées)")
+    sp.add_argument("url", help="lien Dropbox partagé (dossier ou fichier)")
+    sp.add_argument("--dest", default="", help="dossier de destination (défaut : depot/)")
+    sp.add_argument("--skip", default="", help="fichiers à ignorer (morceaux de nom, ex: MIC,.wav)")
+    sp.add_argument("--jobs", type=int, default=3, help="téléchargements en parallèle")
+    sp.set_defaults(fn=cmd_fetch)
     sp = sub.add_parser("doctor", help="vérifie l'installation (FFmpeg, Node, HyperFrames, Python, clés)"); sp.set_defaults(fn=cmd_doctor)
 
     a = p.parse_args(argv)

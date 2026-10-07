@@ -15,7 +15,7 @@ language: fr
 montage:
   preset: aip-short          # style des shorts du monteur AI Partners (config/presets/aip-short.yaml)
 
-formats: ["9x16", "16x9"]
+formats: ["9x16"]            # shorts verticaux seulement (07/10/2026 : le 16:9 doublait build + rendu) ; 16:9 sur demande : --formats 9x16,16x9
 
 selection:
   n_clips: 5                 # workflow : ~10 propositions (`propose`), 5 retenues (`pick`)
@@ -51,7 +51,7 @@ fonts:
 
 outro:
   enabled: true
-  duration: 2.0              # fin rapide (demande d'Arthur) : l'animation de la charte accélérée ×5
+  duration: 3.5              # animation de la charte accélérée ×2,9 (06/10/2026 : ×5 sur 2 s jugé trop rapide)
   background: video          # animation officielle AI Partners (lignes « montagne » qui se dessinent)
   video: "outro_anim.mov"    # 2800×1122, 10 s -> recadrée au format et accélérée pour durer `duration`
   video_focus_x: 0.62        # centre du recadrage vertical sur le motif

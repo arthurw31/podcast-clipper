@@ -20,6 +20,7 @@ from .captions import group_words
 from .config import FORMATS, TEMPLATES_DIR, Brand, Cfg, deep_merge
 from .media import (concat_segments, cut_segment, extract_frame, make_blurred_still, prepare_outro_video, probe,
                     reframe_video)
+from .multicam import cut_multicam, load_spec as load_multicam
 from .reframe import build_plan
 from .transcribe import words_between
 
@@ -397,7 +398,16 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
         return None
 
     src_clip = assets / "source.mp4"
-    if force or not src_clip.exists():
+    # découpe en cache trop courte (carte de fin allongée depuis) alors que l'épisode a de quoi la couvrir : on redécoupe
+    stale = (src_clip.exists() and probe(src_clip)["duration"] < D_total - 0.05
+             and info["duration"] - float(segments[-1]["start"]) > float(segments[-1]["duration"]) + outro_d - 0.05)
+    # rushs multicam (E22+) : gros plan de la personne qui parle, selon les tours de parole du clip
+    multicam = load_multicam(source)
+    if multicam:
+        stamp = json.dumps([segments, clip.get("turns", []), outro_d], sort_keys=True, default=str)
+        stamp_f = assets / "source.multicam.stamp"
+        stale = stale or not stamp_f.exists() or stamp_f.read_text(encoding="utf-8") != stamp
+    if force or stale or not src_clip.exists():
         console.print(f"  découpe de {len(segments)} segment(s) source…")
         parts = []
         for j, sg in enumerate(segments):
@@ -406,13 +416,20 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
             dur = min(dur, max(0.0, info["duration"] - float(sg["start"])))
             part = assets / (f"seg_{j+1}.mp4" if len(segments) > 1 else "source.mp4")
             # source 4K conservée (jusqu'à render.max_source_height) : le recadrage vertical y puise sa netteté
-            cut_segment(source, part, float(sg["start"]), dur, height=min(info["height"], int(cfg.render.get("max_source_height", 2160))),
-                        normalize_audio=bool(cfg.audio.normalize), fps=int(cfg.fps))
+            h_max = min(info["height"], int(cfg.render.get("max_source_height", 2160)))
+            if multicam:
+                cut_multicam(multicam, part, float(sg["start"]), dur, clip.get("turns", []), height=h_max,
+                             normalize_audio=bool(cfg.audio.normalize), fps=int(cfg.fps))
+            else:
+                cut_segment(source, part, float(sg["start"]), dur, height=h_max,
+                            normalize_audio=bool(cfg.audio.normalize), fps=int(cfg.fps))
             parts.append(part)
         if len(parts) > 1:
             concat_segments(parts, src_clip)
             for part in parts:
                 part.unlink(missing_ok=True)
+        if multicam:
+            stamp_f.write_text(stamp, encoding="utf-8")
     # l'audio sous la carte de fin s'arrête avant que le locuteur suivant reprenne
     tail = float(segments[-1].get("tail_silence", clip.get("tail_silence", 5.0)))
     A_fade = max(0.08, min(float(cfg.outro.audio_fade), tail, outro_d)) if outro_d > 0 else 0.0
