@@ -168,13 +168,18 @@ def group_words(words: list[dict], clip_start: float, clip_end: float, cfg: Cfg,
         for li, line in enumerate(raw_lines):
             lw = []
             for wi, w in enumerate(line):
-                text = w["w"].upper() if cap.uppercase else w["w"]
+                hl = _is_highlight(w["w"], kw)
+                # casse propre aux mots-clés (captions.keyword_style.uppercase) : style « multi-polices » où le mot-clé
+                # est en minuscules italiques au milieu de capitales (ou l'inverse)
+                ks = cap.get("keyword_style") or {}
+                up = bool(ks["uppercase"]) if hl and "uppercase" in ks else bool(cap.uppercase)
+                text = w["w"].upper() if up else w["w"]
                 if dialogue_flags[gi] and wi == 0:
                     text = "- " + text
                 n = len(text)
                 dur = max(w["e"] - w["s"], min_step * n)
                 chars = [{"c": ch, "t": round(w["s"] + dur * (i / max(n, 1)), 3)} for i, ch in enumerate(text)]
-                lw.append({"text": text, "s": w["s"], "e": w["e"], "hl": _is_highlight(w["w"], kw), "chars": chars})
+                lw.append({"text": text, "s": w["s"], "e": w["e"], "hl": hl, "chars": chars})
             lines.append(lw)
         out.append({"id": gi + 1, "start": round(start, 3), "end": round(min(end, D), 3), "lines": lines})
     return out

@@ -22,8 +22,11 @@ def _npx(args: list[str], cwd: Path, timeout: int = 1800) -> subprocess.Complete
         alt = fallback_browser()
         if alt:
             env["HYPERFRAMES_BROWSER_PATH"] = alt
+    # aucune fenêtre (Arthur, 08/10/2026 : « arrête d'ouvrir des sessions Chrome, j'ai une pop Chrome souvent ») :
+    # pas de console cmd/npx qui clignote ; le Chrome de rendu est déjà invisible (--headless=new)
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
     return subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True, encoding="utf-8",
-                          errors="replace", shell=(os.name == "nt"), env=env, timeout=timeout)
+                          errors="replace", shell=(os.name == "nt"), env=env, timeout=timeout, creationflags=flags)
 
 
 def _bundled_chrome_blocked() -> bool:

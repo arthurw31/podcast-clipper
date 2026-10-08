@@ -565,6 +565,10 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
     cap_font = brand.font_path("captions_alt")
     if cap_font:
         shutil.copy2(cap_font, fonts_dir / cap_font.name)
+    # police des mots-clés (fonts.keyword) : style « multi-polices » (mot-clé en serif italique / capitales serif)
+    kw_font = brand.font_path("keyword")
+    if kw_font:
+        shutil.copy2(kw_font, fonts_dir / kw_font.name)
     # logo de l'invité / de son entreprise (style shorts AI Partners : en haut à gauche)
     guest_logo_file = None
     gl_cfg = cfg.get("guest_logo") or {}
@@ -665,6 +669,8 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
             "font_px": int(c.font_size),
             "font_file": cap_font.name if cap_font else "",
             "stagger_px": int(W * float(c.stagger_offset)),
+            "kw_font_file": kw_font.name if kw_font else "",
+            "kw": dict(c.get("keyword_style") or {}),
         })
         lg = fcfg.logo
         logo_w = int(W * float(lg.width))

@@ -26,6 +26,14 @@
         font-weight: 100 900;
       }
 {% endif %}
+{% if cap.kw_font_file %}
+      @font-face {
+        font-family: "KeywordFont";
+        src: url("assets/fonts/{{ cap.kw_font_file }}") format("{{ 'opentype' if cap.kw_font_file.lower().endswith('.otf') else 'truetype' }}");
+        font-style: {{ "italic" if cap.kw.get("italic") else "normal" }};
+        font-weight: 100 900;
+      }
+{% endif %}
 {% if hook.font_file %}
       @font-face {
         font-family: "HookFont";
@@ -69,7 +77,16 @@
       .cap-line { display: block; white-space: nowrap; }
       {% if cap.stagger_lines and cap.align == "left" %}.cap-line-2 { padding-left: {{ cap.stagger_px }}px; }{% endif %}
       .cap-word { display: inline-block; white-space: pre; }
-      .cap-word.hl { color: {{ cap.highlight_color }}; }
+      .cap-word.hl { color: {{ cap.kw.get("color") or cap.highlight_color }};
+{% if cap.kw %}
+        {% if cap.kw_font_file %}font-family: "KeywordFont", Georgia, serif;{% endif %}
+        font-style: {{ "italic" if cap.kw.get("italic") else "normal" }};
+        {% if cap.kw.get("weight") %}font-weight: {{ cap.kw.weight }};{% endif %}
+        text-transform: {{ "uppercase" if cap.kw.get("uppercase") else "none" }};
+        {% if cap.kw.get("scale") %}font-size: {{ (cap.font_px * cap.kw.scale) | int }}px;{% endif %}
+        {% if cap.kw.get("letter_spacing") %}letter-spacing: {{ cap.kw.letter_spacing }};{% endif %}
+{% endif %}
+      }
       {% if cap.reveal == "typewriter" %}.ch { opacity: 0; }{% elif cap.reveal == "word" %}.cap-word { opacity: 0; }{% endif %}
       /* reveal_reflow : le mot n'occupe sa place qu'à son apparition -> la ligne visible reste centrée */
       .cap-word.rf { display: none; }

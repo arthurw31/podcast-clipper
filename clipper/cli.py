@@ -515,7 +515,7 @@ def cmd_preview(a: argparse.Namespace) -> None:
             continue
         port = int(a.port) + idx - 1
         _free_port(port, target)
-        res = _npx(["preview", str(target), "--background", "--port", str(port), "--no-open" if a.no_open else "--open"],
+        res = _npx(["preview", str(target), "--background", "--port", str(port), "--open" if getattr(a, "open", False) else "--no-open"],
                    ROOT_DIR, timeout=180)
         ok = res.returncode == 0
         # ?v=… : le navigateur ne réaffiche jamais un ancien short servi auparavant sur le même port (cache)
@@ -1019,7 +1019,8 @@ def main(argv: list[str] | None = None) -> None:
     sp.add_argument("--clip", default="all", help="all (défaut) ou index, ex: 1,3")
     sp.add_argument("--formats", default="", help="format à ouvrir (ex: 9x16)")
     sp.add_argument("--port", default="3002", help="port du short n°1 (les suivants : +1, +2…)")
-    sp.add_argument("--no-open", action="store_true", help="ne pas ouvrir le navigateur par défaut")
+    sp.add_argument("--no-open", action="store_true", help="(par défaut désormais : aucun navigateur ouvert)")
+    sp.add_argument("--open", action="store_true", help="ouvrir le Studio dans le navigateur (sinon : rien ne s'ouvre)")
     sp.add_argument("--stop", action="store_true", help="arrête les aperçus")
     sp.add_argument("--mp4", action="store_true", help="aperçu en MP4 brouillon (dossier apercus/) au lieu du Studio")
     sp.add_argument("--fps", default="12", help="images/s de l'aperçu MP4 (12 = rapide pour itérer ; 24/30 = fluide)")

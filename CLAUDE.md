@@ -387,6 +387,11 @@ short -> `preview` libère le port ; 16:9 inutile -> `formats: ["9x16"]` ; tél�
   lancer `claude` dans un terminal puis `/login`). `TemporaryDirectory(ignore_cleanup_errors=True)` dans `llm.py` :
   sous Windows le dossier temporaire peut rester verrouillé à la sortie de `claude`.
 
+- Aucune fenêtre chez Arthur (08/10/2026 : « arrête d'ouvrir des sessions Chrome, j'ai une pop Chrome souvent ») :
+  `render._npx` lance npx avec `CREATE_NO_WINDOW` (pas de console qui clignote) ; le Chrome de rendu est invisible
+  (`--headless=new`) ; `preview` n'ouvre plus le navigateur par défaut (`--open` pour le Studio) ; on ne laisse plus
+  tourner de serveur Studio (`preview --stop`) puisque les aperçus sont des MP4. Ne pas utiliser le navigateur de
+  l'utilisateur pour vérifier une vidéo : planches d'images (`qa`) et `npx hyperframes snapshot`.
 - Windows (Smart App Control / contrôle des applications) peut bloquer le `chrome-headless-shell` téléchargé par
   HyperFrames (`spawn UNKNOWN`, doctor « Chrome failed ») : ne pas toucher au réglage de sécurité ;
   `render._npx` bascule automatiquement sur Chrome/Edge installés (`fallback_browser`) et `.env` peut fixer
