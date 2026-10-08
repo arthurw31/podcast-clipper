@@ -141,3 +141,11 @@ episode_logo:
   file: "logo.png"
   width: 0.20
   margin: 0.02
+
+# Shorts depuis rushs multicam (retour d'Arthur, 07/10/2026 : « gros angle sur celui qui parle la plupart du temps, mais
+# aussi de temps en temps l'angle avec les deux personnes pour montrer que l'autre écoute ») : écran partagé vertical
+# (les deux caméras l'une sur l'autre) toutes les ~6,5–9,5 s, 2,4–3,2 s, pas avant la fin de l'accroche.
+multicam:
+  split_every: [6.5, 9.5]
+  split_len: [2.4, 3.2]
+  first_after: 11.5          # après l'accroche : la bulle-titre (7,5–11,5 s) cacherait le visage du bas

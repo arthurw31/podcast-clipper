@@ -223,25 +223,25 @@ def pause_after(wav: Path, t0: float, t1: float) -> float:
     return best * 0.02
 
 
-def is_boundary(words: list[dict], i: int, wav: Path, min_pause: float = 0.25) -> bool:
-    """Vraie fin de phrase après words[i] : ponctuation finale dans la transcription normale (stable sur tout
-    l'épisode), mot suivant qui ne prolonge pas la phrase, ET une vraie pause dans le son (≥ min_pause). Le 3e indice
-    ne dépend pas de Whisper : « …dans les années à venir. ‖ et je pense » (point, mais aucune pause) n'est PAS une fin
-    — E22, teaser : la phrase était coupée net."""
+def is_boundary(words: list[dict], i: int, wav: Path, min_pause: float = 0.15, strict: bool = True) -> bool:
+    """Vraie fin de phrase après words[i].
+
+    Ponctuation finale dans la transcription normale (stable sur tout l'épisode) ET :
+      - mot suivant en MAJUSCULE (Whisper ouvre une nouvelle phrase) : début de phrase -> accepté sans autre condition
+        (`strict=False`) ; fin de phrase -> pause réelle dans le son ≥ `min_pause` (0,15 s) ;
+      - mot suivant en minuscule (« …à venir. et je pense que » : Whisper se contredit, la phrase continue) : seulement
+        après une vraie respiration (≥ 0,5 s).
+    Le critère « pause » ne dépend pas de Whisper. Changement d'orateur : fin naturelle dès 0,08 s de blanc."""
     if i + 1 >= len(words):
         return True
     w, nx = words[i], words[i + 1]
     if w["w"].rstrip()[-1:] not in TERMINAL:
         return False
     if w.get("spk") and nx.get("spk") and w["spk"] != nx["spk"]:
-        # l'autre reprend la parole : fin naturelle dès qu'il y a un petit blanc (sinon on sacrifiait la conclusion
-        # de l'invité, E22 short 2 : « …à nos consommateurs. » suivi de Thomas à 0,1 s)
         return pause_after(wav, w["e"], nx["s"]) >= 0.08
-    pause = pause_after(wav, w["e"], nx["s"])
-    first = _norm(nx["w"]).split("'")[0]
-    if first in CONTINUE and nx["w"][:1].islower() and pause < 0.5:
-        return False   # « venir, et je pense » : la phrase continue ; après une vraie respiration, « donc » repart
-    return pause >= min_pause
+    if nx["w"][:1].isupper() or nx["w"][:1].isdigit():
+        return True if not strict else pause_after(wav, w["e"], nx["s"]) >= min_pause
+    return pause_after(wav, w["e"], nx["s"]) >= 0.5
 
 
 def sentence_bounds(words: list[dict], a: int, b: int, wav: Path, max_extend: float = 8.0,
@@ -249,10 +249,10 @@ def sentence_bounds(words: list[dict], a: int, b: int, wav: Path, max_extend: fl
     """Indices (début, fin) recalés sur de vraies frontières de phrase autour de words[a..b] ; None si impossible."""
     notes = []
     # début : words[a-1] doit être une frontière ; sinon on recule (≤ max_back s) puis on avance
-    if a > 0 and not is_boundary(words, a - 1, wav):
+    if a > 0 and not is_boundary(words, a - 1, wav, strict=False):
         back = next((i for i in range(a - 1, 0, -1) if words[a]["s"] - words[i]["s"] <= max_back
-                     and is_boundary(words, i - 1, wav)), None)
-        fwd = next((i for i in range(a + 1, b) if is_boundary(words, i - 1, wav)), None)
+                     and is_boundary(words, i - 1, wav, strict=False)), None)
+        fwd = next((i for i in range(a + 1, b) if is_boundary(words, i - 1, wav, strict=False)), None)
         if back is not None:
             notes.append(f"début avancé à « {words[back]['w']} … » (début de phrase)")
             a = back

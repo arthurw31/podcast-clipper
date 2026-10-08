@@ -404,8 +404,20 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
     # rushs multicam (E22+) : gros plan de la personne qui parle, selon les tours de parole du clip
     # (ou `cams` : plans imposés [{at, speaker: host|guest|wide}] — teaser : alternance + réactions)
     multicam = load_multicam(source)
+    cams = None
     if multicam:
-        stamp = json.dumps([segments, clip.get("cams") or clip.get("turns", []), outro_d], sort_keys=True, default=str)
+        from .multicam import short_cams
+        from .transcribe import all_words
+        # sources composées de gros plans : tout plan à 2 visages = écran partagé (les deux caméras, haut / bas), crop
+        # confiné à la moitié de chaque personne ; pas de « faux visages » à filtrer (pas d'affiche dans un gros plan)
+        cfg = Cfg(deep_merge(dict(cfg), {"framing": {"wide_shot_mode": "split", "split_half": True, "min_face_motion": 0.0,
+                                                      "host_side": multicam.get("host_side", "left")}}))
+        mc = cfg.get("multicam") or {}
+        cams = clip.get("cams") or short_cams(
+            segments, clip.get("turns", []), all_words(transcript),
+            every=tuple(mc.get("split_every", (6.5, 9.5))), length=tuple(mc.get("split_len", (2.4, 3.2))),
+            first_after=float(mc.get("first_after", 11.5)), seed=int(clip.get("index", 1)))
+        stamp = json.dumps([segments, cams or clip.get("turns", []), outro_d], sort_keys=True, default=str)
         stamp_f = assets / "source.multicam.stamp"
         stale = stale or not stamp_f.exists() or stamp_f.read_text(encoding="utf-8") != stamp
     if force or stale or not src_clip.exists():
@@ -419,7 +431,7 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
             # source 4K conservée (jusqu'à render.max_source_height) : le recadrage vertical y puise sa netteté
             h_max = min(info["height"], int(cfg.render.get("max_source_height", 2160)))
             if multicam:
-                cut_multicam(multicam, part, float(sg["start"]), dur, clip.get("cams") or clip.get("turns", []), height=h_max,
+                cut_multicam(multicam, part, float(sg["start"]), dur, cams or clip.get("turns", []), height=h_max,
                              normalize_audio=bool(cfg.audio.normalize), fps=int(cfg.fps))
             else:
                 cut_segment(source, part, float(sg["start"]), dur, height=h_max,

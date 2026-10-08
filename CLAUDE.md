@@ -150,6 +150,22 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
 - E21 n'a ni teaser ni logo incrusté ; E20 a un teaser (~55 s, 4–5 phrases de l'invité) + sting logo : c'est ce
   modèle qui est reproduit.
 
+## Shorts multicam : gros plan + écran partagé (retour de l'équipe via Arthur, 07/10/2026)
+
+« Plus avec les 3 angles : le gros plan la plupart du temps sur celui qui parle, mais aussi de temps en temps l'angle avec
+les deux personnes (comme les shorts du monteur : un en haut, un en bas) pour montrer que l'autre écoute. »
+- `multicam.short_cams` génère les plans d'un short (`clip["cams"]` si fourni à la main) : gros plan de celui qui parle,
+  écran partagé de 2,4–3,2 s toutes les ~6,5–9,5 s (`brand.yaml: multicam.split_every / split_len / first_after`),
+  jamais avant la fin de l'accroche (la bulle-titre cacherait le visage du bas), posé sur une pause entre deux mots,
+  de préférence juste après un raccord (le split masque le jump cut).
+- `cut_multicam` compose un flux « split » = les deux gros plans côte à côte (960 px de large chacun, centrés sur le
+  visage, pixels natifs) ; `compose` force alors `framing.wide_shot_mode: split`, `split_half: true`
+  (`reframe.half_crop` : le crop reste DANS la moitié de chaque personne) et `min_face_motion: 0`. Invité en haut,
+  animateur en bas (`host_side: left`). Limite : la tête de celui du haut touche la barre de logos (le gros plan
+  n'a pas de marge au-dessus) — comme sur les shorts de référence.
+- Le plan large des rushs n'est PAS utilisé en vertical (recadré, on ne verrait qu'une personne).
+- Pour un short existant : `build --only N --force` (le cache de découpe dépend des plans).
+
 ## Contrôle « à l'oreille » : `verify` (retour d'Arthur, 07/10/2026 : « des euh qui restent, des phrases coupées trop
 tôt, un bégaiement au début — rajoute une vérification »)
 

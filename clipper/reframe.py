@@ -148,11 +148,26 @@ def build_plan(analysis: dict, fmt: str, cfg: Cfg, words: list[dict], turns: lis
 
     hs = host_side or fr.get("host_side", "")
 
+    def half_crop(p: dict, headroom: float = 0.47) -> dict:
+        """Source composée de deux gros plans côte à côte (rushs multicam) : le crop reste DANS la moitié de la personne
+        (sinon on verrait un bout de l'autre), à l'aspect de l'emplacement, visage à ~47 % du haut (la tête ne touche pas la barre de logos)."""
+        hw = sw / 2
+        half = 0 if p["cx"] < 0.5 else 1
+        cw, ch = hw, hw * half_wh[1] / half_wh[0]
+        if ch > sh:
+            ch, cw = sh, sh * half_wh[0] / half_wh[1]
+        x = half * hw + (hw - cw) / 2
+        y = min(max(0.0, p["cy"] * sh - headroom * ch), sh - ch)
+        return {"x": round(x, 1), "y": round(y, 1), "w": round(cw, 1), "h": round(ch, 1)}
+
     def split_cams(persons: list[dict]) -> list[dict]:
         # écran partagé : l'invité en haut, l'animateur en bas (si le côté est connu)
         ps = sorted(persons, key=lambda p: p["cx"])[:2]
         if hs == "left":
             ps = ps[::-1]
+        if fr.get("split_half"):
+            return [{"slot": "top", "face": {"cx": ps[0]["cx"], "cy": ps[0]["cy"], "fh": ps[0]["fh"]}, "crop": half_crop(ps[0])},
+                    {"slot": "bottom", "face": {"cx": ps[1]["cx"], "cy": ps[1]["cy"], "fh": ps[1]["fh"]}, "crop": half_crop(ps[1])}]
         return [{"slot": "top", "face": {"cx": ps[0]["cx"], "cy": ps[0]["cy"], "fh": ps[0]["fh"]},
                  "crop": _crop_for(half_wh, sw, sh, ps[0]["cx"], ps[0]["cy"], ps[0]["fh"], 0.26, 0.45, float(fr.face_zoom))},
                 {"slot": "bottom", "face": {"cx": ps[1]["cx"], "cy": ps[1]["cy"], "fh": ps[1]["fh"]},

@@ -178,6 +178,8 @@ def window_edl(turns: list[dict], start: float, duration: float, names: list[str
                min_shot: float = 2.0) -> list[tuple[float, int]]:
     """Plans [(t relatif, index caméra)] d'une fenêtre, d'après les tours de parole absolus [{at, speaker}]."""
     def cam(spk: str) -> int:
+        if spk == "split":          # écran partagé : flux composé en plus des caméras (voir cut_multicam)
+            return len(names)
         return names.index(spk) if spk in names else names.index("wide") if "wide" in names else 0
     ts = sorted(turns, key=lambda t: float(t["at"]))
     before = [t for t in ts if float(t["at"]) <= start + lead]
@@ -196,21 +198,42 @@ def window_edl(turns: list[dict], start: float, duration: float, names: list[str
 
 def cut_multicam(spec: dict, dst: Path, start: float, duration: float, turns: list[dict], height: int | None = None,
                  normalize_audio: bool = True, fps: int | None = None) -> Path:
-    """Équivalent de media.cut_segment pour des rushs multicam : gros plan de la personne qui parle + micro."""
+    """Équivalent de media.cut_segment pour des rushs multicam : gros plan de la personne qui parle + micro.
+
+    `turns` : tours de parole [{at, speaker}] ou plans imposés `cams` [{at, speaker: host|guest|wide|split, force}].
+    « split » = les deux gros plans côte à côte dans une image 16:9 (animateur à gauche, invité à droite, chacun recadré
+    sur son visage, pixels natifs) : le cadrage vertical y voit deux visages et les empile (haut / bas), comme les
+    shorts du monteur (retour d'Arthur, 07/10/2026 : « l'angle avec les deux personnes pour montrer que l'autre écoute »)."""
     dst.parent.mkdir(parents=True, exist_ok=True)
     names = list(spec["cams"])
     edl = window_edl(turns, start, duration, names, float(spec.get("lead", 0.15)), float(spec.get("min_shot", 2.0)))
+    n = len(names)
+    use_split = any(c == n for _, c in edl)
     cmds = dst.with_suffix(".cmds.txt")
     cmds.write_text("".join(f"{t:.3f} streamselect@cam map {c};\n" for t, c in edl[1:]) or "0.0 streamselect@cam map "
                     f"{edl[0][1]};\n", encoding="utf-8")
     cpath = str(cmds).replace("\\", "/").replace(":", "\\:")
-    n = len(names)
     vf = [f"scale=-2:{height}"] if height else []
     vf += [f"fps={fps}"] if fps else []
     vf.append("format=yuv420p")
     af = "loudnorm=I=-16:TP=-1.5:LRA=11" if normalize_audio else "anull"
-    graph = (f"[0:v]sendcmd=f='{cpath}'[c0];[c0]{''.join(f'[{i}:v]' for i in range(1, n))}"
-             f"streamselect@cam=inputs={n}:map={edl[0][1]},{','.join(vf)}[v];[{n}:a]{af}[a]")
+    pre, vin = [], [f"[{i}:v]" for i in range(n)]
+    if use_split:
+        from .episode import _face_x
+        at = start + duration / 2
+        half = {}
+        for k in ("host", "guest"):
+            i = names.index(k)
+            cx = _face_x(spec["cams"][k], at)
+            x = min(max(cx * 1920 - 480, 0), 960)           # fenêtre de 960 px de large centrée sur le visage
+            pre.append(f"[{i}:v]split=2[m{i}][s{i}]")
+            pre.append(f"[s{i}]crop=960:1080:{x:.0f}:0[c{k}]")
+            vin[i] = f"[m{i}]"
+        pre.append("[chost][cguest]hstack=2,setsar=1[split]")
+        vin.append("[split]")
+    graph = ";".join(pre + [f"{vin[0]}sendcmd=f='{cpath}'[c0]",
+                             f"[c0]{''.join(vin[1:])}streamselect@cam=inputs={len(vin)}:map={edl[0][1]},{','.join(vf)}[v]",
+                             f"[{n}:a]{af}[a]"])
     script = dst.with_suffix(".graph.txt")
     script.write_text(graph, encoding="utf-8")
     inputs = [x for p in spec["cams"].values() for x in ("-ss", f"{start:.3f}", "-i", str(p))]
@@ -223,3 +246,55 @@ def cut_multicam(spec: dict, dst: Path, start: float, duration: float, turns: li
     cmds.unlink(missing_ok=True)
     script.unlink(missing_ok=True)
     return dst
+
+
+def short_cams(segments: list[dict], turns: list[dict], words: list[dict], every: tuple[float, float] = (6.5, 9.5),
+               length: tuple[float, float] = (2.4, 3.2), first_after: float = 11.5, tail_guard: float = 1.0,
+               seed: int = 1) -> list[dict]:
+    """Plans d'un short : gros plan de celui qui parle, et de temps en temps (toutes les ~8–12 s, 2,6–3,6 s) l'écran
+    partagé qui montre aussi l'autre en train d'écouter. Jamais avant `first_after` s (accroche), jamais collé à un
+    raccord (`tail_guard` avant la fin d'un morceau) ; chaque bascule posée dans une pause entre deux mots."""
+    import random
+    rng = random.Random(seed)
+    ts = sorted(turns, key=lambda t: float(t["at"]))
+
+    def spk_at(t: float) -> str:
+        cur = ts[0]["speaker"] if ts else "guest"
+        for x in ts:
+            if float(x["at"]) <= t + 0.2:
+                cur = x["speaker"]
+        return cur
+
+    def snap(t: float, lo: float, hi: float) -> float:
+        best, gap = t, 0.0
+        for a, b in zip(words, words[1:]):
+            mid = (a["e"] + b["s"]) / 2
+            if lo <= mid <= hi and abs(mid - t) <= 0.8 and b["s"] - a["e"] > gap:
+                best, gap = mid, b["s"] - a["e"]
+        return best
+
+    cams, splits, rel = [], [], 0.0
+    nxt = first_after + rng.uniform(0.0, 1.5)
+    for sg in segments:
+        s0, s1, d = float(sg["start"]), float(sg["end"]), float(sg["duration"])
+        cams.append({"at": round(s0, 3), "speaker": spk_at(s0)})
+        cams += [{"at": float(t["at"]), "speaker": t["speaker"]} for t in ts if s0 < float(t["at"]) < s1]
+        while nxt < rel + d - tail_guard - length[0]:
+            a_rel = max(nxt, rel + 0.3)   # juste après un raccord : l'écran partagé masque le jump cut
+            ln = rng.uniform(*length)
+            if a_rel + ln > rel + d - tail_guard:
+                break
+            a = snap(s0 + (a_rel - rel), s0 + 0.2, s1 - tail_guard - ln) if a_rel - rel > 1.0 else s0 + 0.15
+            b = snap(a + ln, a + 1.8, s1 - tail_guard)
+            if b - a < 1.8:   # pas de pause nette où couper : on réessaie plus loin
+                nxt += 1.0
+                continue
+            splits.append((a, b))
+            cams += [{"at": round(a, 3), "speaker": "split", "force": True},
+                     {"at": round(b, 3), "speaker": spk_at(b), "force": True}]
+            nxt = a_rel + (b - a) + rng.uniform(*every)
+        rel += d
+    # un changement d'orateur pendant un écran partagé n'interrompt pas l'écran partagé
+    cams = [c for c in cams if c["speaker"] == "split" or c.get("force") or not any(a < c["at"] < b for a, b in splits)]
+    cams.sort(key=lambda c: c["at"])
+    return cams
