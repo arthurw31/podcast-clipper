@@ -4,6 +4,9 @@ Framework Python qui transforme un épisode de podcast (mp4) en shorts/reels mon
 (9:16, 16:9, 1:1) via HyperFrames. Lis [README.md](README.md) pour l'usage complet ;
 ce fichier résume ce qu'il faut savoir pour **modifier** le projet sans casser les acquis.
 
+> **Reprise de session** : l'état du travail en cours (épisode, ce qui est validé, ce qui reste) est dans
+> [docs/REPRISE.md](docs/REPRISE.md) — à lire en premier dans une nouvelle session.
+
 ## Point d'entrée utilisateur
 
 Arthur dépose ses fichiers (épisodes, clips de référence, logos, posts) dans `depot/` (non versionné) : les ranger
