@@ -184,7 +184,7 @@ def build_plan(analysis: dict, fmt: str, cfg: Cfg, words: list[dict], turns: lis
             pieces = _split_long(t0, t1, float(fr.max_shot_len), _sentence_breaks(words, t0, t1)) if fr.synthetic_cuts else [(t0, t1)]
             for i, (a, b) in enumerate(pieces):
                 # sur un plan fixe long : alternance cadrage normal / punch-in
-                zoom = 1.0 if i % 2 == 0 else 1.18
+                zoom = 1.0 if i % 2 == 0 else float(fr.get("synthetic_punch", 1.18))
                 plan.append({"t0": a, "t1": b, "layout": "single", "cams": [single_cam(p, zoom)]})
             continue
 

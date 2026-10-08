@@ -346,7 +346,11 @@ short -> `preview` libère le port ; 16:9 inutile -> `formats: ["9x16"]` ; tél�
   Flash < `min_flash` (0,5 s) : fusionné avec un voisin du même plan source seulement ; s'il est en toute fin de
   clip, la carte de fin démarre plus tôt et le masque (`outro_start`).
 - Jonction de segments sur la même caméra = jump cut → `_punch_junctions` resserre le 2e morceau
-  (`junction_punch: 1.15` dans aip-short), tenu jusqu'à la vraie coupe suivante.
+  (`junction_punch: 1.15` dans aip-short), tenu jusqu'à la vraie coupe suivante. **AI Corner : AUCUN zoom dans les
+  shorts** (Arthur, 08/10/2026 : « pour les shorts, ne pas mettre de zoom finalement ») : `framing.junction_punch: 1.0`
+  et `framing.synthetic_punch: 1.0` (punch-in alterné sur les plans fixes longs, `reframe`) dans brand.yaml ; le
+  teaser garde 1.15 / 1.18 + zoom lent (section `teaser.framing`). Les raccords sur la même caméra restent des coupes
+  nettes (l'écran partagé est placé de préférence juste après un raccord pour les masquer).
 - Peu de coupes ajoutées : `max_shot_len: 10` (AI Corner). Les vraies coupes de la source restent.
 - Sous-titres : nouveau bloc à chaque jonction (`group_words(breaks=junctions)`).
 

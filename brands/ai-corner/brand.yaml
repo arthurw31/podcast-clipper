@@ -85,7 +85,11 @@ framing:
   wide_shot_mode: speaker
   speaker_fallback: split
   host_side: right           # Thomas (animateur) à droite, invité à gauche sur ce plateau
-  slow_zoom: false           # le monteur ne zoome pas (punch-in par coupes)
+  slow_zoom: false           # le monteur ne zoome pas
+  # AUCUN zoom dans les shorts (Arthur, 08/10/2026 : « pour les shorts, note de ne pas mettre de zoom finalement ») :
+  # ni punch-in aux raccords sur la même caméra, ni punch-in alterné sur les plans fixes longs
+  junction_punch: 1.0
+  synthetic_punch: 1.0
   synthetic_cuts: true       # nécessaire en vertical pour suivre le locuteur sur les plans larges
   max_shot_len: 10          # le monteur tient ses plans : peu de coupes ajoutées (retour d'Arthur : « pas trop de cuts »)
   split_divider: 0           # pas de trait entre les deux images (shorts du monteur)
@@ -120,6 +124,9 @@ teaser:
   # sous-titres ÉNORMES en capitales, Metropolis ExtraBold droite (jamais d'italique), blanc + mots-clés bleu #258AF3,
   # mot à mot avec 2e ligne décalée ; logo AI PARTNERS en haut à droite ; carte de fin floutée + invité + entreprise.
   formats: ["16x9"]
+  framing:                   # le teaser garde ses punch-in (validé tel quel ; seuls les shorts sont sans zoom)
+    junction_punch: 1.15
+    synthetic_punch: 1.18
   fps: 24                    # = rushs et corps de l'épisode (concaténation sans réencodage)
   hook:
     enabled: false
