@@ -298,6 +298,10 @@
 {% for e in plan %}{% if e.zoom_from != e.zoom_to %}{% for cam in e.cams %}
       tl.fromTo("#cam-{{ e.id }}-{{ cam.slot }}", { scale: {{ e.zoom_from }} }, { scale: {{ e.zoom_to }}, duration: {{ (e.t1 - e.t0) | round(3) }}, ease: "none" }, {{ e.t0 }});
 {% endfor %}{% endif %}{% endfor %}
+      // ---- transition zoom-flou à l'entrée de certains plans (montage.dynamic_fx) ----
+{% for e in plan %}{% if e.get("fx_in") == "zoomblur" %}{% for cam in e.cams %}
+      tl.fromTo("#cam-{{ e.id }}-{{ cam.slot }}", { filter: "blur(10px) brightness(1.15)" }, { filter: "blur(0px) brightness(1)", duration: 0.32, ease: "power2.out" }, {{ e.t0 }});
+{% endfor %}{% endif %}{% endfor %}
 
       // ---- sous-titres : entrée du bloc + révélation ----
 {% for g in captions %}

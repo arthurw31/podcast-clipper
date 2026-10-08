@@ -630,7 +630,9 @@ def cmd_episode_plan(a: argparse.Namespace) -> None:
     (ep / "work" / "edl.json").write_text(json.dumps({"ranges": ranges, "shots": shots}, indent=0), encoding="utf-8")
     teaser_plan = make_teaser(transcript, words, ranges, brand, ep / "teaser_plan.json", a.guest, a.company, a.host,
                               force=a.force or a.new_teaser)
-    teaser = teaser_clip(words, teaser_plan, a.guest, a.company, wav=spec["audio"], transcript=transcript)
+    from .episode import editorial_order
+    teaser = teaser_clip(words, teaser_plan, a.guest, a.company, wav=spec["audio"], transcript=transcript,
+                         editor=lambda ext: editorial_order(ext, brand))
     # écoute finale : ce que le spectateur entendra, mot pour mot (‖ = raccord)
     from .verify import audit, audit_flags, audit_joins
     heard = audit(teaser["segments"], spec["audio"], ep / "work" / "teaser_audit.wav")

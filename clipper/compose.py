@@ -596,6 +596,23 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
         for i, e in enumerate(plan):
             e["id"] = i + 1   # renumérotation : le lissage fusionne / découpe des plans (ids uniques exigés)
             e["cams"] = [_cam_geometry(c, fmt, sw, sh) for c in e["cams"]]
+        # teaser « dynamique » (retour d'Arthur, 08/10/2026 : « des effets de zoom et des transitions parfois, comme dans
+        # les teasers de Dans la tête d'un CEO, sans que ça fasse too much ») : zoom lent alterné sur chaque plan, et
+        # transition zoom-flou (≈ 0,3 s) sur un changement d'extrait sur trois seulement
+        mt = fcfg.montage
+        if mt.get("dynamic_fx"):
+            amt = float(mt.get("zoom_amount", 0.06))
+            every = int(mt.get("fx_every", 3))
+            ext_j = [offsets[k] for k in range(1, len(segments))
+                     if segments[k].get("orig", k) != segments[k - 1].get("orig", k - 1)]
+            n_j = 0
+            for i, e in enumerate(plan):
+                e["zoom_from"], e["zoom_to"] = (1.0, round(1.0 + amt, 3)) if i % 2 == 0 else (round(1.0 + amt, 3), 1.0)
+                if any(abs(e["t0"] - j) < 0.12 for j in ext_j):
+                    n_j += 1
+                    if n_j % every == 0:
+                        e["fx_in"] = "zoomblur"
+                        e["zoom_from"], e["zoom_to"] = round(1.0 + 1.4 * amt, 3), 1.0
         if plan:
             plan[-1]["t1"] = D_speech
         caps = group_words(words_rel, 0.0, D_speech, fcfg, clip.get("keywords", []), turns_rel=turns_rel, breaks=junctions)

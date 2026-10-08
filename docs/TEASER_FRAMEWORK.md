@@ -44,6 +44,9 @@ réagit) ; jamais de mise en contexte ; chaque extrait se comprend seul et finit
 - **Réaction de l'écoutant** (gros plan, ~1 s) : l'animateur qui rit, sourit, hoche la tête.
 - **Une coupe toutes les ~2 s** (1,4 à 3 s), posée dans une micro-pause entre deux mots.
 - Raccords entre extraits : coupe sèche, ou transition courte (flou / light leak) une fois sur trois.
+- **Mouvement** (retour d'Arthur, 08/10/2026 : « des effets de zoom et des transitions parfois, sans que ça fasse too
+  much ») : zoom lent alterné avant / arrière de 6 % sur chaque plan ; transition **zoom-flou** (≈ 0,3 s : image
+  légèrement floutée, éclaircie et zoomée qui se pose) sur **un changement d'extrait sur trois** seulement.
 
 ## 4. Les sous-titres (le cœur du style)
 
@@ -57,7 +60,7 @@ réagit) ; jamais de mise en contexte ; chaque extrait se comprend seul et finit
 | Apparition | mot à mot, glissé depuis la gauche | idem |
 | Position | moitié basse, ~60–80 % de la hauteur | idem |
 | Mots-clés | chiffres, mots forts (1–3 par phrase) | idem |
-| Ombre | ombre portée sombre, nette | idem |
+| Ombre | ombre portée sombre, nette | **renforcée** : contour sombre derrière les lettres + halo serré + grande ombre portée (lisible sur tout fond) |
 
 ## 5. Habillage
 
@@ -66,7 +69,16 @@ réagit) ; jamais de mise en contexte ; chaque extrait se comprend seul et finit
 - **Carte de fin** : dernière image du teaser **floutée**, logo de l'émission au centre, **nom de l'invité** en
   blanc et **entreprise** en couleur (jaune → **bleu #258AF3**, droit), ~3,5 s. Pas de bouton.
 
-## 6. Dans l'outil
+## 6. Exigences de script (retour d'Arthur, 08/10/2026)
+
+- La **thèse d'ouverture** est dite d'une traite (aucune hésitation gardée) — sinon remplacée.
+- Le **ping-pong** : une question et SA vraie réponse, courte (2–5 s), qui finit nettement.
+- La **chute** est courte (2–5 s), une seule phrase ; une question de l'animateur peut finir le teaser (suspense).
+- **Pas de redite** entre deux extraits.
+- **Relecture éditoriale finale** : le modèle recompose l'enchaînement à partir des seuls extraits déjà vérifiés à
+  l'oreille (texte réellement entendu), pour garantir ces règles.
+
+## 7. Dans l'outil
 
 - `python -m clipper episode-plan … --new-teaser` : script (LLM, `TEASER_PROMPT` = sections 2 et 4 : extraits +
   mots-clés), découpe sur fins de phrase réelles, « euh » et blancs retirés, plans de caméra (section 3), écoute finale.

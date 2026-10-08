@@ -394,6 +394,13 @@ Le script, DANS CET ORDRE (8 à 12 extraits) :
 6. conviction — ce que l'invité défend, sa vision (4–6 s).
 7. chute — une phrase forte ou un moment humain qui donne envie de voir la suite (2–5 s).
 
+Exigences (retour d'Arthur, 08/10/2026) :
+- la THÈSE d'ouverture est dite d'une traite : AUCUNE hésitation (pas de « euh », « enfin », « en fait », reprise ou
+  mot répété) — choisis une phrase fluide, même si elle est un peu moins forte ;
+- le PING-PONG : une question courte, puis une réponse COURTE (2–5 s) qui se termine nettement par un point — une
+  réponse qui part dans une longue explication ne convient pas ;
+- la CHUTE est COURTE : 2 à 5 s, une seule phrase.
+
 Règles :
 - Chaque extrait COMMENCE au début d'une phrase et FINIT sur une fin de phrase (. ? !), jamais sur une virgule ;
   pas de mot d'appui en tête (« donc », « et », « en fait ») : commence juste après. Il se comprend SEUL.
@@ -452,7 +459,7 @@ def _extract(words: list[dict], x: dict, orig: int) -> dict | None:
 
 
 def teaser_clip(words: list[dict], plan: dict, guest: str, company: str, wav: Path | None = None,
-                transcript: dict | None = None, seed: int = 3, target: float = 42.0) -> dict:
+                transcript: dict | None = None, seed: int = 3, target: float = 42.0, editor=None) -> dict:
     """Clip « teaser » (format de clips.json), selon docs/TEASER_FRAMEWORK.md.
 
     1. extraits du script (+ réserve) calés sur de vraies fins de phrase (`verify.snap_extract`, « euh » retirés) ;
@@ -469,6 +476,7 @@ def teaser_clip(words: list[dict], plan: dict, guest: str, company: str, wav: Pa
     ext = []
     for x in main + backup:
         pieces = [{"start": x["start"], "end": x["end"], "duration": x["duration"]}]
+        notes = []
         if wav is not None:
             from .tighten import tighten_segment
             from .verify import snap_extract, trim_edges
@@ -489,8 +497,16 @@ def teaser_clip(words: list[dict], plan: dict, guest: str, company: str, wav: Pa
         ws = [w for p in pieces for w in words if p["start"] - 0.05 <= w["s"] <= p["end"]]
         if not ws:
             continue
+        role = (plan.get("teaser", [])[x["orig"]].get("role", "") if x["orig"] < 100 else "")
+        dur = sum(p["end"] - p["start"] for p in pieces)
+        # exigences par rôle : thèse d'une traite (aucune hésitation gardée), ping-pong / réaction / chute courts
+        hesit = wav is not None and any(n.startswith("gardé") for n in (notes or []))
+        too_long = {"these": 8.0, "pingpong": 6.0, "reaction": 3.0, "chute": 6.0}.get(role)
+        if (role == "these" and hesit) or (too_long and dur > too_long):
+            console.print(f"  teaser {x['start']:.1f}s : {role} écartée ({'hésitation' if hesit else f'{dur:.1f} s, trop long'})")
+            continue
         spk = max(("host", "guest"), key=lambda k: sum(w.get("spk") == k for w in ws))
-        ext.append({"orig": x["orig"], "pieces": pieces, "spk": spk, "kw": x["kw"], "ws": ws,
+        ext.append({"orig": x["orig"], "pieces": pieces, "spk": spk, "kw": x["kw"], "ws": ws, "hesit": hesit,
                     "dur": sum(p["end"] - p["start"] for p in pieces)})
     mains = [e for e in ext if e["orig"] < 100]
     spare = [e for e in ext if e["orig"] >= 100]
@@ -507,13 +523,18 @@ def teaser_clip(words: list[dict], plan: dict, guest: str, company: str, wav: Pa
     seq = list(mains)
     for i in [i for i in lost if roles[i] != "pingpong"]:   # remplacé par une réserve du même interlocuteur
         who = plan["teaser"][i].get("speaker", "guest")
-        rep = next((e for e in spare if e["spk"] == who), None)
+        strict = roles[i] in ("these", "chute")      # remplaçant court et dit d'une traite
+        rep = next((e for e in spare if e["spk"] == who and (not strict or (not e["hesit"] and e["dur"] <= 7.0))), None)
         if rep:
             spare.remove(rep)
             pos = sum(1 for e in seq if e["orig"] < i)
             seq.insert(pos, rep)
     while seq and sum(e["dur"] for e in seq) > target + 5 and len(seq) > 6:
         seq.pop(-2)         # trop long : on retire avant la chute (la chute reste la dernière)
+    if editor is not None and ext:
+        picked = editor(ext)
+        if picked:
+            seq = picked
     segs, turns, cams, keywords = [], [], [], []
     last_cam = None
     for e in seq:
@@ -558,6 +579,49 @@ def teaser_clip(words: list[dict], plan: dict, guest: str, company: str, wav: Pa
             "start": segs[0]["start"] if segs else 0, "end": segs[-1]["end"] if segs else 0,
             "duration": round(sum(s["duration"] for s in segs), 2), "guest": guest, "company": company,
             "keywords": list(dict.fromkeys(keywords)), "broll": []}
+
+
+EDITOR_PROMPT = """Tu es le monteur final du teaser d'ouverture d'un podcast vidéo B2B (AI Corner), au style des teasers de
+« Dans la tête d'un CEO » (docs/TEASER_FRAMEWORK.md). On te donne des EXTRAITS DÉJÀ VÉRIFIÉS À L'OREILLE (texte exact
+entendu, qui parle, durée, moment dans l'épisode). Compose l'enchaînement final.
+
+Rends UNIQUEMENT un JSON : {"order": [<id>, …], "why": "<1 phrase>"}
+
+Règles :
+- 35 à 45 s au total ; 7 à 11 extraits ; les deux interlocuteurs parlent (au moins 3 extraits de l'animateur).
+- Ordre du framework : THÈSE choc de l'invité (fluide, sans hésitation) → développement → PING-PONG (une question de
+  l'animateur suivie de SA vraie réponse : la réponse doit répondre à CETTE question — vérifie le sens et la proximité
+  dans l'épisode ; sinon pas de ping-pong) → réaction de l'animateur → histoire → conviction → CHUTE courte et forte.
+- Pas de redite : deux extraits ne disent jamais la même idée (ex. « refonte des entreprises » et « transformations
+  majeures des entreprises » = redite, garde la meilleure).
+- Une question de l'animateur n'est jamais suivie d'une réponse hors sujet ; une question peut finir le teaser si
+  elle donne envie de voir la suite.
+- Chaque enchaînement doit sonner naturel à l'oral (« Super intéressant » après une affirmation de l'invité, etc.).
+- N'utilise que les ids fournis, chacun au plus une fois."""
+
+
+def editorial_order(ext: list[dict], brand: Brand) -> list[dict] | None:
+    """Relecture éditoriale (LLM) sur des extraits déjà vérifiés : ordre final, ping-pong cohérent, pas de redite."""
+    from .llm import ask_json
+    pool = []
+    for e in ext:
+        txt = " ".join(w["w"] for w in e["ws"])
+        pool.append(f'id {e["orig"]} · {"ANIMATEUR" if e["spk"] == "host" else "INVITÉ"} · {e["dur"]:.1f} s · '
+                    f'{_ts(e["pieces"][0]["start"])} · {"hésitation gardée · " if e.get("hesit") else ""}« {txt} »')
+    model = str((brand.cfg.get("episode") or {}).get("teaser_model") or "claude-opus-5")
+    try:
+        data = ask_json(EDITOR_PROMPT, "EXTRAITS :\n" + "\n".join(pool), model=model,
+                        backend=brand.cfg.selection.llm_backend, max_tokens=2000)
+    except Exception as ex:  # noqa: BLE001 — sans relecture, on garde l'ordre du script
+        console.print(f"[yellow]  relecture éditoriale indisponible : {ex}[/yellow]")
+        return None
+    by_id = {e["orig"]: e for e in ext}
+    order = [by_id[i] for i in data.get("order", []) if i in by_id]
+    order = [e for k, e in enumerate(order) if e not in order[:k]]
+    if len(order) < 5:
+        return None
+    console.print(f"  teaser : relecture éditoriale -> {len(order)} extraits ({data.get('why', '')})")
+    return order
 
 
 def teaser_brand(brand: Brand) -> Brand:

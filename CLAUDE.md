@@ -166,6 +166,23 @@ les deux personnes (comme les shorts du monteur : un en haut, un en bas) pour mo
 - Le plan large des rushs n'est PAS utilisé en vertical (recadré, on ne verrait qu'une personne).
 - Pour un short existant : `build --only N --force` (le cache de découpe dépend des plans).
 
+## Teaser façon « Dans la tête d'un CEO » (08/10/2026) — `docs/TEASER_FRAMEWORK.md`
+
+- Script (`TEASER_PROMPT`, rôles these → developpement → pingpong → reaction → histoire → conviction → chute, mots-clés
+  par extrait), coupes toutes les ~2 s (gros plan / large / réaction, `teaser_clip`), sous-titres géants Metropolis
+  ExtraBold blanc + mots-clés #258AF3 (section `teaser:` de brand.yaml), carte de fin floutée + invité + entreprise.
+- Mots-clés en expressions (« 3000 agents ») : `captions.group_words` les découpe en mots (petits mots exclus).
+- Exigences : thèse sans hésitation, ping-pong indissociable (question + SA réponse), chute ≤ 6 s ; extraits
+  écartés -> réserve courte et propre ; puis `editorial_order` (LLM, `EDITOR_PROMPT`) recompose l'ordre final à
+  partir des seuls extraits VÉRIFIÉS (texte réellement entendu) : Q/R cohérentes, aucune redite, fin forte. Sans ça,
+  E22 avait un ping-pong absurde (« top-down ? » / « 3 000 agents ») et une redite ouverture/fin.
+- Hésitations : `verify._isolated_hole` — on ne retire un « euh »/« enfin » que s'il forme un bloc de voix entouré
+  de vrais silences dans le son ; sinon il reste (E22 : couper sur les horodatages avait emporté « plus de »).
+  Raccord signalé au milieu d'un mot par l'écoute (`audit_joins`) -> retrait annulé, réécoute.
+- Dynamique dosée : `montage.dynamic_fx` (compose) — zoom lent alterné 6 % sur chaque plan + `fx_in: zoomblur`
+  (filtre flou + luminosité, 0,32 s, template) sur 1 changement d'extrait sur 3 (`fx_every`). Sous-titres : contour
+  sombre épais (`stroke_width: 7`, paint-order) + halo + grande ombre.
+
 ## Contrôle « à l'oreille » : `verify` (retour d'Arthur, 07/10/2026 : « des euh qui restent, des phrases coupées trop
 tôt, un bégaiement au début — rajoute une vérification »)
 

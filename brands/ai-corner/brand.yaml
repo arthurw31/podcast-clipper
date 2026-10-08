@@ -138,8 +138,11 @@ teaser:
     highlight_color: "#258AF3"
     highlight_keywords: true
     keyword_pop: true
-    text_shadow: "0 4px 0 rgba(0,0,0,.35), 0 10px 28px rgba(0,0,0,.6)"
-    stroke_width: 0
+    # contraste renforcé (retour d'Arthur, 08/10/2026 : « accentue l'ombre autour des sous-titres ») : contour sombre
+    # derrière les lettres (paint-order) + halo serré + ombre portée large
+    text_shadow: "0 0 4px rgba(0,0,0,.95), 0 0 14px rgba(0,0,0,.8), 0 6px 0 rgba(0,0,0,.55), 0 12px 36px rgba(0,0,0,.85)"
+    stroke_width: 7
+    stroke_color: "rgba(0,0,0,.72)"
     align: left
     stagger_lines: true
     stagger_offset: 0.12
@@ -151,7 +154,10 @@ teaser:
     max_words_per_group: 6
     min_group_duration: 0.5
   montage:
-    join_transition: cut     # coupes sèches entre extraits (débit continu)
+    join_transition: cut     # coupes sèches entre extraits (débit continu)…
+    dynamic_fx: true         # …zoom lent alterné (6 %) sur chaque plan + zoom-flou sur 1 changement d'extrait sur 3
+    zoom_amount: 0.06
+    fx_every: 3
   outro:
     duration: 3.5
     background: blur-freeze  # dernière image floutée, comme les teasers de référence
