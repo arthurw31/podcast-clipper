@@ -369,30 +369,37 @@ def out_time(shots: list[dict], t_src: float, fps: int = 24) -> float | None:
 
 # ------------------------------------------------------------------------------------------------ teaser
 
-TEASER_PROMPT = """Tu montes le TEASER d'ouverture d'un podcast vidéo B2B (AI Corner) : 45 à 60 secondes très
-dynamiques qui donnent envie de regarder l'épisode. On te donne la transcription de l'épisode monté, phrase par
-phrase, avec `[début → fin]` et QUI parle (ANIMATEUR / INVITÉ).
+TEASER_PROMPT = """Tu écris le SCRIPT du teaser d'ouverture d'un podcast vidéo B2B (AI Corner, AI Partners), sur le
+modèle des teasers de « Dans la tête d'un CEO » (docs/TEASER_FRAMEWORK.md) : 35 à 45 secondes ULTRA catchy, débit
+continu, une idée forte toutes les 3 secondes. On te donne la transcription de l'épisode monté, phrase par phrase,
+avec `[début → fin]` et QUI parle (ANIMATEUR / INVITÉ).
 
-Rends UNIQUEMENT un JSON : {"teaser": [ {"start": <s>, "end": <s>, "start_text": "<premiers mots EXACTS>",
-"end_text": "<derniers mots EXACTS>", "speaker": "host|guest", "why": "<pourquoi c'est percutant>"} ],
-"backup": [ <même format : 5 à 6 autres extraits de réserve, au moins 3 de l'invité et 2 de l'animateur> ]}
+Rends UNIQUEMENT un JSON :
+{"teaser": [ {"start": <s>, "end": <s>, "start_text": "<premiers mots EXACTS>", "end_text": "<derniers mots EXACTS>",
+              "speaker": "host|guest", "role": "these|developpement|pingpong|reaction|histoire|conviction|chute",
+              "keywords": ["<1 à 3 mots EXACTS de l'extrait à mettre en couleur : chiffres, mots forts>"],
+              "why": "<pourquoi ça accroche>"} ],
+ "backup": [ <même format : 5 à 6 extraits de réserve variés, dont au moins 2 de l'animateur> ]}
 (Les extraits sont ensuite contrôlés à l'oreille ; ceux qui ont un défaut sont remplacés par la réserve.)
 
-Règles (retour d'Arthur, 07/10/2026 : « plus dynamique, qu'on voie les deux interlocuteurs, des passages où ils
-disent des trucs impactants ») :
-- 5 à 7 extraits de 5 à 12 s chacun (une vraie phrase complète, pas un fragment), total 45 à 60 s
-  (retour d'Arthur : « des phrases un peu plus longues, il faut que chacun parle »).
-- Uniquement de l'impact : chiffre frappant, formule choc, prise de position tranchée, contre-intuition, image
-  forte. Pas de contexte, pas d'explication, pas de mise en place.
-- Les DEUX interlocuteurs parlent à tour de rôle : alterne animateur / invité (au moins 2 extraits de l'animateur :
-  question qui pique, réaction forte, punchline), pour un effet de dialogue.
-- Ordre de montage = ordre de la liste : ouvrir sur le plus fort, faire monter la tension, finir sur une phrase
-  qui donne envie de la suite.
-- Chaque extrait COMMENCE au début d'une phrase et FINIT sur une fin de phrase (. ? !) — jamais sur une virgule,
-  jamais en milieu de phrase. Pas de mot d'appui en tête (« ouais », « donc », « et », « en fait ») : commence
-  l'extrait juste après. Il se comprend seul, sans contexte.
-- Animateur : uniquement une question qui interpelle ou une affirmation forte (pas une relance, une transition, un
-  accord, une reformulation molle).
+Le script, DANS CET ORDRE (8 à 12 extraits) :
+1. these — l'invité, une phrase tranchée, contre-intuitive, compréhensible sans contexte (4–7 s). C'est l'accroche :
+   la plus forte de l'épisode.
+2. developpement — la phrase qui précise ou durcit la thèse (3–6 s).
+3. pingpong — une question COURTE et directe de l'animateur puis la réponse courte de l'invité, idéalement avec un
+   CHIFFRE (2–5 s chacune, deux extraits qui se suivent).
+4. reaction — l'animateur réagit en une phrase courte (« Ah ouais ? », « Super intéressant », « Exactement »…)
+   (1–3 s), seulement si l'épisode en contient une vraie.
+5. histoire — une anecdote concrète, un moment vécu, un exemple chiffré (5–8 s).
+6. conviction — ce que l'invité défend, sa vision (4–6 s).
+7. chute — une phrase forte ou un moment humain qui donne envie de voir la suite (2–5 s).
+
+Règles :
+- Chaque extrait COMMENCE au début d'une phrase et FINIT sur une fin de phrase (. ? !), jamais sur une virgule ;
+  pas de mot d'appui en tête (« donc », « et », « en fait ») : commence juste après. Il se comprend SEUL.
+- Les deux interlocuteurs parlent : au moins 3 extraits de l'animateur (questions qui piquent, réactions, punchline).
+- Rien de technique ni de mise en contexte ; que de l'impact : chiffres, formules, prises de position, images fortes.
+- keywords : 1 à 3 mots recopiés EXACTEMENT de l'extrait (ils seront en bleu dans les sous-titres géants).
 - Textes cités MOT POUR MOT depuis la transcription (ils servent à caler les coupes)."""
 
 
@@ -445,23 +452,26 @@ def _extract(words: list[dict], x: dict, orig: int) -> dict | None:
 
 
 def teaser_clip(words: list[dict], plan: dict, guest: str, company: str, wav: Path | None = None,
-                transcript: dict | None = None, reaction: float = 1.2, seed: int = 3, target: float = 55.0) -> dict:
-    """Clip « teaser » (format de clips.json).
+                transcript: dict | None = None, seed: int = 3, target: float = 42.0) -> dict:
+    """Clip « teaser » (format de clips.json), selon docs/TEASER_FRAMEWORK.md.
 
-    1. extraits du LLM (+ réserve) calés sur les mots ; 2-3. `verify.snap_extract` : une transcription VERBATIM de la
-    zone -> phrases entières, « euh » / répétitions retirés, coupes dans les silences ; `trim_edges` sur les bords
-    (fin de mot parasite) ; un extrait sans fin de phrase propre est écarté ; 4. enchaînement final :
-    ordre du LLM, en ALTERNANT animateur / invité (la réserve comble les trous), jusqu'à ~`target` s ;
-    5. plans : gros plan de celui qui parle + au milieu de chaque extrait, tour à tour un plan large ou la réaction de
-    l'autre (`cams`, lu par cut_multicam) — les 3 caméras."""
+    1. extraits du script (+ réserve) calés sur de vraies fins de phrase (`verify.snap_extract`, « euh » retirés) ;
+    2. débit continu : blancs internes > 0,3 s ramenés à 0,1 s (`tighten`), bords recalés (`trim_edges`) ;
+    3. ordre du script conservé ; un extrait écarté au contrôle est remplacé par la réserve (même interlocuteur) ;
+    4. plans : une coupe toutes les ~2 s — gros plan de celui qui parle, plan large, réaction de l'écoutant (~1 s) ;
+       deux extraits du même orateur qui se suivent ne recommencent pas sur le même cadre (pas de jump cut) ;
+    5. mots-clés du script -> `keywords` (en bleu dans les sous-titres)."""
     rng = random.Random(seed)
-    main = [e for i, x in enumerate(plan.get("teaser", [])) if (e := _extract(words, x, i))]
-    backup = [e for i, x in enumerate(plan.get("backup", [])) if (e := _extract(words, x, 100 + i))]
-    segs = []
-    if wav is not None:
-        # découpe sur une transcription verbatim unique : phrases entières, sans « euh », coupes dans les silences
-        from .verify import snap_extract, trim_edges
-        for x in main + backup:
+    main = [dict(e, spk_hint=x.get("speaker", ""), kw=x.get("keywords", []))
+            for i, x in enumerate(plan.get("teaser", [])) if (e := _extract(words, x, i))]
+    backup = [dict(e, spk_hint=x.get("speaker", ""), kw=x.get("keywords", []))
+              for i, x in enumerate(plan.get("backup", [])) if (e := _extract(words, x, 100 + i))]
+    ext = []
+    for x in main + backup:
+        pieces = [{"start": x["start"], "end": x["end"], "duration": x["duration"]}]
+        if wav is not None:
+            from .tighten import tighten_segment
+            from .verify import snap_extract, trim_edges
             ia = next(i for i, w in enumerate(words) if w["s"] >= x["start"] - 0.05)
             ib = max(i for i, w in enumerate(words) if w["e"] <= x["end"] + 0.05)
             pieces, notes = snap_extract(words, ia, ib, wav)
@@ -469,66 +479,85 @@ def teaser_clip(words: list[dict], plan: dict, guest: str, company: str, wav: Pa
                 console.print(f"  teaser {x['start']:.1f}s : " + " ; ".join(notes))
             if not pieces:
                 continue
-            pieces[0], n0 = trim_edges(pieces[0], wav)
-            pieces[-1], n1 = trim_edges(pieces[-1], wav)
-            for k, p in enumerate(pieces):
-                segs.append(dict(x, start=p["start"], end=p["end"], duration=round(p["end"] - p["start"], 3),
-                                 start_text=x["start_text"] if k == 0 else "",
-                                 end_text=x["end_text"] if k == len(pieces) - 1 else ""))
-    else:
-        segs = main + backup
-
-    def who(pieces):
+            pieces[0], _ = trim_edges(pieces[0], wav)
+            pieces[-1], _ = trim_edges(pieces[-1], wav)
+            if transcript is not None:   # débit continu : pas de blanc dans un extrait
+                tight = []
+                for p in pieces:
+                    tight += tighten_segment(p, transcript, wav, min_gap=0.3, keep=0.1, max_silence=0.3, min_cut=0.2)
+                pieces = tight
         ws = [w for p in pieces for w in words if p["start"] - 0.05 <= w["s"] <= p["end"]]
-        return max(("host", "guest"), key=lambda k: sum(w["spk"] == k for w in ws))
-
-    groups = {}
-    for p in segs:
-        if not p.get("incomplete"):          # phrase inachevée : jamais dans le teaser
-            groups.setdefault(p["orig"], []).append(p)
-    ext = [{"orig": o, "pieces": ps, "spk": who(ps), "dur": sum(p["duration"] for p in ps)} for o, ps in groups.items()]
-    mains = [e for e in ext if e["orig"] < 100]
-    spare = [e for e in ext if e["orig"] >= 100]
-    seq, total = [], 0.0
-    while mains or spare:
-        want = None if not seq else ("guest" if seq[-1]["spk"] == "host" else "host")
-        pick = next((e for e in mains if want is None or e["spk"] == want), None) \
-            or next((e for e in spare if e["spk"] == want), None) or (mains[0] if mains else None)
-        if pick is None or total + pick["dur"] > target + 6:
-            break
-        (mains if pick in mains else spare).remove(pick)
-        seq.append(pick)
-        total += pick["dur"]
-        if total >= target:
-            break
-    segs = [p for e in seq for p in e["pieces"]]
-
-    turns, cams = [], []
-    n_ins = 0
-    for e in seq:
-        ws = [w for p in e["pieces"] for w in words if p["start"] - 0.05 <= w["s"] <= p["end"]]
-        for w in ws:
-            if not turns or turns[-1]["speaker"] != w["spk"]:
-                turns.append({"at": round(w["s"], 3), "speaker": w["spk"]})
         if not ws:
             continue
-        cams.append({"at": round(e["pieces"][0]["start"], 3), "speaker": e["spk"], "force": True})
-        longest = max(e["pieces"], key=lambda p: p["duration"])
-        if longest["duration"] >= 4.0:
-            insert = ("wide", 2.0) if n_ins % 2 == 0 else ("guest" if e["spk"] == "host" else "host", reaction)
-            n_ins += 1
-            lw = [w for w in ws if longest["start"] <= w["s"] <= longest["end"]]
-            mid = longest["start"] + longest["duration"] * rng.uniform(0.4, 0.55)
-            r = _snap_gap(lw, mid, longest["start"] + 1.5, longest["end"] - insert[1] - 1.0)
-            cams += [{"at": round(r, 3), "speaker": insert[0], "force": True},
-                     {"at": round(r + insert[1], 3), "speaker": e["spk"], "force": True}]
-        for p in e["pieces"][1:]:   # chaque morceau reprend sur celui qui parle
-            cams.append({"at": round(p["start"], 3), "speaker": e["spk"], "force": True})
+        spk = max(("host", "guest"), key=lambda k: sum(w.get("spk") == k for w in ws))
+        ext.append({"orig": x["orig"], "pieces": pieces, "spk": spk, "kw": x["kw"], "ws": ws,
+                    "dur": sum(p["end"] - p["start"] for p in pieces)})
+    mains = [e for e in ext if e["orig"] < 100]
+    spare = [e for e in ext if e["orig"] >= 100]
+    roles = [x.get("role", "") for x in plan.get("teaser", [])]
+    lost = [i for i in range(len(roles)) if i not in {e["orig"] for e in mains}]
+    # ping-pong : une question et sa réponse vont ensemble (E22 : la réponse écartée avait été remplacée par une réserve
+    # sans rapport -> « C'est quoi le bon équilibre… ? » / « …c'est un marché de vendeur »)
+    for i in list(lost):
+        if roles[i] == "pingpong":
+            for j in (i - 1, i + 1):
+                if 0 <= j < len(roles) and roles[j] == "pingpong" and j not in lost:
+                    lost.append(j)
+    mains = [e for e in mains if e["orig"] not in lost]
+    seq = list(mains)
+    for i in [i for i in lost if roles[i] != "pingpong"]:   # remplacé par une réserve du même interlocuteur
+        who = plan["teaser"][i].get("speaker", "guest")
+        rep = next((e for e in spare if e["spk"] == who), None)
+        if rep:
+            spare.remove(rep)
+            pos = sum(1 for e in seq if e["orig"] < i)
+            seq.insert(pos, rep)
+    while seq and sum(e["dur"] for e in seq) > target + 5 and len(seq) > 6:
+        seq.pop(-2)         # trop long : on retire avant la chute (la chute reste la dernière)
+    segs, turns, cams, keywords = [], [], [], []
+    last_cam = None
+    for e in seq:
+        other = "guest" if e["spk"] == "host" else "host"
+        for k, p in enumerate(e["pieces"]):
+            segs.append({"start": p["start"], "end": p["end"], "duration": round(p["end"] - p["start"], 3),
+                         "tail_silence": 0.1, "role": "teaser", "orig": e["orig"],
+                         "start_text": "", "end_text": ""})
+        for w in e["ws"]:
+            if not turns or turns[-1]["speaker"] != w.get("spk"):
+                turns.append({"at": round(w["s"], 3), "speaker": w.get("spk", e["spk"])})
+        keywords += [k for k in e["kw"] if isinstance(k, str)]
+        # plans : une coupe toutes les ~2 s, posées dans une micro-pause entre deux mots de l'extrait
+        t0, t_end = e["pieces"][0]["start"], e["pieces"][-1]["end"]
+        first = "wide" if last_cam == e["spk"] else e["spk"]
+        cams.append({"at": round(t0, 3), "speaker": first, "force": True})
+        cur, cur_cam, step = t0, first, 0
+        while True:
+            nxt = cur + rng.uniform(1.6, 2.8)
+            if nxt > t_end - 1.2:
+                break
+            gaps = [((a["e"] + b["s"]) / 2, b["s"] - a["e"]) for a, b in zip(e["ws"], e["ws"][1:])
+                    if nxt - 0.7 <= (a["e"] + b["s"]) / 2 <= nxt + 0.7]
+            at = max(gaps, key=lambda g: g[1])[0] if gaps else nxt
+            if cur_cam != e["spk"]:
+                cam = e["spk"]                       # retour sur celui qui parle
+            else:
+                cam = ("wide", other)[step % 2]      # puis tour à tour plan large / réaction de l'écoutant
+                step += 1
+            if cam == other and at + 1.0 < t_end - 1.0:
+                cams += [{"at": round(at, 3), "speaker": other, "force": True},
+                         {"at": round(at + 1.0, 3), "speaker": e["spk"], "force": True}]
+                cur, cur_cam = at + 1.0, e["spk"]
+                continue
+            if cam == other:
+                cam = "wide"
+            cams.append({"at": round(at, 3), "speaker": cam, "force": True})
+            cur, cur_cam = at, cam
+        last_cam = cur_cam
     cams.sort(key=lambda c: c["at"])
     return {"index": 99, "title": "teaser", "hook_title": "", "segments": segs, "turns": turns, "cams": cams,
             "start": segs[0]["start"] if segs else 0, "end": segs[-1]["end"] if segs else 0,
             "duration": round(sum(s["duration"] for s in segs), 2), "guest": guest, "company": company,
-            "keywords": [], "broll": []}
+            "keywords": list(dict.fromkeys(keywords)), "broll": []}
 
 
 def teaser_brand(brand: Brand) -> Brand:

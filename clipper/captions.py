@@ -80,7 +80,15 @@ def group_words(words: list[dict], clip_start: float, clip_end: float, cfg: Cfg,
     """`words` : mots avec temps relatifs au clip (s/e) OU absolus (clip_start/clip_end servent alors à recaler).
     `turns_rel` : tours de parole en temps relatifs ([{"at", "speaker"}]) pour les tirets de dialogue."""
     cap = cfg.captions
-    kw = {_norm(k) for k in keywords if _norm(k)} if cap.get("highlight_keywords", True) else set()
+    # mots-clés : une expression (« 3000 agents », « 50 outils IA ») est découpée en mots ; les petits mots de liaison
+    # ne sont jamais colorés (sinon chaque « la » / « de » de l'extrait passerait en couleur)
+    small = {"le", "la", "les", "de", "des", "du", "un", "une", "et", "en", "a", "au", "aux", "pas", "plus", "que",
+             "qui", "ce", "se", "sa", "son", "ses", "on", "il", "elle", "l", "d", "c", "est", "dans", "pour", "par"}
+    kw = set()
+    if cap.get("highlight_keywords", True):
+        for k in keywords:
+            toks = [_norm(t) for t in re.split(r"[\s'’]+", k) if _norm(t)]
+            kw |= {t for t in toks if t not in small and (len(t) >= 3 or t.isdigit())}
     max_chars = int(cap.max_chars_per_line)
     max_lines = int(cap.max_lines)
     max_words = int(cap.max_words_per_group)

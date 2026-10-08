@@ -115,25 +115,74 @@ format_overrides:
 # Teaser d'ouverture de l'épisode complet (commande episode, 07/10/2026) — calqué sur E20 MAIF : ~50 s de phrases fortes
 # sous-titrées, puis le logo AI Partners sur l'animation de la charte. Appliqué PAR-DESSUS la config ci-dessus.
 teaser:
+  # Framework : docs/TEASER_FRAMEWORK.md (modèle « Dans la tête d'un CEO », 08/10/2026) adapté à la charte AI Partners :
+  # sous-titres ÉNORMES en capitales, Metropolis ExtraBold droite (jamais d'italique), blanc + mots-clés bleu #258AF3,
+  # mot à mot avec 2e ligne décalée ; logo AI PARTNERS en haut à droite ; carte de fin floutée + invité + entreprise.
   formats: ["16x9"]
   fps: 24                    # = rushs et corps de l'épisode (concaténation sans réencodage)
   hook:
     enabled: false
   guest_logo:
     enabled: false
+  fonts:
+    caption_upright: "fonts/Metropolis-ExtraBold.ttf"
+    captions_alt: ""         # pas d'Arimo ici : la police de la marque (Metropolis)
+  captions:
+    uppercase: true
+    italic: false
+    weight: 800
+    font_family: ""
+    line_height: 1.0
+    letter_spacing: "0.01em"
+    color: "#FFFFFF"
+    highlight_color: "#258AF3"
+    highlight_keywords: true
+    keyword_pop: true
+    text_shadow: "0 4px 0 rgba(0,0,0,.35), 0 10px 28px rgba(0,0,0,.6)"
+    stroke_width: 0
+    align: left
+    stagger_lines: true
+    stagger_offset: 0.12
+    reveal: typewriter
+    entrance: slide-left
+    reveal_reflow: false
+    word_fade: 0
+    dialogue_dashes: false
+    max_words_per_group: 6
+    min_group_duration: 0.5
+  montage:
+    join_transition: cut     # coupes sèches entre extraits (débit continu)
   outro:
-    duration: 3.0            # « sting » : animation AI Partners + logo, sans bouton
+    duration: 3.5
+    background: blur-freeze  # dernière image floutée, comme les teasers de référence
+    blur: 22
+    darken: 0.25
+    layout: center
+    show_guest: true
+    guest_color: "#FFFFFF"
+    company_color: "#258AF3"
+    company_italic: false
     cta:
       enabled: false
-  format_overrides:          # le 16:9 des shorts n'affiche pas de logo : le teaser, si (même réglage que l'épisode)
+  format_overrides:
     "16x9":
+      captions:
+        font_size: 100       # ≈ 10 % de la hauteur par ligne, comme les références
+        max_chars_per_line: 18
+        max_lines: 2
+        position_y: 0.56
+        side_margin: 0.08
       logo:
         enabled: true
         mode: image
         position: top-right
-        width: 0.20             # E20 MAIF : ≈ 0,22 de la largeur
+        width: 0.20             # même réglage que l'épisode (E20 MAIF : ≈ 0,22)
         margin: 0.02
         opacity: 1.0
+      outro:
+        logo_width: 0.40
+        guest_font_size: 76    # nom de l'invité bien lisible, comme les cartes de fin de référence
+        company_font_size: 60
 
 # Logo incrusté en haut à droite pendant tout l'épisode complet (retour d'Arthur, 07/10/2026 : « plus gros en haut à
 # droite » — E20 l'avait, en tout petit). Fractions de la largeur de l'image ; même réglage que le teaser ci-dessus.

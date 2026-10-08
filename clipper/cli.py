@@ -632,8 +632,21 @@ def cmd_episode_plan(a: argparse.Namespace) -> None:
                               force=a.force or a.new_teaser)
     teaser = teaser_clip(words, teaser_plan, a.guest, a.company, wav=spec["audio"], transcript=transcript)
     # écoute finale : ce que le spectateur entendra, mot pour mot (‖ = raccord)
-    from .verify import audit, audit_flags
+    from .verify import audit, audit_flags, audit_joins
     heard = audit(teaser["segments"], spec["audio"], ep / "work" / "teaser_audit.wav")
+    # raccord signalé au milieu d'un mot : on annule ce retrait (on garde l'hésitation) et on réécoute
+    for _ in range(3):
+        segs = teaser["segments"]
+        fix = [k for k in audit_joins(heard) if k + 1 < len(segs) and segs[k].get("orig") == segs[k + 1].get("orig")]
+        if not fix:
+            break
+        for k in sorted(fix, reverse=True):
+            segs[k]["end"] = segs[k + 1]["end"]
+            segs[k]["duration"] = round(segs[k]["end"] - segs[k]["start"], 3)
+            del segs[k + 1]
+        console.print(f"  teaser : {len(fix)} raccord(s) dans un mot annulé(s), réécoute…")
+        heard = audit(segs, spec["audio"], ep / "work" / "teaser_audit.wav")
+    teaser["duration"] = round(sum(s["duration"] for s in teaser["segments"]), 2)
     (ep / "teaser_audit.txt").write_text(heard + "\n", encoding="utf-8")
     teaser["audit_flags"] = audit_flags(heard)
     (ep / "teaser_clip.json").write_text(json.dumps(teaser, ensure_ascii=False, indent=1), encoding="utf-8")

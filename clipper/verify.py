@@ -304,6 +304,45 @@ def _marks(ws: list[dict]) -> set:
     return drop
 
 
+def _isolated_hole(wav: Path, f: dict, reach: float = 0.35, min_quiet: int = 3) -> tuple[float, float] | None:
+    """Trou à retirer pour une hésitation : le bloc de voix qui correspond au mot dans le son, entouré de VRAIS silences
+    (≥ 60 ms) des deux côtés ; coupe au milieu de ces silences. None si le mot est collé à ses voisins.
+
+    Les horodatages verbatim d'un « euh » / « enfin » bougent de 0,1–0,2 s d'une transcription à l'autre : couper sur ces
+    horodatages a emporté « plus de » dans « on est, enfin, plus de 3 000 agents » (E22). Ici seul le son décide."""
+    from .tighten import _rms
+    a, b = max(0.0, f["s"] - reach), f["e"] + reach
+    r = _rms(wav, a, b)
+    if len(r) < 8:
+        return None
+    ctx = _rms(wav, max(0.0, a - 1.0), b + 1.0)
+    v = r > 0.25 * float(np.percentile(ctx, 90))
+    runs, k = [], 0                                   # blocs de voix [début, fin) en trames
+    while k < len(v):
+        if v[k]:
+            j = k
+            while j < len(v) and v[j]:
+                j += 1
+            runs.append((k, j))
+            k = j
+        else:
+            k += 1
+    c0, c1 = (f["s"] - a) / 0.02, (f["e"] - a) / 0.02
+    best = max(runs, key=lambda r_: min(r_[1], c1) - max(r_[0], c0), default=None)
+    if best is None or min(best[1], c1) - max(best[0], c0) <= 0:
+        return None
+    i0, i1 = best
+    q0 = i0
+    while q0 > 0 and not v[q0 - 1]:
+        q0 -= 1
+    q1 = i1
+    while q1 < len(v) and not v[q1]:
+        q1 += 1
+    if i0 - q0 < min_quiet or q1 - i1 < min_quiet or q0 == 0 or q1 == len(v):
+        return None                                   # pas de silence net avant / après dans la fenêtre
+    return a + (q0 + i0) / 2 * 0.02, a + (i1 + q1) / 2 * 0.02
+
+
 def snap_extract(words: list[dict], a: int, b: int, wav: Path, cfg=None) -> tuple[list[dict], list[str]]:
     """Extrait words[a..b] (transcription normale) -> morceaux : bornes sur de VRAIES fins de phrase
     (`sentence_bounds` : ponctuation + pause réelle dans le son), puis UNE transcription verbatim de l'extrait pour
@@ -321,17 +360,18 @@ def snap_extract(words: list[dict], a: int, b: int, wav: Path, cfg=None) -> tupl
     s1 = _quiet(wav, words[b]["e"] - 0.02, min(next_s, words[b]["e"] + 0.5))
     ws = verbatim(wav, s0, s1, cfg)
     drop = _marks(ws)
-    holes = []
+    holes, gone, kept = [], [], []
     for i in sorted(drop):
-        f = ws[i]
-        lo = ws[i - 1]["e"] if i > 0 else s0
-        hi = ws[i + 1]["s"] if i + 1 < len(ws) else s1
-        h0 = _quiet(wav, lo - 0.02, f["s"] + 0.06)
-        h1 = _quiet(wav, f["e"] - 0.06, hi + 0.02)
-        if s0 + 0.2 < h0 < h1 < s1 - 0.2 and h1 - h0 >= 0.12:
-            holes.append((h0, h1))
-    if drop:
-        notes.append("retiré : " + " ".join(ws[i]["w"] for i in sorted(drop)))
+        h = _isolated_hole(wav, ws[i])
+        if h and s0 + 0.2 < h[0] < h[1] < s1 - 0.2:
+            holes.append(h)
+            gone.append(ws[i]["w"])
+        else:
+            kept.append(ws[i]["w"])
+    if gone:
+        notes.append("retiré : " + " ".join(gone))
+    if kept:
+        notes.append("gardé (collé aux mots, pas de silence où couper) : " + " ".join(kept))
     pieces, cur = [], s0
     for h0, h1 in sorted(holes):
         if h0 - cur > 0.25:
@@ -538,3 +578,16 @@ def audit_flags(text: str) -> list[str]:
                                                       or len(_norm(toks[i - 1])) == 1):
             flags.append(f"raccord dans un mot : « {toks[i - 1]} ‖ {toks[i + 1]} »")
     return flags
+
+
+def audit_joins(text: str) -> list[int]:
+    """Indices des raccords (0 = 1er ‖) qui tombent au milieu d'un mot dans le texte entendu."""
+    out, k = [], -1
+    toks = text.split()
+    for i, t in enumerate(toks):
+        if t == "‖":
+            k += 1
+            if 0 < i < len(toks) - 1 and (toks[i + 1].startswith("'") or toks[i - 1].endswith("'")
+                                          or len(_norm(toks[i - 1])) == 1):
+                out.append(k)
+    return out
