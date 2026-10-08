@@ -161,6 +161,49 @@ def _onset(v: np.ndarray, sustain: int = 5, max_k: int = 40) -> int | None:
     return None
 
 
+def pad_end(wav: Path, t: float, pad: float = 0.35, max_ext: float = 1.2, gap: float = 0.12) -> float:
+    """Fin d'un extrait, quel que soit le format (teaser, short, épisode) : jamais tant que la personne parle, puis un
+    petit temps de respiration (retour d'Arthur, 08/10/2026 : « faut jamais que tu coupes avant que quelqu'un ait fini
+    sa phrase, laisse même un mini temps à la fin pour que ça ne fasse pas effet coupé »). Mesuré sur l'énergie du
+    micro : la voix est finie au premier silence >= `gap` s (< 20 % du niveau de parole) ; fin = cet instant + `pad`,
+    sans jamais atteindre la voix suivante (- 0,08 s). Ne raccourcit jamais ; si la voix continue plus de `max_ext` s,
+    la phrase n'était pas finie : on renvoie t (à traiter par la recherche de fin de phrase)."""
+    from .tighten import _rms
+    a = max(0.0, t - 1.0)
+    r = _rms(wav, a, t + max_ext + pad + 0.6)
+    k0 = int(round((t - a) / 0.02))
+    if len(r) <= k0 + 2:
+        return t
+    lvl = float(np.percentile(r[: max(k0, 10)], 90)) or float(np.percentile(r, 90))
+    if lvl <= 0:
+        return t
+    quiet = r < 0.2 * lvl          # 20 % : le souffle du micro de l'invité monte à ~10 % (E22 34:16)
+    n = max(2, int(round(gap / 0.02)))
+    lo_q = k0
+    while lo_q > 0 and quiet[lo_q - 1]:
+        lo_q -= 1
+    hi_q = k0
+    while hi_q < len(r) and quiet[hi_q]:
+        hi_q += 1
+    if quiet[k0] and hi_q - lo_q >= 4:
+        # la coupe tombe dans un vrai silence (≥ 0,08 s) : la phrase est finie. On ne va JAMAIS au-delà du son suivant
+        # (short 1 E22 : « l'entreprise. ‖ Et » — le début de la phrase suivante était entendu). Un silence plus court
+        # est une occlusion DANS un mot (« bien-t-ôt », 0,06 s) : on continue jusqu'à la vraie fin de la voix.
+        k = lo_q
+    else:
+        k = k0
+        while k + n <= len(r) and not quiet[k:k + n].all():
+            k += 1
+        if k + n > len(r) or (k - k0) * 0.02 > max_ext:
+            return t
+    end_voice = a + k * 0.02
+    nxt = next((j for j in range(max(k + 1, k0), len(r)) if not quiet[j]), None)
+    new = end_voice + pad
+    if nxt is not None:
+        new = min(new, a + nxt * 0.02 - 0.08)
+    return round(max(t, new), 3)
+
+
 def trim_edges(sg: dict, wav: Path, look: float = 1.2) -> tuple[dict, list[str]]:
     """Bord qui commence sur la FIN d'un mot (ou finit sur le DÉBUT d'un mot) : un bout de voix, puis un blanc ≥ 0,2 s,
     puis la vraie parole -> on recale sur la parole (retour d'Arthur, teaser E22 : « il commence sur la fin d'un mot,
@@ -180,6 +223,10 @@ def trim_edges(sg: dict, wav: Path, look: float = 1.2) -> tuple[dict, list[str]]
         if k is not None:
             s1 -= k * 0.02 - 0.15
             notes.append(f"fin sur un début de mot ({k * 0.02 - 0.15:.2f} s retirées)")
+    e2 = pad_end(wav, s1)
+    if e2 > s1 + 0.02:
+        notes.append(f"fin prolongée de {e2 - s1:.2f} s (fin de la voix + respiration)")
+        s1 = e2
     if notes:
         sg = dict(sg, start=round(s0, 3), end=round(s1, 3), duration=round(s1 - s0, 3))
     return sg, notes

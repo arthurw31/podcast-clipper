@@ -67,6 +67,7 @@ fonts:
 # -------------------------------------------------------------- captions ---
 captions:
   enabled: true
+  double_check: true        # écoute le montage 2 fois : tout mot entendu les 2 fois est sous-titré (caption_check.py)
   uppercase: true
   italic: true
   weight: 800
@@ -135,6 +136,7 @@ guest_logo:
 montage:
   preset: dynamic
   join_transition: cut      # cut | flash | leak  (jonction entre deux segments ; leak = lumière orangée, style shorts AI Partners)
+  transition_min_diff: 25   # flash/leak seulement si l'angle de caméra change au raccord (diff. d'image ≥ 25 ; même caméra ≈ 0–7)
   flash_color: "#FFFFFF"
 
 # ----------------------------------------------------------------- outro ---

@@ -168,7 +168,9 @@ python -m clipper propose    --brand mon-podcast --input episode-12.mp4 --guest 
 python -m clipper pick       --brand mon-podcast --input episode-12.mp4 --ids 1,3,4,7,9
 python -m clipper find       --brand mon-podcast --input episode-12.mp4 "mots d'une phrase à retrouver"
 python -m clipper check      --brand mon-podcast --input episode-12.mp4                                  # coupes mot à mot
-python -m clipper preview    --brand mon-podcast --input episode-12.mp4 [--stop]                         # aperçu sans rendu
+python -m clipper polish     --brand mon-podcast --input episode-12.mp4 --only 1,2,3,4,5                 # nettoyage + montage + contrôles + aperçus MP4
+python -m clipper qa         --brand mon-podcast --input episode-12.mp4 --only 1 [--render]              # rapport de contrôle (output/…/qa/)
+python -m clipper preview    --brand mon-podcast --input episode-12.mp4 --clip 1 --mp4                   # aperçu MP4 rapide seul
 
 # ou étape par étape (chaque étape est mise en cache et reprend là où elle s'est arrêtée)
 python -m clipper transcribe --brand mon-podcast --input episode-12.mp4
@@ -197,11 +199,13 @@ output/<marque>/<episode>/
   summary.md               ← récap des extraits (timecodes, segments, mots-clés) + les posts
   clips.json               ← la sélection, éditable à la main (timecodes, segments, mots-clés, B-roll)
   transcript.json          ← transcription mot à mot
-  clips/clip_01_<titre>/   ← projet HyperFrames de chaque clip (retouche manuelle possible)
+  clips/clip_01_<titre>/   ← projet HyperFrames de chaque clip (retouche manuelle possible) + captions_check.txt
+  apercus/                 ← aperçus MP4 rapides à valider avant le rendu final
+  qa/                      ← rapports de contrôle (clip_NN.md, episode.md) + planches d'images
 ```
 
-**Corriger un clip** : modifiez `clips.json` (ou demandez à Claude), puis
-`python -m clipper build … --only N` et `python -m clipper render … --only N --force`.
+**Corriger un clip** : modifiez `clips.json` (ou demandez à Claude), puis `python -m clipper polish … --only N`
+(montage + contrôles + aperçu MP4) ; après validation, `python -m clipper render … --only N` puis `qa … --only N --render`.
 Pour une retouche fine, `preview` ouvre le Studio HyperFrames (timeline, déplacement des éléments).
 
 ## 7. Ce que garantit le montage

@@ -487,6 +487,25 @@ def cmd_preview(a: argparse.Namespace) -> None:
              and (only is None or int(p.name.split("_")[1]) in only)]
     if not projs:
         sys.exit(f"Aucun short monté dans {ep / 'clips'} (lancer build d'abord)")
+    if a.mp4:
+        # aperçu en MP4 (qualité brouillon, ~5 min par minute de vidéo) à ouvrir dans un lecteur vidéo : Arthur,
+        # 08/10/2026 : « les aperçus dans HyperFrames buguent à chaque fois, je ne peux pas bien voir s'il y a des
+        # problèmes ». Ce n'est PAS le rendu final : nom « _apercu », dossier apercus/.
+        out_dir = ep / "apercus"
+
+        def one_preview(proj: Path) -> None:
+            dst = out_dir / f"{proj.name}_{fmt}_apercu.mp4"
+            console.print(f"  rendu de l'aperçu {proj.name} ({fmt}, brouillon)…")
+            # 12 i/s par défaut (Arthur, 08/10/2026 : « fais le genre en 240p pour que ce soit rapide sur la phase
+            # d'itération ») : HyperFrames ne sait pas rendre plus petit que la composition, le coût est par image
+            render(proj / fmt, dst, quality="draft", fps=int(a.fps))
+            console.print(f"  [green]{dst.resolve()}[/green]")
+
+        # 2 aperçus à la fois (mesuré : 2 rendus en parallèle ≈ 1,6× plus vite sur ce PC ; plus = contention)
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=2 if len(projs) > 1 else 1) as ex:
+            list(ex.map(one_preview, projs))
+        return
     for proj in projs:
         idx = int(proj.name.split("_")[1])
         target = proj / fmt
@@ -626,6 +645,9 @@ def cmd_episode_plan(a: argparse.Namespace) -> None:
         wf.write_text(json.dumps(words, ensure_ascii=False), encoding="utf-8")
     _refine_boundaries(words)
     ranges, notes = keep_ranges(words, plan)
+    # reprises après coupe : ni « euh », ni mot répété, ni coupe dans un son, ni long blanc (écoute + énergie du micro)
+    from .episode import clean_join_starts
+    ranges = clean_join_starts(ranges, Path(spec["audio"]), brand.cfg, words=words, log=lambda m: (console.print(m), notes.append(m.strip())))
     shots = build_edl(words, ranges)
     (ep / "work" / "edl.json").write_text(json.dumps({"ranges": ranges, "shots": shots}, indent=0), encoding="utf-8")
     teaser_plan = make_teaser(transcript, words, ranges, brand, ep / "teaser_plan.json", a.guest, a.company, a.host,
@@ -671,7 +693,7 @@ def cmd_episode_plan(a: argparse.Namespace) -> None:
 
 def cmd_episode_render(a: argparse.Namespace) -> None:
     """Montage complet, étape 2 : teaser (HyperFrames) + corps (plans) + fin -> un MP4. --proxy = aperçu 540p rapide."""
-    from .episode import _normalize, assemble, description, end_card, render_body, teaser_brand
+    from .episode import _normalize, assemble, description, end_card, end_duration, render_body, teaser_brand
     from .media import FFMPEG, probe
     from .media import run as _run
     from .render import render as hf_render
@@ -709,7 +731,7 @@ def cmd_episode_render(a: argparse.Namespace) -> None:
     out_dir.mkdir(exist_ok=True)
     suffix = f"_{a.minutes}min" if a.minutes else ""
     out = out_dir / f"{video.stem}_episode{tag}{suffix}.mp4"
-    assemble([t_v, body_v, end], [t_a, work / "body_audio.wav", 4.0], out, work)
+    assemble([t_v, body_v, end], [t_a, work / "body_audio.wav", end_duration(brand)], out, work)
     t_len = float(probe(t_v)["duration"])
     (out_dir / "description_youtube.md").write_text(description(plan, edl["shots"], words, t_len, a.guest, a.company),
                                                    encoding="utf-8")
@@ -736,6 +758,8 @@ def cmd_verify(a: argparse.Namespace) -> None:
         if only and c["index"] not in only:
             continue
         c2, notes = verify_clip(c, wav, brand.cfg, fix=a.fix, words=words)
+        if a.fix:
+            c2 = _mark(c2, "verify")
         data["clips"][i] = c2
         console.rule(f"#{c['index']} {c.get('hook_title') or c['title']}")
         console.print("\n".join(notes) if notes else "RAS")
@@ -747,6 +771,31 @@ def cmd_verify(a: argparse.Namespace) -> None:
             console.print(f"[yellow]⚠ {f}[/yellow]")
     if a.fix:
         (ep / "clips.json").write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
+def cmd_fillers(a: argparse.Namespace) -> None:
+    """Retire les « euh » collés aux mots (voyelles tenues, détectées dans le son ; chaque coupe validée par la
+    transcription et l'écoute) -> clips.json. À lancer après verify, avant build."""
+    from .fillers import clean_clip
+    brand = Brand(a.brand)
+    video = resolve_input(brand, a.input)
+    ep = episode_dir(brand, video)
+    spec = video.with_suffix(".multicam.json")
+    wav = (video.parent / json.loads(spec.read_text(encoding="utf-8"))["audio"]) if spec.exists() else video
+    data = json.loads((ep / "clips.json").read_text(encoding="utf-8"))
+    if not (ep / "clips_before_fillers.json").exists():
+        shutil.copy2(ep / "clips.json", ep / "clips_before_fillers.json")
+    only = _parse_only(a.only)
+    for i, c in enumerate(data["clips"]):
+        if only and c["index"] not in only:
+            continue
+        console.rule(f"#{c['index']} {c.get('hook_title') or c['title']}")
+        c2, heard = clean_clip(c, wav, brand.cfg, log=console.print, work=ep / "work")
+        c2 = _mark(c2, "fillers")
+        console.print(f"{c['duration']:.1f} s -> {c2['duration']:.1f} s")
+        console.print(f"[bold]On entend[/bold] : {heard}")
+        data["clips"][i] = c2
+    (ep / "clips.json").write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
 def cmd_tighten(a: argparse.Namespace) -> None:
@@ -769,6 +818,7 @@ def cmd_tighten(a: argparse.Namespace) -> None:
             continue
         old = c["duration"]
         c2, removed = tighten_clip(c, transcript, wav, min_gap=a.min_gap)
+        c2 = _mark(c2, "tighten")
         data["clips"][i] = c2
         console.print(f"#{c['index']} {c.get('hook_title') or c['title']} : {len(removed)} retrait(s), {old:.1f}s -> {c2['duration']:.1f}s")
         for t0, t1, _ in removed:
@@ -776,6 +826,133 @@ def cmd_tighten(a: argparse.Namespace) -> None:
             after = " ".join(w["w"] for w in W if w["s"] >= t1 - 0.1)[:40]
             console.print(f"    {t0:.2f}→{t1:.2f} ({t1 - t0:.2f}s) …{before} | {after}…")
     (ep / "clips.json").write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
+def _wav_for(video: Path) -> Path:
+    """Audio de référence : le WAV du micro (rushs multicam) ou la vidéo elle-même."""
+    spec = video.with_suffix(".multicam.json")
+    return (video.parent / json.loads(spec.read_text(encoding="utf-8"))["audio"]) if spec.exists() else video
+
+
+def _mark(clip: dict, step: str) -> dict:
+    """Étape de nettoyage déjà faite sur ce clip : `polish` ne la refait pas (ni perte de temps, ni double coupe)."""
+    import datetime
+    return dict(clip, checks=dict(clip.get("checks") or {}, **{step: datetime.datetime.now().isoformat(timespec="seconds")}))
+
+
+def _project(ep: Path, clip: dict) -> Path:
+    return ep / "clips" / f"clip_{clip['index']:02d}_{slugify(clip.get('title', ''))}"
+
+
+def cmd_qa(a: argparse.Namespace) -> str:
+    """Contrôle qualité : rapport par short (`output/…/qa/`), --render = aussi le MP4 (final ou aperçu), --episode =
+    l'épisode complet. À lancer avant de montrer quoi que ce soit à Arthur ; un ÉCHEC se corrige d'abord."""
+    from .qa import FAIL, qa_episode, qa_short
+    brand = Brand(a.brand)
+    video = resolve_input(brand, a.input)
+    ep = episode_dir(brand, video)
+    out_dir = ep / "qa"
+    out_dir.mkdir(exist_ok=True)
+    worst = "OK"
+    if a.episode:
+        mp4 = ep / "episode" / f"{video.stem}_episode{'_apercu' if a.proxy else ''}.mp4"
+        from .episode import end_duration
+        status, lines = qa_episode(ep, mp4, brand.cfg, end_len=end_duration(brand))
+        (out_dir / "episode.md").write_text(f"# QA épisode complet — {status}\n\n" + "\n".join(lines) + "\n", encoding="utf-8")
+        console.rule(f"Épisode complet : {status}")
+        console.print("\n".join(lines))
+        return status
+    wav = _wav_for(video)
+    data = json.loads((ep / "clips.json").read_text(encoding="utf-8"))
+    only = _parse_only(a.only)
+    fmt = a.formats or brand.cfg.formats[0]
+    for c in data["clips"]:
+        if only and c["index"] not in only:
+            continue
+        proj = _project(ep, c)
+        if not (proj / "clip.json").exists():
+            console.print(f"[yellow]#{c['index']} pas encore monté (build)[/yellow]")
+            continue
+        render_f = None
+        if a.render:
+            final = ep / "renders" / f"{proj.name}_{fmt}.mp4"
+            apercu = ep / "apercus" / f"{proj.name}_{fmt}_apercu.mp4"
+            render_f = final if final.exists() else apercu
+        status, lines = qa_short(c, proj, wav, brand.cfg, fmt=fmt, render=render_f, work=out_dir)
+        (out_dir / f"clip_{c['index']:02d}.md").write_text(
+            f"# QA short {c['index']} — {c.get('hook_title') or c.get('title')} — {status}\n\n" + "\n".join(lines) + "\n",
+            encoding="utf-8")
+        console.rule(f"#{c['index']} {c.get('hook_title') or c.get('title')} : {status}")
+        console.print("\n".join(lines))
+        worst = FAIL if FAIL in (worst, status) else ("ATTENTION" if "ATTENTION" in (worst, status) else worst)
+    return worst
+
+
+def cmd_polish(a: argparse.Namespace) -> None:
+    """Chaîne complète d'un short après le choix des passages (`pick`), avec les contrôles à chaque étape :
+    tighten -> verify --fix -> fillers -> build (sous-titres doublement contrôlés) -> qa -> aperçu MP4 -> qa de
+    l'aperçu. Tout dans UN processus (Whisper chargé une seule fois) ; étapes déjà faites sautées (`checks` dans
+    clips.json, `--redo` pour tout refaire depuis clips_before_tighten.json). Ne rend JAMAIS le MP4 final."""
+    from .fillers import clean_clip
+    from .tighten import tighten_clip
+    from .transcribe import all_words
+    from .verify import verify_clip
+    brand = Brand(a.brand)
+    video = resolve_input(brand, a.input)
+    ep = episode_dir(brand, video)
+    wav = _wav_for(video)
+    only = _parse_only(a.only)
+    if a.redo and (ep / "clips_before_tighten.json").exists():
+        orig = {c["index"]: c for c in json.loads((ep / "clips_before_tighten.json").read_text(encoding="utf-8"))["clips"]}
+    else:
+        orig = {}
+    data = json.loads((ep / "clips.json").read_text(encoding="utf-8"))
+    transcript = json.loads((ep / "transcript.json").read_text(encoding="utf-8"))
+    dw = ep / "work" / "diarized_words.json"
+    words = json.loads(dw.read_text(encoding="utf-8")) if dw.exists() else all_words(transcript)
+    for name in ("clips_before_tighten.json", "clips_before_verify.json", "clips_before_fillers.json"):
+        if not (ep / name).exists():
+            shutil.copy2(ep / "clips.json", ep / name)
+    idx = []
+    for i, c in enumerate(data["clips"]):
+        if only and c["index"] not in only:
+            continue
+        idx.append(c["index"])
+        if a.redo and c["index"] in orig:
+            c = dict(orig[c["index"]], checks={})
+        done = c.get("checks") or {}
+        console.rule(f"#{c['index']} {c.get('hook_title') or c['title']}")
+        if "tighten" not in done:
+            c2, removed = tighten_clip(c, transcript, wav)
+            console.print(f"  1/3 blancs + « euh » entre les mots : {len(removed)} retrait(s), {c['duration']:.1f} -> {c2['duration']:.1f} s")
+            c = _mark(c2, "tighten")
+        if "verify" not in done:
+            c2, notes = verify_clip(c, wav, brand.cfg, fix=True, words=words)
+            console.print("  2/3 contrôle à l'oreille (fins de phrase, bords, « euh » isolés) : " + ("; ".join(notes) or "RAS"))
+            c = _mark(c2, "verify")
+        if "fillers" not in done:
+            c2, _heard = clean_clip(c, wav, brand.cfg, log=lambda m: console.print(m), work=ep / "work")
+            console.print(f"  3/3 « euh » collés aux mots : {c['duration']:.1f} -> {c2['duration']:.1f} s")
+            c = _mark(c2, "fillers")
+        data["clips"][i] = c
+        (ep / "clips.json").write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+    if not idx:
+        sys.exit("Aucun clip sélectionné")
+    sel = ",".join(str(k) for k in idx)
+    console.rule("Montage (sous-titres contrôlés à l'écoute)")
+    cmd_build(argparse.Namespace(**{**vars(a), "only": sel, "formats": a.formats, "force": False, "no_broll": False,
+                                    "jobs": a.jobs}))
+    console.rule("Contrôle qualité du montage")
+    status = cmd_qa(argparse.Namespace(**{**vars(a), "only": sel, "render": False, "episode": False}))
+    if status == "ÉCHEC" and not a.anyway:
+        sys.exit("Contrôle qualité en ÉCHEC : corriger avant l'aperçu (voir output/…/qa/). --anyway pour passer outre.")
+    console.rule("Aperçus MP4")
+    cmd_preview(argparse.Namespace(brand=a.brand, input=a.input, clip=sel, formats=a.formats, port="3002",
+                                   no_open=True, stop=False, mp4=True, fps=a.fps))
+    console.rule("Contrôle qualité des aperçus")
+    cmd_qa(argparse.Namespace(**{**vars(a), "only": sel, "render": True, "episode": False}))
+    console.print("[bold]Prochaine étape[/bold] : regarder les planches d'images (output/…/qa/), envoyer les liens des aperçus "
+                  "à Arthur ; après sa validation seulement : render --only N, puis qa --render --only N.")
 
 
 def cmd_brands(_: argparse.Namespace) -> None:
@@ -844,6 +1021,8 @@ def main(argv: list[str] | None = None) -> None:
     sp.add_argument("--port", default="3002", help="port du short n°1 (les suivants : +1, +2…)")
     sp.add_argument("--no-open", action="store_true", help="ne pas ouvrir le navigateur par défaut")
     sp.add_argument("--stop", action="store_true", help="arrête les aperçus")
+    sp.add_argument("--mp4", action="store_true", help="aperçu en MP4 brouillon (dossier apercus/) au lieu du Studio")
+    sp.add_argument("--fps", default="12", help="images/s de l'aperçu MP4 (12 = rapide pour itérer ; 24/30 = fluide)")
     sp.set_defaults(fn=cmd_preview)
     sp = sub.add_parser("new-brand"); sp.add_argument("slug"); sp.set_defaults(fn=cmd_new_brand)
     sp = sub.add_parser("brands"); sp.set_defaults(fn=cmd_brands)
@@ -858,6 +1037,20 @@ def main(argv: list[str] | None = None) -> None:
         sp.set_defaults(fn=fn)
     sp = sub.add_parser("verify", help="contrôle verbatim des coupes (euh, bégaiements, mots coupés) ; --fix corrige"); common(sp)
     sp.add_argument("--only", default=""); sp.add_argument("--fix", action="store_true"); sp.set_defaults(fn=cmd_verify)
+    sp = sub.add_parser("polish", help="short après pick : tighten -> verify -> fillers -> build -> qa -> aperçu MP4 -> qa")
+    common(sp); sp.add_argument("--only", default=""); sp.add_argument("--formats", default="")
+    sp.add_argument("--jobs", default=""); sp.add_argument("--fps", default="12")
+    sp.add_argument("--redo", action="store_true", help="tout refaire depuis clips_before_tighten.json")
+    sp.add_argument("--anyway", action="store_true", help="faire l'aperçu même si le contrôle qualité échoue")
+    sp.set_defaults(fn=cmd_polish, render=False, episode=False, proxy=False)
+    sp = sub.add_parser("qa", help="contrôle qualité : rapport par short (output/…/qa/) ; --render ; --episode")
+    common(sp); sp.add_argument("--only", default=""); sp.add_argument("--formats", default="")
+    sp.add_argument("--render", action="store_true", help="contrôle aussi le MP4 rendu (ou l'aperçu)")
+    sp.add_argument("--episode", action="store_true", help="contrôle l'épisode complet (MP4 final)")
+    sp.add_argument("--proxy", action="store_true", help="avec --episode : l'aperçu 540p")
+    sp.set_defaults(fn=cmd_qa)
+    sp = sub.add_parser("fillers", help="retire les « euh » collés aux mots (voyelles tenues) -> clips.json")
+    common(sp); sp.add_argument("--only", default=""); sp.set_defaults(fn=cmd_fillers)
     sp = sub.add_parser("tighten", help="retire les « euh » et longs blancs (sans saccades) dans clips.json"); common(sp)
     sp.add_argument("--only", default=""); sp.add_argument("--min-gap", type=float, default=0.5)
     sp.set_defaults(fn=cmd_tighten)

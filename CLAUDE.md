@@ -45,7 +45,10 @@ python -m clipper transcribe|select|build|posts|render|preview … --brand <slug
 python -m clipper posts --brand <slug> --input … [--episode-url URL] [--guest-role "…"] [--only N] [--force]   # post LinkedIn + description par clip
 python -m clipper build|render … --jobs N          # parallélisme (défaut : build.jobs / render.jobs = auto)
 python -m clipper propose|pick|find|check … --brand <slug> --input …   # workflow 10 propositions -> 5 choisies (skill)
-python -m clipper preview … [--clip all|N] [--stop]   # aperçu instantané (Studio en arrière-plan, ports 3002+), validé AVANT render
+python -m clipper polish … --only N   # APRÈS pick : tighten -> verify -> fillers -> build -> qa -> aperçu MP4 -> qa (le chemin normal)
+python -m clipper qa … --only N [--render] | --episode   # contrôle qualité (rapport output/…/qa/), à relancer après tout rendu
+python -m clipper fillers … --only N   # retire les « euh » collés aux mots (inclus dans polish)
+python -m clipper preview … [--clip all|N] [--stop] [--mp4]   # aperçu (Studio ports 3002+, ou MP4 brouillon --mp4), validé AVANT render
 python -m clipper new-brand <slug>   # copie brands/_template
 python -m clipper fetch "<lien Dropbox>" [--dest dossier] [--skip MIC]   # rushs : reprise auto, taille exacte vérifiée
 npx hyperframes lint|check|snapshot --at 3,10 --no-end -o <dir>   # dans output/<brand>/<ep>/clips/<clip>/<format>/
@@ -90,9 +93,11 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
    Arimo Bold (= Arial, embarquée via `fonts.captions_alt`, sinon HyperFrames la remplace par Inter) 68 px + trait
    épaissi 1,6 px + halo sombre marqué (retour de l'équipe, 06/10/2026 : « comme DUST, plus gros, bords ombrés ») sous la bulle, centrés, 1–3 lignes construites mot à mot (`reveal: word`, `reveal_reflow`,
    `word_fade`), même position en écran partagé (`split_center: false`) ; split sans séparateur ; light leak
-   aux raccords (`join_transition: leak`) ; 25–45 s ; pas de B-roll ; + carte de fin de **3,5 s** sur l'animation
+   aux raccords (`join_transition: leak`) **seulement quand l'angle de caméra change** (Arthur, 08/10/2026 : « les flashs
+   lumineux de transition, que quand tu changes d'angle de caméra » : `montage.transition_min_diff` 25, différence
+   d'image de part et d'autre du raccord — même caméra 0,5–7, autre caméra ≈ 50 ; même caméra = coupe nette) ; 25–45 s ; pas de B-roll ; + carte de fin de **7 s** (3,5 s jusqu'au 08/10/2026 : « trop rapide, x2 ») sur l'animation
    officielle AI Partners (`assets/outro_anim.mov`, lignes « montagne » qui se dessinent, recadrée au format et
-   accélérée ×2,9 — ×5 sur 2 s jugé trop rapide, 06/10/2026 : `outro.background: video`, `media.prepare_outro_video`) + logo blanc + CTA **centrés** (`outro.layout: center`, voile radial). Bleu #258AF3,
+   accélérée ×1,4 depuis le 08/10 — ×5 sur 2 s puis ×2,9 sur 3,5 s jugés trop rapides : `outro.background: video`, `media.prepare_outro_video`) + logo blanc + CTA **centrés** (`outro.layout: center`, voile radial). Bleu #258AF3,
    **jamais d'italique**.
    L'ancien style LinkedIn 16:9 (`references/*.mp4`) reste disponible : preset `editorial`.
 5. **Clips multi-segments** (`selection.max_segments` > 1) : un clip = accroche + développement + conclusion
@@ -147,6 +152,20 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
   en alternance ; dans chaque extrait, tour à tour un plan large de 2 s ou la réaction de l'autre (1,2 s).
   « Logo plus gros en haut à droite » -> `episode_logo` (0,20 de la largeur, comme E20 ≈ 0,22) dans chaque plan
   du corps + même réglage pour le teaser (`teaser.format_overrides.16x9.logo`).
+- Raccords de dérushage (retour d'Arthur, 08/10/2026 : « vérifie bien plusieurs fois qu'il n'y a pas de problème de
+  coupure, de euh laissé au montage ») : `episode.clean_join_starts` (appelé par `episode-plan` après `keep_ranges`)
+  — reprise dans un son -> reculée au creux qui le précède ; voix entre la reprise et le 1er mot de la transcription
+  NORMALE (qui omet toujours les hésitations) = hésitation -> reprise 0,28 s avant l'attaque de ce mot (signal le plus
+  fiable : le verbatim, lui, entend ou non le « euh » selon la fenêtre) ; « euh » / mot répété en tête (écouté 2 fois, contextes
+  différents : le verbatim varie) -> blocs de voix sautés, coupe au point le plus silencieux ; blanc > 1,2 s au
+  raccord -> reprise 0,28 s avant la voix. E22 : « Euh, pour, pour finir » -> « Pour finir » (2924,50) ; 3 s de blanc
+  après la question reposée + « Euh… ben, je… » non transcrit -> reprise sur « Je pense » (2469,95), 1,1 s de pause.
+  Le contrôle final se fait sur le MP4 rendu (audio extrait, réécoute de chaque raccord) : c'est lui qui a trouvé ce
+  « ben, je… ». Avant tout rendu final : réécouter chaque raccord (`verify.audit`, 10 s de
+  part et d'autre). Les « euh » DANS les réponses restent (montage du monteur : conversation naturelle).
+- Fin de l'épisode : `episode_end.duration` (brand.yaml), 8 s depuis le 08/10/2026 (équipe : « trop rapide, x2 sur la
+  longueur de l'animation ») ; même retour pour les shorts : `outro.duration` 3,5 -> 7 s. `end_card` lit le logo PNG
+  avec `-loop 1` (sinon une seule image, transparente avant le fondu : logo invisible — bug présent jusqu'au 08/10).
 - L'épisode entier n'est PAS rendu par HyperFrames (≈ 12× la durée = 9–10 h) : corps en FFmpeg, teaser en
   HyperFrames. Toujours montrer l'aperçu (Studio pour le teaser : `preview --clip 99 --formats 16x9`, 540p pour le
   corps) et attendre la confirmation d'Arthur avant tout MP4 final.
@@ -183,8 +202,64 @@ les deux personnes (comme les shorts du monteur : un en haut, un en bas) pour mo
   de vrais silences dans le son ; sinon il reste (E22 : couper sur les horodatages avait emporté « plus de »).
   Raccord signalé au milieu d'un mot par l'écoute (`audit_joins`) -> retrait annulé, réécoute.
 - Dynamique dosée : `montage.dynamic_fx` (compose) — zoom lent alterné 6 % sur chaque plan + `fx_in: zoomblur`
-  (filtre flou + luminosité, 0,32 s, template) sur 1 changement d'extrait sur 3 (`fx_every`). Sous-titres : contour
-  sombre épais (`stroke_width: 7`, paint-order) + halo + grande ombre.
+  (filtre flou + luminosité, 0,32 s, template) sur 1 changement d'extrait sur 3 (`fx_every`). Sous-titres : ombre
+  en DÉGRADÉ (retour d'Arthur, 08/10/2026 : « fais un effet plus dégradé sur l'ombre autour ») — 6 couches de flou
+  croissant (2 → 90 px) et d'opacité décroissante, contour fin (`stroke_width: 3`, noir 40 %), plus d'ombre portée
+  nette ni de contour épais ; garder ce principe pour tout réglage de contraste des sous-titres.
+
+## Workflow « double / triple check » (demande d'Arthur, 08/10/2026 : « intègre vraiment le workflow en mode double
+triple check, optimise-le pour la rapidité sans réduire la qualité »)
+
+- Chemin normal d'un short après `pick` : **`polish --only N`** = `tighten` -> `verify --fix` -> `fillers` -> `build`
+  (sous-titres contrôlés à l'écoute) -> **`qa`** (1er contrôle) -> aperçu MP4 -> **`qa --render`** (2e contrôle +
+  planche d'images à REGARDER) -> liens à Arthur (3e contrôle, humain) -> `render` -> `qa --render` sur le final.
+  Épisode complet : `qa --episode` (réécoute de chaque raccord dans le MP4 final, volumes, images).
+- `clipper/qa.py` : statuts OK / ATTENTION / ÉCHEC ; un ÉCHEC arrête `polish` avant l'aperçu (`--anyway` pour forcer).
+  Contrôles : raccords à l'écoute (mot coupé), fin pendant la voix (`_voice_at`), **début de la phrase suivante entendu
+  en fin d'extrait** (`_new_sound_before_cut`), respiration de fin, sous-titres (`captions_check.txt`), lint, durée,
+  transitions ; rendu : à jour, format, durée, -16 LUFS ±1,5, planche d'images.
+- Rapidité sans perte : un seul processus (Whisper chargé une fois), étapes déjà faites sautées (`clip["checks"]`,
+  posé aussi par `tighten` / `verify --fix` / `fillers` lancés seuls ; `--redo` repart de `clips_before_tighten.json`),
+  `fillers` valide toutes les coupes d'un passage en UNE transcription (une par une seulement si un mot manque —
+  Whisper traite toujours des blocs de 30 s, des fenêtres plus courtes ne coûtent pas moins), 2 aperçus MP4 en
+  parallèle. Whisper utilise déjà 4 threads = 4 cœurs physiques : rien à gagner de ce côté.
+- `pad_end` corrigé le 08/10 (trouvé par `qa`) : si la coupe tombe déjà dans un vrai silence (≥ 0,08 s), la phrase est
+  finie et on ne dépasse JAMAIS le son suivant (short 1 E22 : « l'entreprise. ‖ É(t) » entendu) ; un silence plus court
+  est une occlusion dans un mot (« bien-t-ôt », 0,06 s) -> on va jusqu'à la vraie fin de la voix. Teaser E22 : 5 fins
+  reculées de 0,1–0,35 s ; épisode : fins de partie 2406,19 -> 2405,99 et 2819,02 -> 2818,67 (début du hors antenne).
+
+## Aperçus en MP4 (retour d'Arthur, 08/10/2026 : « les aperçus dans HyperFrames buguent à chaque fois »)
+
+Le Studio HyperFrames ne suffit pas pour valider : donner à Arthur un MP4 brouillon à ouvrir dans son lecteur
+(`preview --mp4 --clip N` -> `output/…/apercus/clip_NN_…_<fmt>_apercu.mp4` ; épisode : `episode-render --proxy`, avec
+`--minutes 2` pour juger teaser + raccord + volumes). Le lien Studio peut être donné en plus. Lien cliquable vers le
+fichier dans la réponse. Toujours un aperçu avant le rendu final.
+- Vitesse (Arthur : « fais le genre en 240p pour que ce soit rapide sur la phase d'itération ») : HyperFrames ne rend
+  jamais plus petit que la composition (`--resolution` ne fait qu'agrandir) et réduire après coup ne gagne rien ; le
+  coût est par image -> aperçu à 12 i/s (`preview --mp4 --fps 12`, défaut) en brouillon : short de 49 s en 2 min 30.
+
+## Fins d'extraits : jamais pendant que quelqu'un parle + respiration (retour d'Arthur, 08/10/2026)
+
+« Faut jamais que tu coupes avant que quelqu'un ait fini sa phrase, laisse même un mini temps à la fin pour que ça ne
+fasse pas effet coupé — et ça vaut pour toutes les formes de vidéo : teaser, short, podcast entier. »
+- `verify.pad_end(wav, t)` : la voix est finie au premier silence ≥ 0,12 s (< 20 % du niveau de parole — le souffle
+  du micro de l'invité monte à ~10 %) ; fin = cet instant + 0,35 s, sans jamais atteindre la voix suivante (- 0,08 s) ;
+  ne raccourcit jamais ; voix qui continue > 1,2 s = phrase pas finie -> inchangé.
+- Appelé partout : `trim_edges` (fin de chaque short et de chaque extrait du teaser), `episode.clean_join_starts`
+  (fin de chaque partie du montage complet et fin de l'épisode).
+- Cas E22 : teaser « …en productivité » coupé sur la dernière syllabe (« -té » jusqu'à 1294,94, coupe à 1294,85) ;
+  fin de l'épisode coupée dans « À bien-tôt » (3058,97 -> 3059,42).
+
+## Volume et musique du teaser (retour d'Arthur, 08/10/2026)
+
+- « Le teaser avait un volume trop fort par rapport au reste » : teaser rendu à -17 LUFS, micro brut du corps à -37.
+  `episode.assemble` normalise désormais CHAQUE partie séparément à -16 LUFS avant de les enchaîner.
+- Musique d'ambiance sous le teaser : `teaser.audio.music` (brand.yaml, fichier dans `assets/music/`), « vraiment en
+  léger, qu'on entende surtout les invités » : `music_volume: 0.08` pour une piste à -16 LUFS (≈ -22 dB sous les
+  voix) ; elle s'éteint pendant la carte de fin. E22 : « Driving Momentum ».
+- Teaser et corps sont rendus SÉPARÉMENT (`renders/teaser.mp4` ; morceaux du corps en cache dans
+  `work/episode/pieces_*`) : une retouche du teaser = nouveau rendu du teaser (~10 min) + réassemblage (~5 min,
+  sans réencoder le corps). Supprimer/renommer `renders/teaser.mp4` pour forcer son nouveau rendu.
 
 ## Contrôle « à l'oreille » : `verify` (retour d'Arthur, 07/10/2026 : « des euh qui restent, des phrases coupées trop
 tôt, un bégaiement au début — rajoute une vérification »)
@@ -219,6 +294,34 @@ tôt, un bégaiement au début — rajoute une vérification »)
   signale un « euh » entendu ou un raccord au milieu d'un mot. C'est ce texte qu'on montre à Arthur.
 - Whisper hallucine « Sous-titrage ST' 501 » sur le silence de fin : filtré (`HALLU`).
 
+## « Euh » collés aux mots : `fillers` (retour d'Arthur, 08/10/2026, short 1 E22 : « faut que tu enlèves les euhhh,
+l'invité le fait beaucoup donc c'est pas assez dynamique »)
+
+- Ni `tighten` (trous entre mots) ni `verify` (verbatim) ne les voyaient : Whisper rattache le « euh » au mot voisin,
+  qui dure alors anormalement longtemps (« humaine » 3,2 s, « qu'il » 1,7 s) et le verbatim ne l'écrit pas.
+- `clipper/fillers.py` : un « euh » = VOYELLE TENUE (voix au spectre stable ≥ 0,2 s, flux spectral < 40e centile du
+  passage). Chaque coupe (bords au point le plus silencieux à ±0,06 s) est VALIDÉE par la transcription normale du
+  passage coupé : un mot dit une seule fois ne doit jamais disparaître (un mot répété peut perdre une occurrence) ;
+  puis écoute (`audit`) : raccord au milieu d'un mot -> coupe annulée. Hésitation en début de passage : on démarre
+  après ; deux « euh » collés : une seule coupe. Morceaux gardés ≥ 0,25 s.
+- Commande : `python -m clipper fillers --only N` (sauvegarde `clips_before_fillers.json`), après `verify --fix`,
+  avant `build`. Short 1 E22 : 41,8 -> 37,1 s, 4,7 s d'hésitations retirées, tous les mots gardés.
+
+## Sous-titres : double contrôle à l'écoute (retour d'Arthur, 08/10/2026 : « dans les sous-titres il oublie quelques
+mots des fois, faudrait une sorte de boucle de double check »)
+
+- Causes mesurées (short 1 E22) : la transcription NORMALE « nettoie » (« c'est », « en fait » ×3, « Et », « Donc »
+  dits mais pas écrits) ; un mot à cheval sur une coupe n'était gardé que s'il tenait entier dans un morceau
+  (« redéployer », « humaine » perdus après `fillers`) ; à l'inverse un bout de la phrase suivante (« Et puis ») non
+  entendu était sous-titré.
+- `compose` : mot gardé dans le morceau où on l'entend le plus ; puis `clipper/caption_check.py` (`captions.double_check`,
+  défaut true) : l'audio du montage (assets/source.mp4) est écouté 2 fois en verbatim (2e écoute décalée de 0,7 s) ;
+  seuls les mots entendus les DEUX fois comptent. Alignement : mot entendu absent -> ajouté ; ordre et horaires = ceux
+  de l'écoute (la transcription normale est en avance de ~0,2 s) ; orthographe des sous-titres gardée pour les mots
+  communs (noms propres) ; mot sous-titré non entendu au début, à la fin ou à ±0,4 s d'un raccord -> retiré. Contrôle
+  final `missing` : rapport `clips/<clip>/captions_check.txt` (+ ajouts, - retraits, RESTE = écart non résolu).
+- Coût ≈ 2 écoutes de la durée du clip (~1 min pour 40 s), mises en cache (`heard_words.json`).
+
 ## « Euh » et blancs : `tighten` (demande d'Arthur, 07/10/2026 : « enlève les euh, sans couper trop, pas saccadé »)
 
 - Whisper n'écrit jamais les « euh » : ils sont dans les trous entre mots. `python -m clipper tighten` (clipper/tighten.py)
@@ -232,7 +335,7 @@ tôt, un bégaiement au début — rajoute une vérification »)
 
 Chaque modification demandée par Arthur se généralise : la traduire en réglage de marque/preset ou en code, la noter ici
 (avec date et verbatim) et dans la mémoire, pour que les prochains épisodes en profitent sans qu'il ait à le redemander.
-Exemples du 07/10/2026 : fin trop rapide -> `outro.duration: 3,5` ; « euh » -> `tighten` ; lien d'aperçu vers un autre
+Exemples du 07/10/2026 : fin trop rapide -> `outro.duration: 3,5` (puis 7 s le 08/10) ; « euh » -> `tighten` ; lien d'aperçu vers un autre
 short -> `preview` libère le port ; 16:9 inutile -> `formats: ["9x16"]` ; téléchargement coupé -> `fetch`.
 
 ## Fluidité des coupes (demande d'Arthur, 05/10/2026 : « moins de cuts, pas trop couper, plus fluide »)

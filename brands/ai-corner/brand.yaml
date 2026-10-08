@@ -53,7 +53,8 @@ fonts:
 
 outro:
   enabled: true
-  duration: 3.5              # animation de la charte accélérée ×2,9 (06/10/2026 : ×5 sur 2 s jugé trop rapide)
+  duration: 7.0              # animation de la charte accélérée ×1,4. 06/10 : ×5 sur 2 s trop rapide -> 3,5 s ;
+                             # 08/10 (équipe via Arthur : « trop rapide, x2 sur la longueur de l'animation ») -> 7 s
   background: video          # animation officielle AI Partners (lignes « montagne » qui se dessinent)
   video: "outro_anim.mov"    # 2800×1122, 10 s -> recadrée au format et accélérée pour durer `duration`
   video_focus_x: 0.62        # centre du recadrage vertical sur le motif
@@ -139,10 +140,12 @@ teaser:
     highlight_keywords: true
     keyword_pop: true
     # contraste renforcé (retour d'Arthur, 08/10/2026 : « accentue l'ombre autour des sous-titres ») : contour sombre
-    # derrière les lettres (paint-order) + halo serré + ombre portée large
-    text_shadow: "0 0 4px rgba(0,0,0,.95), 0 0 14px rgba(0,0,0,.8), 0 6px 0 rgba(0,0,0,.55), 0 12px 36px rgba(0,0,0,.85)"
-    stroke_width: 7
-    stroke_color: "rgba(0,0,0,.72)"
+    # derrière les lettres (paint-order) + halo serré + ombre portée large.
+    # Ombre en dégradé (retour d'Arthur, 08/10/2026 : « fais un effet plus dégradé sur l'ombre autour ») : plus de
+    # contour net ni d'ombre portée dure ; halo en couches de flou croissant et d'opacité décroissante, contour fin.
+    text_shadow: "0 0 2px rgba(0,0,0,.6), 0 0 8px rgba(0,0,0,.55), 0 0 18px rgba(0,0,0,.45), 0 2px 32px rgba(0,0,0,.4), 0 4px 56px rgba(0,0,0,.35), 0 6px 90px rgba(0,0,0,.25)"
+    stroke_width: 3
+    stroke_color: "rgba(0,0,0,.4)"
     align: left
     stagger_lines: true
     stagger_offset: 0.12
@@ -153,6 +156,11 @@ teaser:
     dialogue_dashes: false
     max_words_per_group: 6
     min_group_duration: 0.5
+  audio:
+    # musique d'ambiance du teaser (demande d'Arthur, 08/10/2026 : « met-la vraiment en léger, faut qu'on entende
+    # surtout les invités ») : piste à -16 LUFS, gain 0,08 ≈ -22 dB sous les voix ; s'éteint pendant la carte de fin
+    music: "music/driving_momentum.mp3"   # composée par Arthur (libre de droits, versionnée)
+    music_volume: 0.08
   montage:
     join_transition: cut     # coupes sèches entre extraits (débit continu)…
     dynamic_fx: true         # …zoom lent alterné (6 %) sur chaque plan + zoom-flou sur 1 changement d'extrait sur 3
@@ -192,6 +200,9 @@ teaser:
 
 # Logo incrusté en haut à droite pendant tout l'épisode complet (retour d'Arthur, 07/10/2026 : « plus gros en haut à
 # droite » — E20 l'avait, en tout petit). Fractions de la largeur de l'image ; même réglage que le teaser ci-dessus.
+episode_end:                 # fin de l'épisode complet : animation AI Partners + logo (comme E20)
+  duration: 8.0              # 4 s jugé trop rapide (équipe via Arthur, 08/10/2026 : « x2 sur la longueur ») -> 8 s
+
 episode_logo:
   file: "logo.png"
   width: 0.20

@@ -146,6 +146,131 @@ def _refine_boundaries(words: list[dict], reach: int = 3) -> None:
             i += 1
 
 
+def _voice_blocks(wav: Path, a: float, b: float, min_gap: int = 3) -> list[tuple[float, float]]:
+    """Blocs de voix du micro dans [a, b] séparés par des creux >= min_gap trames de 20 ms (< 25 % du niveau de parole)."""
+    from .tighten import _rms
+    r = _rms(wav, a, b)
+    if not len(r):
+        return []
+    on = r > 0.25 * max(1e-6, float(np.percentile(r, 90)))
+    blocks, k = [], 0
+    while k < len(on):
+        if not on[k]:
+            k += 1
+            continue
+        j = k
+        while j < len(on) and (on[j] or (j + min_gap < len(on) and on[j:j + min_gap].any())):
+            j += 1
+        blocks.append((a + k * 0.02, a + j * 0.02))
+        k = j
+    return blocks
+
+
+def _lead_junk(text: str) -> int:
+    """Nombre de mots parasites en tête de ce qu'on entend après un raccord : « euh », mot répété (« pour, pour »)."""
+    from .verify import FILLERS, _norm
+    toks = [_norm(t) for t in text.split()]
+    toks = [t for t in toks if t]
+    n = 0
+    while n < len(toks) - 1:
+        if toks[n] in FILLERS or toks[n] == toks[n + 1]:
+            n += 1
+        else:
+            break
+    return n
+
+
+def _onset(wav: Path, a: float, b: float, rel: float = 0.3) -> float | None:
+    """Premier instant de [a, b] où la voix dépasse `rel` × son niveau de parole (trames de 20 ms)."""
+    from .tighten import _rms
+    r = _rms(wav, a, b)
+    if not len(r):
+        return None
+    lvl = float(np.percentile(r, 90))
+    k = np.nonzero(r > rel * lvl)[0]
+    return a + 0.02 * int(k[0]) if len(k) else None
+
+
+def clean_join_starts(ranges: list[tuple[float, float]], wav: Path, cfg=None, log=print,
+                      max_pause: float = 1.2, lead: float = 0.28, words: list[dict] | None = None) -> list[tuple[float, float]]:
+    """Chaque reprise après une coupe de dérushage démarre proprement (retour d'Arthur, 08/10/2026 : « vérifie bien
+    plusieurs fois qu'il n'y a pas de problème de coupure, de euh laissé au montage » — E22 reprenait sur « Euh, pour,
+    pour finir » et laissait 3 s de blanc à un autre raccord).
+    0. Reprise au milieu d'un son : reculée au creux qui le précède (on entend ce son en entier, puis 1.).
+    0b. Voix entre la reprise et le 1er mot de la transcription normale (qui omet les hésitations) : parasite ->
+       reprise `lead` s avant l'attaque de ce mot. C'est le signal le plus fiable.
+    1. Mots parasites en tête (« euh », mot répété) : on écoute la reprise deux fois avec un contexte différent
+       (`verify.audit`, le verbatim varie d'une écoute à l'autre : on garde le pire), on saute autant de blocs de voix
+       du micro et on coupe au point le plus silencieux avant le bloc suivant.
+    2. Blanc au raccord (fin de la phrase d'avant -> coupe -> reprise de la voix) > max_pause : la reprise est avancée
+       à `lead` s avant la voix (respiration naturelle).
+    La reprise corrigée est réécoutée ; si elle n'est pas propre, on garde l'original."""
+    import tempfile
+
+    from .verify import _quiet, audit
+    out = [list(r) for r in ranges]
+    tmp = Path(tempfile.gettempdir()) / "clipper_join_audit.wav"
+
+    def junk(i: int, st: float) -> int:
+        worst = 0
+        for tail, head in (((3.0, 6.0), (10.0, 10.0)) if i else ((0.0, 6.0), (0.0, 10.0))):
+            segs = ([{"start": out[i - 1][1] - tail, "end": out[i - 1][1]}] if i else []) + [{"start": st, "end": st + head}]
+            h = audit(segs, wav, tmp, cfg)
+            worst = max(worst, _lead_junk(h.split("‖")[-1] if i else h))
+        return worst
+
+    for i in range(len(out)):
+        st = out[i][0]
+        # reprise au milieu d'un son (le micro parle déjà à la coupe) : on recule au creux qui précède ce son
+        bl0 = [bl for bl in _voice_blocks(wav, st - 1.5, st + 1) if bl[0] < st - 0.03 < bl[1]]
+        if bl0 and i:
+            new = _quiet(wav, bl0[0][0] - 0.25, bl0[0][0])
+            log(f"  reprise {i + 1} : coupe au milieu d'un son ({st:.2f}) -> {new:.2f} s, avant ce son")
+            st = new
+        # hésitation non transcrite : la transcription normale n'écrit jamais « euh / ben, je… » ; toute voix entre la
+        # reprise et le 1er mot transcrit est donc parasite (E22 41:06 : « Euh… ben, je… » 0,9 s + 2,6 s de blanc)
+        if words and i:
+            nxt = next((w for w in words if float(w["s"]) >= st - 0.05 and str(w["w"]).strip("?.!,… ")), None)
+            if nxt and float(nxt["s"]) - st > 0.5:
+                pre = [bl for bl in _voice_blocks(wav, st, float(nxt["s"]) - 0.3) if bl[1] - bl[0] >= 0.08]
+                on = _onset(wav, float(nxt["s"]) - 0.4, float(nxt["s"]) + 0.8)
+                if pre and on and on - lead > st:
+                    log(f"  reprise {i + 1} : hésitation non transcrite avant « {nxt['w']} » -> reprise {st:.2f} -> {on - lead:.2f} s")
+                    st = on - lead
+        n = junk(i, st)
+        if n:
+            blocks = [bl for bl in _voice_blocks(wav, st - 0.3, st + 4) if bl[1] > st + 0.04]
+            if len(blocks) > n:
+                new = max(blocks[n - 1][1], min(_quiet(wav, blocks[n - 1][1], blocks[n][0]), blocks[n][0] - 0.05))
+                if junk(i, new) == 0:
+                    log(f"  reprise {i + 1} : {st:.2f} -> {new:.2f} s ({n} mot(s) parasite(s) retiré(s))")
+                    st = new
+                else:
+                    log(f"  ⚠ reprise {i + 1} ({_ts(st)}) : correction non concluante à l'écoute — à vérifier")
+            else:
+                log(f"  ⚠ reprise {i + 1} ({_ts(st)}) : {n} mot(s) parasite(s), découpage introuvable — à vérifier")
+        if i:
+            before = [bl for bl in _voice_blocks(wav, out[i - 1][1] - 3, out[i - 1][1]) if bl[1] - bl[0] >= 0.1]
+            after = [bl for bl in _voice_blocks(wav, st, st + 5) if bl[1] - bl[0] >= 0.1]
+            if before and after:
+                pause = (out[i - 1][1] - before[-1][1]) + (after[0][0] - st)
+                if pause > max_pause and after[0][0] - lead > st:
+                    new = max(st, after[0][0] - lead)
+                    log(f"  reprise {i + 1} : blanc de {pause:.1f} s au raccord -> reprise {st:.2f} -> {new:.2f} s")
+                    st = new
+                    if junk(i, st):
+                        log(f"  ⚠ reprise {i + 1} ({_ts(st)}) : encore un mot parasite à l'écoute — à vérifier")
+        out[i][0] = round(st, 2)
+    # fins de partie (avant chaque coupe et fin de l'épisode) : jamais pendant que quelqu'un parle + respiration
+    from .verify import pad_end
+    for i in range(len(out)):
+        e = pad_end(wav, out[i][1])
+        if e > out[i][1] + 0.02:
+            log(f"  fin de partie {i + 1} : {out[i][1]:.2f} -> {e:.2f} s (voix pas finie / respiration)")
+            out[i][1] = e
+    return [tuple(r) for r in out]
+
+
 def _snap_gap(words: list[dict], t: float, lo: float, hi: float) -> float:
     """Instant de coupe dans le silence entre deux mots le plus proche de t (dans [lo, hi])."""
     best, score = t, 1e9
@@ -646,9 +771,15 @@ def _normalize(src: Path, dst: Path, size: tuple[int, int], fps: int, proxy: boo
     return dst
 
 
-def end_card(brand: Brand, dst: Path, size: tuple[int, int], fps: int, proxy: bool, duration: float = 4.0) -> Path:
+def end_duration(brand: Brand) -> float:
+    """Durée de la fin de l'épisode (`episode_end.duration` de brand.yaml ; 8 s = animation 2× plus lente qu'à 4 s)."""
+    return float((brand.cfg.get("episode_end") or {}).get("duration") or 4.0)
+
+
+def end_card(brand: Brand, dst: Path, size: tuple[int, int], fps: int, proxy: bool, duration: float | None = None) -> Path:
     """Fin de l'épisode (comme E20) : l'animation AI Partners + logo blanc centré."""
     from .media import prepare_outro_video
+    duration = duration or end_duration(brand)
     o = brand.cfg.outro
     W, H = size
     anim = dst.with_name("end_anim.mp4")
@@ -656,8 +787,9 @@ def end_card(brand: Brand, dst: Path, size: tuple[int, int], fps: int, proxy: bo
     logo = brand.asset(o.get("logo_file") or "logo.png")
     lw = int(W * 0.34)
     enc = ["-preset", "ultrafast", "-crf", "28"] if proxy else ["-preset", "medium", "-crf", "16"]
-    run([FFMPEG, "-y", "-v", "error", "-i", str(anim), "-i", str(logo), "-filter_complex",
-         f"[1:v]scale={lw}:-1,format=rgba,fade=t=in:st=0.4:d=0.6:alpha=1[l];[0:v][l]overlay=(W-w)/2:(H-h)/2,format=yuv420p[v]",
+    # -loop 1 : sans lui le PNG n'a qu'une image (t = 0, encore transparente avant le fondu) répétée -> logo invisible
+    run([FFMPEG, "-y", "-v", "error", "-i", str(anim), "-loop", "1", "-i", str(logo), "-filter_complex",
+         f"[1:v]scale={lw}:-1,format=rgba,fade=t=in:st=0.4:d=0.6:alpha=1[l];[0:v][l]overlay=(W-w)/2:(H-h)/2:shortest=1,format=yuv420p[v]",
          "-map", "[v]", "-an", "-r", str(fps), "-g", str(fps * 2), "-c:v", "libx264", *enc,
          "-video_track_timescale", "12288", str(dst)])
     return dst
@@ -665,7 +797,9 @@ def end_card(brand: Brand, dst: Path, size: tuple[int, int], fps: int, proxy: bo
 
 def assemble(parts_video: list[Path], parts_audio: list[Path | float], dst: Path, work: Path) -> Path:
     """Concatène les vidéos (sans réencodage) ; audio = morceaux concaténés (un nombre = silence de n s), volume
-    normalisé sur l'ensemble (-16 LUFS, le niveau de l'invité qui baisse quand son micro « tombe » est rattrapé)."""
+    normalisé PARTIE PAR PARTIE au même niveau (-16 LUFS ; dans le corps, le niveau de l'invité qui baisse quand son
+    micro « tombe » est rattrapé). Retour d'Arthur, 08/10/2026 : « le teaser avait un volume trop fort par rapport au
+    reste » — teaser rendu à -17 LUFS, micro brut à -37 : un loudnorm unique sur l'ensemble ne rattrapait pas l'écart."""
     lst = work / "final_concat.txt"
     lst.write_text("".join(f"file '{p.resolve().as_posix()}'\n" for p in parts_video), encoding="utf-8")
     vid = work / "final_video.mp4"
@@ -676,10 +810,11 @@ def assemble(parts_video: list[Path], parts_audio: list[Path | float], dst: Path
             inputs += ["-f", "lavfi", "-t", f"{a:.3f}", "-i", "anullsrc=r=48000:cl=stereo"]
         else:
             inputs += ["-i", str(a)]
-        chain.append(f"[{i}:a]aresample=48000,aformat=channel_layouts=stereo[x{i}]")
+        norm = "" if isinstance(a, (int, float)) else ",loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000"
+        chain.append(f"[{i}:a]aresample=48000,aformat=channel_layouts=stereo{norm}[x{i}]")
     n = len(parts_audio)
     graph = ";".join(chain) + ";" + "".join(f"[x{i}]" for i in range(n)) + \
-        f"concat=n={n}:v=0:a=1,loudnorm=I=-16:TP=-1.5:LRA=11[a]"
+        f"concat=n={n}:v=0:a=1[a]"
     aud = work / "final_audio.wav"
     run([FFMPEG, "-y", "-v", "error", *inputs, "-filter_complex", graph, "-map", "[a]", "-ar", "48000", str(aud)])
     run([FFMPEG, "-y", "-v", "error", "-i", str(vid), "-i", str(aud), "-map", "0:v", "-map", "1:a", "-c:v", "copy",

@@ -22,7 +22,6 @@ from .media import (concat_segments, cut_segment, extract_frame, make_blurred_st
                     reframe_video)
 from .multicam import cut_multicam, load_spec as load_multicam
 from .reframe import build_plan
-from .transcribe import words_between
 
 console = Console()
 HYPERFRAMES_VERSION = "0.8.46"
@@ -445,7 +444,20 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
             stamp_f.write_text(stamp, encoding="utf-8")
     # l'audio sous la carte de fin s'arrête avant que le locuteur suivant reprenne
     tail = float(segments[-1].get("tail_silence", clip.get("tail_silence", 5.0)))
-    A_fade = max(0.08, min(float(cfg.outro.audio_fade), tail, outro_d)) if outro_d > 0 else 0.0
+    # silence réellement disponible, mesuré dans le son du montage (le `tail_silence` stocké date de la sélection et
+    # ne suit pas les recalages de fin) : le fondu finit AVANT le son suivant (short 1 E22 : « É(t) » 0,02 s après)
+    if outro_d > 0 and src_clip.exists():
+        import numpy as np
+
+        from .tighten import _rms
+        r = _rms(src_clip, max(0.0, D_speech - 1.5), D_speech + 1.0)
+        k0 = int(round(min(1.5, D_speech) / 0.02))
+        if len(r) > k0 + 1:
+            lvl = float(np.percentile(r[:k0], 90)) if k0 > 5 else 0.0
+            nxt = next((j for j in range(k0, len(r)) if r[j] > 0.2 * lvl), None) if lvl > 0 else None
+            if nxt is not None:
+                tail = min(tail, max(0.0, (nxt - k0) * 0.02 - 0.01))
+    A_fade = max(0.02, min(float(cfg.outro.audio_fade), tail, outro_d)) if outro_d > 0 else 0.0
     A_dur = round(D_speech + A_fade, 3)
     seg_info = probe(src_clip)
     if seg_info["duration"] < D_total - 0.05:
@@ -457,11 +469,38 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
     analysis = analyze(src_clip, cfg, proj / "analysis.json", force=force)
 
     # ---- 3. mots (temps relatifs au clip assemblé) ----
+    # un mot à cheval sur une coupe (« euh » retiré au milieu de « redéployer ») est gardé dans le morceau où on
+    # l'entend le plus (avant : seulement s'il tenait entier dans un morceau -> mots absents des sous-titres)
     words_rel = []
-    for sg, off in zip(segments, offsets):
-        for w in words_between(transcript, float(sg["start"]), float(sg["end"])):
-            words_rel.append({"w": w["w"], "s": round(off + w["s"] - float(sg["start"]), 3),
-                              "e": round(off + w["e"] - float(sg["start"]), 3)})
+    from .transcribe import all_words as _all_words
+    lo, hi = min(float(sg["start"]) for sg in segments), max(float(sg["end"]) for sg in segments)
+    for w in _all_words(transcript):
+        if w["e"] < lo - 0.05 or w["s"] > hi + 0.05:
+            continue
+        best, ov_best = None, 0.0
+        for sg, off in zip(segments, offsets):
+            a, b = float(sg["start"]), float(sg["end"])
+            ov = min(w["e"], b) - max(w["s"], a)
+            if w["e"] <= w["s"] and a - 0.05 <= w["s"] <= b + 0.05:
+                ov = 0.01
+            if ov > ov_best:
+                best, ov_best = (sg, off), ov
+        if best is None or ov_best < min(0.05, 0.3 * max(0.01, w["e"] - w["s"])):
+            continue
+        (sg, off), a, b = best, float(best[0]["start"]), float(best[0]["end"])
+        words_rel.append({"w": w["w"], "s": round(off + max(w["s"], a) - a, 3), "e": round(off + min(w["e"], b) - a, 3)})
+    words_rel.sort(key=lambda x: x["s"])
+    # double contrôle des sous-titres (retour d'Arthur, 08/10/2026 : « il oublie quelques mots des fois ») : le montage
+    # est écouté deux fois ; tout mot entendu les deux fois doit être sous-titré (clipper/caption_check.py)
+    if cfg.captions.get("double_check", True) and src_clip.exists():
+        from .caption_check import heard_words, missing, reconcile
+        heard = heard_words(src_clip, D_speech, cfg, proj / "heard_words.json")
+        words_rel, cnotes = reconcile(words_rel, heard, bounds=[0.0, *junctions, D_speech])
+        left = missing(words_rel, heard)
+        report = cnotes + [f"RESTE : {m}" for m in left]
+        (proj / "captions_check.txt").write_text("".join(f"{x}\n" for x in report), encoding="utf-8")
+        console.print(f"  sous-titres : {len(cnotes)} correction(s) d'après l'écoute"
+                      + (f", [yellow]{len(left)} écart(s) restant(s)[/yellow]" if left else ", aucun mot entendu oublié"))
     turns_rel = []
     for tr in clip.get("turns", []):
         r = abs_to_rel(float(tr["at"]))
@@ -725,6 +764,12 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
                             "cams": [full]}]
             console.print(f"  {fmt:5s} recadrage FFmpeg → {ref_name}")
 
+        # flash / light leak SEULEMENT quand l'angle de caméra change au raccord (retour d'Arthur, 08/10/2026 : « des
+        # sortes de flashs lumineux de transition : il faut les mettre que quand tu changes d'angle de caméra ») ; un
+        # raccord sur la même caméra (« euh » retiré, passage enchaîné) reste une coupe nette. Mesure : différence
+        # d'image de part et d'autre du raccord (même caméra 0,5–7 ; autre caméra ≈ 50 sur le short 1 de E22).
+        thr = float(fcfg.montage.get("transition_min_diff", 25))
+        fx_junctions = [j for j in junctions if frame_diff(j) >= thr]
         html = tpl.render(
             lang=cfg.get("language", "fr"), title=f"{clip.get('title','')} · {fmt}", W=W, H=H, fps=int(cfg.fps),
             D_total=D_total, D_speech=D_speech, A_dur=A_dur, A_fade=round(A_fade, 3),
@@ -733,7 +778,7 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
             outro=Cfg(outro_ctx), hook=Cfg(hook_ctx), broll=Cfg(broll_ctx), brolls=brolls_fmt, music=music,
             guest_logo=Cfg(guest_logo_ctx), outro_start=outro_start,
             guest=clip.get("guest", ""), company=clip.get("company", ""),
-            junctions=junctions, join_transition=fcfg.montage.get("join_transition", "cut"), flash_color=fcfg.montage.get("flash_color", "#FFFFFF"),
+            junctions=fx_junctions, join_transition=fcfg.montage.get("join_transition", "cut"), flash_color=fcfg.montage.get("flash_color", "#FFFFFF"),
             split_divider=int(fcfg.framing.get("split_divider", 0)), split_divider_color=fcfg.framing.get("split_divider_color", "#FFFFFF"),
         )
         fmt_dir = proj / fmt

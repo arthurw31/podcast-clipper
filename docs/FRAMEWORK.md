@@ -12,16 +12,22 @@ flowchart TD
     B --> C{{"2 · Claude propose ~10 passages<br/>3 lectures en parallèle<br/>(cas concret · position tranchée · humain)<br/>puis un jury garde les 10 meilleurs"}}
     C --> D["3 · L'équipe choisit 5 passages<br/>+ demandes particulières<br/>« il faut le passage où il dit… »"]
     D --> E["Calage des coupes<br/>début et fin de phrase · contrôle mot à mot"]
-    E --> F["4 · Montage des 5 shorts<br/>recadrage vertical · logos · bulle-titre<br/>sous-titres · carte de fin animée"]
-    F --> V["4 · L'équipe regarde les shorts en aperçu instantané<br/>(lus en direct dans le navigateur, sans rendu)<br/>et demande ses retouches"]
-    V -->|retouche| F
+    E --> N["4 · Nettoyage à l'écoute (polish)<br/>blancs et « euh » retirés · vraies fins de phrase<br/>+ respiration · aucun mot perdu"]
+    N --> F["4 · Montage des 5 shorts<br/>recadrage vertical · logos · bulle-titre<br/>sous-titres vérifiés à l'écoute · carte de fin"]
+    F --> Q1["Contrôle 1 (automatique)<br/>raccords · fins · sous-titres complets · durée"]
+    Q1 --> P["Aperçus MP4 rapides"]
+    P --> Q2["Contrôle 2 (automatique)<br/>format · volume · planche d'images regardée"]
+    Q2 --> V["4 · Contrôle 3 : l'équipe regarde les aperçus MP4<br/>et demande ses retouches"]
+    V -->|retouche| N
     E --> G["4 · Rédaction des 5 posts LinkedIn<br/>méthode de la marque (posts.md)"]
-    V -->|validé| R["5 · Rendu final unique des 5 MP4<br/>1080×1920"]
+    V -->|validé| R["5 · Rendu final unique des 5 MP4<br/>1080×1920 + contrôle du fichier final"]
     R --> H["5 · Livraison<br/>5 MP4 + 5 posts prêts à publier"]
     G --> H
 
     classDef human fill:#258AF3,color:#fff,stroke:#151D53;
+    classDef check fill:#E8F1FE,stroke:#258AF3;
     class D,V human;
+    class Q1,Q2 check;
 ```
 
 | Étape | Qui | Durée (PC sans GPU, épisode de 50 min) |
@@ -29,12 +35,18 @@ flowchart TD
 | 1. Dépôt + transcription | vous déposez (ou collez le lien Dropbox), Claude télécharge et transcrit | ≈ 20 min (automatique) + téléchargement |
 | 2. 10 propositions | Claude | ≈ 8 min |
 | 3. Choix + demandes | **vous** | 2 min |
-| 4. Montage + aperçu + posts | Claude monte, **vous regardez et validez** | ≈ 4 min de montage (≈ 10 en 4K), aperçu instantané, ≈ 1 min par retouche |
-| 5. Rendu final + livraison | Claude | ≈ 30–40 min pour 5 shorts, une seule fois, en arrière-plan |
+| 4. Nettoyage + montage + contrôles + aperçus + posts | Claude prépare, **vous regardez les aperçus et validez** | ≈ 6–8 min par short (tout compris, en arrière-plan), ≈ 3 min par retouche |
+| 5. Rendu final + contrôle + livraison | Claude | ≈ 10 min par short, 2 en parallèle, une seule fois |
 
 **Aperçu ou rendu ?** Un short est d'abord une « page » (vidéo + sous-titres, logos, transitions programmés par
-dessus). L'**aperçu** la joue en direct dans le navigateur : immédiat, idéal pour vérifier et corriger. Le
-**rendu** la transforme en fichier MP4 image par image (≈ 7 min par short) : on ne le fait qu'une fois, à la fin.
+dessus). L'**aperçu MP4** en est une version rapide (image un peu saccadée, 12 images/s) à ouvrir dans votre lecteur
+vidéo habituel : idéal pour vérifier le contenu. Le **rendu** final la transforme en MP4 net et fluide image par image
+(≈ 10 min par short) : on ne le fait qu'une fois, après votre validation.
+
+**Trois contrôles avant toute livraison.** Chaque retour de l'équipe est devenu une vérification automatique :
+aucun mot coupé à un raccord, aucune fin de phrase coupée (et un petit temps après), jamais le début de la phrase
+suivante, « euh » retirés sans perdre un mot, sous-titres vérifiés à l'écoute (deux écoutes indépendantes), flash
+lumineux seulement aux changements de plan, volume -16 LUFS. Rapport par short : `output/…/qa/`.
 
 ## Ce qui se passe à l'intérieur
 

@@ -10,7 +10,9 @@ schéma [docs/FRAMEWORK.md](../../../docs/FRAMEWORK.md)). L'utilisateur est un m
 il ne tape aucune commande, tu fais tout et tu lui parles simplement (pas de jargon technique).
 
 Le workflow a **deux moments où l'humain décide** : le choix des passages (étape 3) et la validation des shorts
-en aperçu (étape 4). Ne monte rien avant le choix, ne rends rien avant la validation.
+en aperçu MP4 (étape 4). Ne monte rien avant le choix, ne rends rien avant la validation. Entre les deux, chaque
+vidéo passe **trois contrôles** : automatique sur le montage (`qa`), automatique sur l'aperçu (`qa --render` +
+planche d'images que tu regardes), puis l'humain.
 
 ## 0. Environnement (une fois par machine)
 
@@ -115,27 +117,6 @@ Pour chaque demande particulière :
 - « pas ce sujet / pas ce chiffre » → retire ou recoupe le segment concerné.
 - un changement de titre de bulle → `hook_title` dans `clips.json`.
 
-Puis **retire les « euh »** (jamais coupés par Whisper, donc invisibles dans le texte) :
-
-```bash
-python -m clipper tighten --brand <marque> --input <fichier>
-```
-
-Seuls les vrais trous (> 0,6 s) sont retirés, pour ne pas rendre le short saccadé ; dis à l'utilisateur ce qui a été
-retiré et à quels instants écouter les raccords (tu ne peux pas écouter).
-
-Puis **contrôle « à l'oreille »** (obligatoire avant `build`) : chaque passage est retranscrit en VERBATIM (Whisper
-poussé à écrire les « euh », bégaiements et mots coupés), puis corrigé en 2 passes (« euh », « enfin » entre virgules
-et répétitions retirés, début qui mange un mot avancé, fin coupée trop tôt prolongée — chaque coupe posée au point le
-plus silencieux du son). Un passage qui garde un mot coupé revient à sa coupe d'origine (jamais de mot amputé) :
-
-```bash
-python -m clipper verify --brand <marque> --input <fichier> --fix
-```
-
-Le teaser de l'épisode complet passe par le même contrôle automatiquement (`episode-plan`) ; ses extraits fautifs
-sont remplacés par la réserve. Dis à l'utilisateur ce qui a été corrigé et ce qui reste (« après correction : … »).
-
 Puis **vérifie chaque coupe mot à mot** (règle absolue : ne jamais couper une pensée) :
 
 ```bash
@@ -143,29 +124,45 @@ python -m clipper check --brand <marque> --input <fichier>
 ```
 
 Chaque passage doit commencer au début d'une phrase et finir sur une fin de phrase complète ; jamais de mot du
-passage suivant (« après » ne doit pas être entamé). Corrige dans `clips.json` et relance `check`.
+passage suivant. Corrige dans `clips.json` et relance `check`.
 
-## 4. Monter les 5 shorts, les faire valider en aperçu, rédiger les posts
+## 4. Nettoyer, monter et contrôler — `polish` (une seule commande, contrôles à chaque étape)
 
 ```bash
-python -m clipper build   --brand <marque> --input <fichier>          # ≈ 1 min/short en 1080p, 2-3 min en 4K (2 en parallèle)
-python -m clipper preview --brand <marque> --input <fichier> --no-open
+python -m clipper polish --brand <marque> --input <fichier> --only 1,2,3,4,5      # arrière-plan, ≈ 6–8 min/short
 ```
 
-`build` doit finir sur « lint OK ». `preview` lance un aperçu **instantané, sans rendu** pour chaque short
-(adresses affichées par la commande, port 3002 pour le n° 1, 3003 pour le n° 2, … — utilise-les telles quelles, avec
-leur `?v=…`, sinon le navigateur peut réafficher un ancien short gardé en cache) : ouvre-les dans le navigateur intégré
-(Claude Browser `navigate`), place-toi à 3 s pour vérifier logos / bulle / sous-titres, puis **donne toujours à
-l'utilisateur la liste des liens cliquables**, un par short, avec le titre de la bulle comme texte du lien :
+`polish` enchaîne, pour chaque short, dans UN seul processus (Whisper chargé une fois) :
 
-> 1. [Short 1 : <titre de la bulle>](http://localhost:3002/?v=…#project/9x16)
-> 2. [Short 2 : <titre de la bulle>](http://localhost:3003/?v=…#project/9x16)
+1. `tighten` — blancs et « euh » entre les mots (trous > 0,6 s ; en dessous = respiration, on garde) ;
+2. `verify --fix` — contrôle « à l'oreille » : vraies fins de phrase (ponctuation stable + vraie pause dans le son),
+   bords recalés sur la voix, « euh » isolés retirés, et **chaque fin attend la fin de la voix + ~0,35 s de
+   respiration, sans jamais entendre le début de la phrase suivante** (`verify.pad_end`) ;
+3. `fillers` — « euh » collés aux mots (voyelles tenues détectées dans le son) ; toutes les coupes d'un passage
+   validées en une écoute, sinon une par une : jamais un mot perdu, jamais un raccord dans un mot ;
+4. `build` — montage ; les **sous-titres sont contrôlés à l'écoute** : le montage est écouté 2 fois, tout mot entendu
+   les 2 fois est sous-titré, les bouts de phrase non entendus près d'un raccord sont retirés
+   (`clips/<clip>/captions_check.txt`) ; flash lumineux seulement quand l'angle de caméra change ;
+5. `qa` — **1er contrôle** (rapport `output/<marque>/<episode>/qa/clip_NN.md`) : raccords à l'écoute, fins jamais
+   pendant la voix, début de la phrase suivante jamais entendu, sous-titres complets, composition valide, durée ;
+   un ÉCHEC arrête la chaîne (à corriger, puis relancer `polish --only N`) ;
+6. aperçus **MP4** (12 i/s, brouillon, 2 à la fois ; ≈ 2–3 min/short) dans `output/…/apercus/` ;
+7. `qa --render` — **2e contrôle** sur l'aperçu : format, durée, volume -16 LUFS, et une **planche d'images**
+   (`qa/qa_images_NN.png`) que tu DOIS regarder (Read) avant d'envoyer le lien : visages cadrés, logos, bulle,
+   sous-titres, carte de fin.
+
+Les étapes 1–3 déjà faites sont sautées (`checks` dans `clips.json`) : relancer `polish` après une retouche ne
+recoupe rien deux fois. `--redo` repart des passages d'origine (`clips_before_tighten.json`).
+
+Puis le **3e contrôle, humain** : envoie à l'utilisateur les liens cliquables vers les MP4 (jamais seulement le
+Studio HyperFrames, qui bugue chez Arthur), un par short, avec le titre de la bulle, plus ce que le rapport `qa`
+signale (ATTENTION) et les instants à écouter de près :
+
+> 1. [Short 1 : <titre de la bulle>](output/<marque>/<episode>/apercus/clip_01_…_9x16_apercu.mp4)
+> 2. [Short 2 : <titre de la bulle>](output/<marque>/<episode>/apercus/clip_02_…_9x16_apercu.mp4)
 > …
 >
-> Sur chaque page : ▶ sous l'image pour lire, icône plein écran juste à droite. Dites-moi ce que vous voulez changer.
-
-(Le panneau du navigateur intégré peut être replié : les liens s'ouvrent aussi dans le navigateur habituel.) Si le navigateur intégré n'est pas disponible, relance `preview` sans `--no-open`
-(ouverture dans le navigateur du PC).
+> Aperçus rapides (image un peu saccadée, normal) : dites-moi ce que vous voulez changer.
 
 Pendant qu'il regarde, rédige les posts (ils ne dépendent pas du rendu) :
 
@@ -177,35 +174,43 @@ Les posts suivent `brands/<marque>/posts.md` (méthode « post d'un short » : a
 développement concret, chute, CTA ; anglais pour AI Corner, sans hashtags). Relis-les : rien d'inventé (chiffre,
 exemple, citation absents du short), deux posts ne commencent pas pareil.
 
-Retouches demandées sur l'aperçu : modifie `clips.json` (passages, `hook_title`) ou la config de la marque, puis
-`build --only N` ; l'aperçu se recharge tout seul. Recommence jusqu'à ce que l'utilisateur valide **tous** les shorts.
-Ne lance jamais le rendu final avant cette validation explicite.
+Retouches : modifie `clips.json` (passages, `hook_title`) ou la config de la marque, puis `polish --only N`. **Chaque
+retour qui vaut pour la suite devient une règle durable** (code ou config + CLAUDE.md + mémoire), avec la date et
+la phrase de l'utilisateur. Recommence jusqu'à ce que l'utilisateur valide **tous** les shorts. Jamais de rendu
+final avant cette validation explicite.
 
-## 5. Rendu final et livraison
+## 5. Rendu final, dernier contrôle et livraison
 
 ```bash
-python -m clipper render  --brand <marque> --input <fichier> --formats 9x16   # ≈ 6-8 min/short, 2 en parallèle : arrière-plan
-python -m clipper preview --brand <marque> --input <fichier> --stop   # arrête les aperçus
+python -m clipper render --brand <marque> --input <fichier> --formats 9x16 --only N    # ≈ 10 min/short, 2 en parallèle : arrière-plan
+python -m clipper qa     --brand <marque> --input <fichier> --only N --render          # contrôle du MP4 final + planche d'images
 ```
 
-- Annonce la durée du rendu (≈ 30–40 min pour 5 shorts) ; l'utilisateur peut faire autre chose.
-- Envoie les 5 MP4 (`output/<marque>/<episode>/renders/`) avec SendUserFile, dans l'ordre.
-- Colle dans le chat, pour chaque short : le titre, la durée, puis son **post LinkedIn** prêt à copier.
-- Donne le chemin du dossier.
+- Ne réécrase jamais un MP4 déjà livré : renomme l'ancien (`…_v1_<date>.mp4`) avant le rendu (un fichier ouvert
+  dans le lecteur de l'utilisateur bloque l'écriture).
+- `qa --render` doit être OK (ou ATTENTION expliquée) ; regarde la planche d'images du MP4 final.
+- Envoie les MP4 (`output/<marque>/<episode>/renders/`) avec SendUserFile, dans l'ordre ; colle pour chaque short le
+  titre, la durée et son **post LinkedIn** prêt à copier ; donne le chemin du dossier.
 
 ## Épisode complet (rushs multicam -> épisode monté + teaser)
 
 Sur demande (« monte l'épisode en entier ») : `python -m clipper episode-plan --brand <m> --input <ep>.mp4 --guest … --company … --host "…"`,
 présente `episode_plan.md` (durée, coupes du dérushage, extraits du teaser) et demande validation ; puis
 `episode-render … --proxy` (aperçu 540p, ~15 min, à envoyer avec SendUserFile) ; après validation seulement,
-`episode-render …` (1080p, ~1 h, arrière-plan). Joindre `episode/description_youtube.md` (titre + chapitres).
+`episode-render …` (1080p, ~1 h, arrière-plan ; pour juger seulement teaser + raccord + volumes :
+`episode-render … --proxy --minutes 2`, ~5 min). Puis **`qa --episode`** : réécoute de chaque raccord DANS le MP4
+final (aucun « euh », aucun mot coupé, fin jamais pendant la voix), volumes teaser / épisode à ±1,5 LUFS, planche
+d'images (logo en haut à droite, carte de fin) à regarder. Joindre `episode/description_youtube.md` (titre +
+chapitres). Teaser et corps sont rendus séparément : retoucher le teaser ne refait pas le corps (~15 min au lieu d'1 h).
 
 ## Retouches courantes
 
 | Demande | Action |
 | --- | --- |
-| « coupe trop tôt / trop tard » | ajuster `segments` dans `clips.json`, `check`, `build --only N` (l'aperçu se recharge) ; après livraison : `render --only N --force` |
-| « autre titre dans la bulle » | `hook_title` dans `clips.json`, `build --only N` ; après livraison : `render --only N --force` |
+| « coupe trop tôt / trop tard » | ajuster `segments` dans `clips.json`, `check`, `polish --only N` ; après livraison : renommer l'ancien MP4, `render --only N`, `qa --render --only N` |
+| « autre titre dans la bulle » | `hook_title` dans `clips.json`, `polish --only N` ; après livraison : idem |
+| « il reste des euh » | `polish --only N --redo` ; si un « euh » précis reste, le signaler (instant) : seuil de `fillers.held_vowels` |
+| « il manque des mots dans les sous-titres » | lire `clips/<clip>/captions_check.txt` (RESTE = écart) ; `captions.double_check` doit être actif |
 | « c'est saccadé » | ne pas ajouter de coupes : voir `framing` (max_shot_len, min_reframe_len) dans `brand.yaml` |
 | « refais le post » | `posts --only N --force` (ajouter une consigne dans `posts.md` si c'est un défaut récurrent) |
 | « nouvelle marque / autre podcast » | `python -m clipper new-brand <slug>`, puis brand.yaml, guidelines.md, posts.md (voir README) |
