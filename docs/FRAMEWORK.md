@@ -4,6 +4,8 @@ Un épisode entier entre, cinq shorts verticaux montés et leurs posts LinkedIn 
 répétitif (transcrire, repérer, couper, monter, rédiger) ; l'équipe garde les décisions éditoriales :
 **quels passages**, **ce qu'il faut absolument inclure**, et la **validation des shorts** en aperçu avant le rendu final.
 
+> Ce qui a été validé (et ce qu'il faut éviter) est résumé dans [BONNES_PRATIQUES.md](BONNES_PRATIQUES.md).
+
 ## Le workflow en 5 étapes
 
 ```mermaid

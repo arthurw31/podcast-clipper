@@ -14,6 +14,9 @@ Deux façons de l'utiliser :
   questions manquantes et fait tout ;
 - **en ligne de commande**, étape par étape.
 
+
+> **Bonnes pratiques validées** (sous-titres, coupes, shorts, teaser, épisode complet) : [docs/BONNES_PRATIQUES.md](docs/BONNES_PRATIQUES.md).
+
 ## Le workflow en 5 étapes
 
 ```mermaid

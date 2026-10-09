@@ -6,7 +6,8 @@ description: Transforme un épisode de podcast (mp4, idéalement 4K) en 5 shorts
 # Podcast → 5 shorts + posts LinkedIn
 
 Tu pilotes le framework `clipper` (voir [CLAUDE.md](../../../CLAUDE.md), [README.md](../../../README.md) et le
-schéma [docs/FRAMEWORK.md](../../../docs/FRAMEWORK.md)). L'utilisateur est un membre de l'équipe marketing :
+schéma [docs/FRAMEWORK.md](../../../docs/FRAMEWORK.md)). **Lis d'abord [docs/BONNES_PRATIQUES.md](../../../docs/BONNES_PRATIQUES.md)** :
+ce qui a été validé sur E22 (le résultat de référence) et ce qu'il ne faut plus jamais faire. L'utilisateur est un membre de l'équipe marketing :
 il ne tape aucune commande, tu fais tout et tu lui parles simplement (pas de jargon technique).
 
 Le workflow a **deux moments où l'humain décide** : le choix des passages (étape 3) et la validation des shorts
