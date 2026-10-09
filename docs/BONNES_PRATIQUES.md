@@ -5,8 +5,8 @@ Ce qu'Arthur et l'équipe ont validé sur E22 (teaser, épisode complet, short 1
 dit *quoi* et *pourquoi* ; le *comment* (code, réglages) est dans [CLAUDE.md](../CLAUDE.md), le pas à pas dans le skill
 [podcast-clips](../.claude/skills/podcast-clips/SKILL.md), le teaser dans [TEASER_FRAMEWORK.md](TEASER_FRAMEWORK.md).
 
-Résultat jugé « franchement plutôt bien » par Arthur (09/10/2026) : `output/ai-corner/e22-thomas-spitz/episode/`
-(`E22_teaser_final.mp4`, `E22_thomas-spitz_episode.mp4`) et `renders/clip_01_…_9x16.mp4` (style à reprendre).
+Résultat jugé « franchement plutôt bien » par Arthur (09/10/2026) : `output/ai-corner/e22-nicolas-comestaz-coty/episode/`
+(`E22_teaser_final.mp4`, `E22_nicolas-comestaz_coty_episode.mp4`) et `renders/clip_01_…_9x16.mp4` (style à reprendre).
 
 ## 1. Le son et les coupes (valable pour TOUT : shorts, teaser, épisode)
 

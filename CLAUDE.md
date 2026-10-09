@@ -120,7 +120,7 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
 - Références : `brands/ai-corner/references/thumbnails/` (+ README d'analyse). Gabarit : animateur à gauche / invité à
   droite détourés depuis LEUR caméra, studio flouté recoloré bleu, 2 icônes d'app 3D au centre (AI Partners / entreprise
   invitée `assets/guests/<entreprise>.svg|png`), titre 2 lignes Metropolis ExtraBold, une ligne sur bandeau bleu arrondi.
-- `python -m clipper thumbnail --brand ai-corner --input E22_thomas-spitz.mp4 [--n 4] [--title "l1 | *l2"]
+- `python -m clipper thumbnail --brand ai-corner --input E22_nicolas-comestaz_coty.mp4 [--n 4] [--title "l1 | *l2"]
   [--host-frame s] [--guest-frame s]` -> `output/…/miniatures/` (`variante_N.jpg` 1280×720, `_HD.png`, `planche.jpg`,
   `titres.md`). Invité/entreprise lus dans clips.json. ~5 min (détourage ≈ 45 s par photo, CPU).
 - `clipper/thumbnail.py` : images clés toutes les 8 s -> note YuNet (netteté, regard vers le centre, sourire) ->
@@ -156,8 +156,11 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
   E22 : Thomas 40:06, Nicolas 48:33. Si `claude -p` est indisponible (limite hebdo atteinte le 09/10), l'agent regarde
   les planches et écrit lui-même `work/thumbnail/jury_v2.json` ({"host": [n°…], "guest": [n°…]}).
 - `cv2.imread` ne lit pas les chemins accentués (« Création… ») : `score_frame` lit avec `np.fromfile` + `imdecode`.
-- Les rushs E22 sont nommés « thomas-spitz » alors que Thomas Spitz est l'ANIMATEUR (CEO AI Partners, toujours là) ;
-  l'invité est Nicolas Comestaz (Coty). Nommer les prochains épisodes d'après l'invité : `E23_<invite>_<entreprise>`.
+- Nommage des épisodes : **d'après l'INVITÉ**, `E<n>_<prenom-nom-invite>_<entreprise>` (E20 `thierry-champeroux_maif`,
+  E21 `quentin-amaudry_mendo`, E22 `nicolas-comestaz_coty`) — jamais d'après Thomas Spitz, l'animateur (CEO AI
+  Partners, présent dans tous les épisodes). E22 était nommé « thomas-spitz » : renommé le 09/10/2026 (demande
+  d'Arthur, « pour être cohérent avec ce qu'on faisait avant ») — sources, dossier `output/…/e22-nicolas-comestaz-coty`,
+  fichiers et chemins dans les JSON ; jonctions `assets/` des projets recréées (cible absolue).
 
 ## Rushs multicam (E22, 06/10/2026 : l'équipe livre 3 caméras + 1 WAV au lieu de l'épisode monté)
 

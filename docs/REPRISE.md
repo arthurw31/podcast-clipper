@@ -20,11 +20,11 @@ dossiers). Les règles durables sont dans [CLAUDE.md](../CLAUDE.md) ; ce fichier
 | Quoi | Où |
 |---|---|
 | Rushs (40 Go, non versionnés) | `brands/ai-corner/episodes/rushes/E22/cam1_nicolas.mp4`, `cam2_large.mp4`, `cam3_thomas.mp4` |
-| Audio micro | `brands/ai-corner/episodes/E22_thomas-spitz.wav` |
-| « Épisode » (lien dur vers le plan large) + description des caméras | `E22_thomas-spitz.mp4` + `E22_thomas-spitz.multicam.json` |
-| Tout le travail généré | `output/ai-corner/e22-thomas-spitz/` (transcript, clips.json, teaser_*, episode_plan.*, work/) |
+| Audio micro | `brands/ai-corner/episodes/E22_nicolas-comestaz_coty.wav` |
+| « Épisode » (lien dur vers le plan large) + description des caméras | `E22_nicolas-comestaz_coty.mp4` + `E22_nicolas-comestaz_coty.multicam.json` |
+| Tout le travail généré | `output/ai-corner/e22-nicolas-comestaz-coty/` (transcript, clips.json, teaser_*, episode_plan.*, work/) |
 
-Commande de base : `python -m clipper <commande> --brand ai-corner --input E22_thomas-spitz.mp4`
+Commande de base : `python -m clipper <commande> --brand ai-corner --input E22_nicolas-comestaz_coty.mp4`
 (+ `--guest "Nicolas Comestaz" --company Coty --host "Thomas Spitz (CEO AI Partners)"` pour `episode-*`).
 
 ## Où on en est (08/10/2026, fin de journée)
@@ -35,7 +35,7 @@ Commande de base : `python -m clipper <commande> --brand ai-corner --input E22_t
    contrôlés à l'écoute, fins avec respiration sans jamais entendre la phrase suivante, flash seulement aux changements
    de plan. Anciennes versions gardées : `…_v1_0710.mp4`, `…_v2_sans-double-check.mp4`.
 3. **Teaser + épisode complet : RENDUS FINAUX validés par Arthur le 09/10/2026** —
-   `episode/E22_teaser_final.mp4` (44,6 s) et `episode/E22_thomas-spitz_episode.mp4` (47 min 10 s, teaser au début, logo
+   `episode/E22_teaser_final.mp4` (44,6 s) et `episode/E22_nicolas-comestaz_coty_episode.mp4` (47 min 10 s, teaser au début, logo
    en haut à droite, fin AI Partners 8 s). Teaser : sous-titres variante B, carte invité (seul motion design retenu),
    musique « Driving Momentum » très basse, « Super intéressant » retiré. `qa --episode` : tout OK (raccords propres,
    fin sur « À bientôt » entier, volumes -16,0 / -15,9 LUFS). Versions précédentes : `*_v1_0810.mp4`.
@@ -49,7 +49,7 @@ Toujours en MP4 (le Studio HyperFrames bugue chez Arthur) : `preview --mp4 --cli
 ## Ce qui reste à faire (dans l'ordre probable)
 
 1. Livrer à Arthur le teaser + l'épisode + la description YouTube (fait le 09/10/2026).
-2. Shorts 2 à 5 dans le nouveau style : `python -m clipper polish --brand ai-corner --input E22_thomas-spitz.mp4
+2. Shorts 2 à 5 dans le nouveau style : `python -m clipper polish --brand ai-corner --input E22_nicolas-comestaz_coty.mp4
    --only 2,3,4,5 --redo` (repart des passages d'origine), regarder les planches `qa/`, envoyer les aperçus MP4,
    validation, renommer les MP4 du 07/10, `render --only N`, `qa --render --only N`.
 3. Pistes de la recherche d'outils (08/10) mises de côté par Arthur (« on reste sur notre workflow ») : Silero VAD
