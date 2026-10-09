@@ -34,13 +34,12 @@ Commande de base : `python -m clipper <commande> --brand ai-corner --input E22_t
    (≈ 44 s : 36,8 s de parole + fin AI Partners de 7 s). « Euh » collés retirés (`fillers`), sous-titres doublement
    contrôlés à l'écoute, fins avec respiration sans jamais entendre la phrase suivante, flash seulement aux changements
    de plan. Anciennes versions gardées : `…_v1_0710.mp4`, `…_v2_sans-double-check.mp4`.
-3. **Teaser + épisode complet** : un MP4 1080p a été rendu le 08/10 (`episode/E22_teaser_final.mp4`,
-   `episode/E22_thomas-spitz_episode.mp4`) MAIS depuis : fins d'extraits corrigées (`pad_end`), musique « Driving
-   Momentum » (composée par Arthur) sous le teaser, volumes teaser / épisode égalisés (-16 LUFS par partie), fin de
-   l'épisode sur « À bientôt » entier, raccords de dérushage recalés. Aperçus MP4 envoyés à Arthur
-   (`apercus/E22_teaser_apercu.mp4`, `episode/E22_thomas-spitz_episode_apercu_2min.mp4`) ; **en attente du retour de
-   ses collègues**, puis : renommer `renders/teaser.mp4`, `episode-render` (1080p : ~15 min, seuls le teaser et
-   quelques plans sont refaits), `qa --episode`.
+3. **Teaser + épisode complet : RENDUS FINAUX validés par Arthur le 09/10/2026** —
+   `episode/E22_teaser_final.mp4` (44,6 s) et `episode/E22_thomas-spitz_episode.mp4` (47 min 10 s, teaser au début, logo
+   en haut à droite, fin AI Partners 8 s). Teaser : sous-titres variante B, carte invité (seul motion design retenu),
+   musique « Driving Momentum » très basse, « Super intéressant » retiré. `qa --episode` : tout OK (raccords propres,
+   fin sur « À bientôt » entier, volumes -16,0 / -15,9 LUFS). Versions précédentes : `*_v1_0810.mp4`.
+   `episode/description_youtube.md` régénéré.
 
 ## Aperçus
 
@@ -49,7 +48,7 @@ Toujours en MP4 (le Studio HyperFrames bugue chez Arthur) : `preview --mp4 --cli
 
 ## Ce qui reste à faire (dans l'ordre probable)
 
-1. Retour des collègues d'Arthur sur le teaser et l'épisode -> retouches -> rendu final -> `qa --episode`.
+1. Livrer à Arthur le teaser + l'épisode + la description YouTube (fait le 09/10/2026).
 2. Shorts 2 à 5 dans le nouveau style : `python -m clipper polish --brand ai-corner --input E22_thomas-spitz.mp4
    --only 2,3,4,5 --redo` (repart des passages d'origine), regarder les planches `qa/`, envoyer les aperçus MP4,
    validation, renommer les MP4 du 07/10, `render --only N`, `qa --render --only N`.
