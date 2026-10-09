@@ -250,7 +250,7 @@ def cut_multicam(spec: dict, dst: Path, start: float, duration: float, turns: li
 
 def short_cams(segments: list[dict], turns: list[dict], words: list[dict], every: tuple[float, float] = (6.5, 9.5),
                length: tuple[float, float] = (2.4, 3.2), first_after: float = 11.5, tail_guard: float = 1.0,
-               seed: int = 1) -> list[dict]:
+               seed: int = 1, calm=None) -> list[dict]:
     """Plans d'un short : gros plan de celui qui parle, et de temps en temps (toutes les ~8–12 s, 2,6–3,6 s) l'écran
     partagé qui montre aussi l'autre en train d'écouter. Jamais avant `first_after` s (accroche), jamais collé à un
     raccord (`tail_guard` avant la fin d'un morceau) ; chaque bascule posée dans une pause entre deux mots."""
@@ -289,6 +289,11 @@ def short_cams(segments: list[dict], turns: list[dict], words: list[dict], every
             if b - a < 1.8:   # pas de pause nette où couper : on réessaie plus loin
                 nxt += 1.0
                 continue
+            # celui qui écoute doit être calme à l'image (Arthur, 09/10/2026 : « enlève le passage où Thomas se gratte
+            # l'oreille ») : sinon on essaie un peu plus loin (et pas d'écran partagé s'il ne se calme jamais)
+            if calm is not None and not calm(a, b, "guest" if spk_at(a) == "host" else "host"):
+                nxt += 1.0
+                continue
             splits.append((a, b))
             cams += [{"at": round(a, 3), "speaker": "split", "force": True},
                      {"at": round(b, 3), "speaker": spk_at(b), "force": True}]
@@ -298,3 +303,18 @@ def short_cams(segments: list[dict], turns: list[dict], words: list[dict], every
     cams = [c for c in cams if c["speaker"] == "split" or c.get("force") or not any(a < c["at"] < b for a, b in splits)]
     cams.sort(key=lambda c: c["at"])
     return cams
+
+
+def listener_motion(cam: Path, a: float, b: float) -> float:
+    """Mouvement maximal (différence moyenne entre images à 6 i/s, vignettes 96×54) dans la caméra de celui qui écoute.
+    E22 : immobile à l'écoute 0,6–1,9 ; se gratte l'oreille 6,95."""
+    import subprocess
+
+    import numpy as np
+    r = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{a:.2f}", "-t", f"{max(0.2, b - a):.2f}", "-i", str(cam),
+                        "-vf", "fps=6,scale=96:54,format=gray", "-f", "rawvideo", "-"], capture_output=True).stdout
+    f = np.frombuffer(r, np.uint8)
+    if f.size < 2 * 96 * 54:
+        return 0.0
+    f = f[: f.size // (96 * 54) * 96 * 54].reshape(-1, 54, 96).astype(float)
+    return float(np.abs(np.diff(f, axis=0)).mean(axis=(1, 2)).max())

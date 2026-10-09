@@ -45,7 +45,7 @@ python -m clipper transcribe|select|build|posts|render|preview … --brand <slug
 python -m clipper posts --brand <slug> --input … [--episode-url URL] [--guest-role "…"] [--only N] [--force]   # post LinkedIn + description par clip
 python -m clipper build|render … --jobs N          # parallélisme (défaut : build.jobs / render.jobs = auto)
 python -m clipper propose|pick|find|check … --brand <slug> --input …   # workflow 10 propositions -> 5 choisies (skill)
-python -m clipper polish … --only N   # APRÈS pick : tighten -> verify -> fillers -> build -> qa -> aperçu MP4 -> qa (le chemin normal)
+python -m clipper polish … --only N   # APRÈS pick : tighten -> verify -> fillers -> réactions -> mots-clés -> build -> qa -> aperçu MP4 -> qa
 python -m clipper qa … --only N [--render] | --episode   # contrôle qualité (rapport output/…/qa/), à relancer après tout rendu
 python -m clipper fillers … --only N   # retire les « euh » collés aux mots (inclus dans polish)
 python -m clipper preview … [--clip all|N] [--stop] [--mp4]   # aperçu (Studio ports 3002+, ou MP4 brouillon --mp4), validé AVANT render
@@ -98,7 +98,7 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
    d'image de part et d'autre du raccord — même caméra 0,5–7, autre caméra ≈ 50 ; même caméra = coupe nette) ; 25–45 s ; pas de B-roll ; + carte de fin de **7 s** (3,5 s jusqu'au 08/10/2026 : « trop rapide, x2 ») sur l'animation
    officielle AI Partners (`assets/outro_anim.mov`, lignes « montagne » qui se dessinent, recadrée au format et
    accélérée ×1,4 depuis le 08/10 — ×5 sur 2 s puis ×2,9 sur 3,5 s jugés trop rapides : `outro.background: video`, `media.prepare_outro_video`) + logo blanc + CTA **centrés** (`outro.layout: center`, voile radial). Bleu #258AF3,
-   **jamais d'italique**.
+   **jamais d'italique** — SAUF le mot-clé des sous-titres en serif italique (variante B choisie par l'équipe le 09/10/2026).
    L'ancien style LinkedIn 16:9 (`references/*.mp4`) reste disponible : preset `editorial`.
 5. **Clips multi-segments** (`selection.max_segments` > 1) : un clip = accroche + développement + conclusion
    pris à des endroits différents de l'épisode ; `clip["segments"]` (liste ordonnée), `compose` découpe chaque
@@ -185,6 +185,10 @@ les deux personnes (comme les shorts du monteur : un en haut, un en bas) pour mo
   (`reframe.half_crop` : le crop reste DANS la moitié de chaque personne) et `min_face_motion: 0`. Invité en haut,
   animateur en bas (`host_side: left`). Limite : la tête de celui du haut touche la barre de logos (le gros plan
   n'a pas de marge au-dessus) — comme sur les shorts de référence.
+- Écran partagé seulement si celui qui écoute est CALME à l'image (Arthur, 09/10/2026 : « enlève le passage où Thomas
+  se gratte l'oreille ») : `multicam.listener_motion` (différence d'image max à 6 i/s dans sa caméra) ≤
+  `multicam.max_listener_motion` (3,0 ; immobile 0,6–1,9, se gratter l'oreille 6,95) ; sinon `short_cams` essaie plus
+  loin, et pas d'écran partagé s'il ne se calme jamais.
 - Le plan large des rushs n'est PAS utilisé en vertical (recadré, on ne verrait qu'une personne).
 - Pour un short existant : `build --only N --force` (le cache de découpe dépend des plans).
 
@@ -307,6 +311,22 @@ l'invité le fait beaucoup donc c'est pas assez dynamique »)
 - Commande : `python -m clipper fillers --only N` (sauvegarde `clips_before_fillers.json`), après `verify --fix`,
   avant `build`. Short 1 E22 : 41,8 -> 37,1 s, 4,7 s d'hésitations retirées, tous les mots gardés.
 
+## Sous-titres « variante B » + réactions vides (retours d'Arthur, 09/10/2026)
+
+- « On a choisi la variante B : bold capitals, mot-clé en serif italique minuscule jaune ; adoucis un peu la partie
+  bold capital pour que ce soit plus fluide. » -> section `captions:` de brand.yaml (shorts ET teaser) : Metropolis
+  **Bold** 700 (pas ExtraBold), capitales, `letter_spacing 0.025em`, aucun trait, ombre en dégradé, fondu mot à mot
+  (`reveal: word`, 0,14–0,16 s) ; mot-clé = `fonts.keyword` Lora Italic 600, minuscules, ×1,14, #F2E86D
+  (`captions.keyword_style`, appliqué par le template + `captions.py` pour la casse). Remplace le style DUST (Arimo)
+  et le bleu des mots-clés du teaser. Variantes testées : `apercus/E22_teaser_sous-titres_{A,B,actuel}_apercu.mp4`.
+- Mots-clés des shorts : choisis par le LLM s'il n'y en a pas (`captions.auto_keywords`, `caption_check.pick_keywords`,
+  appelé par `polish`) : ~1 tous les 6–10 mots, mots porteurs de sens, copiés exactement.
+- « Thomas dit "super intéressant", il faudrait pas ça, ça n'apporte rien » -> **jamais de réaction vide** (liste
+  `fillers.REACTIONS` : super intéressant, ah ouais, exactement, d'accord, c'est clair…) : `fillers.drop_reactions`
+  retire une réaction prononcée seule entre deux pauses (shorts : étape de `polish` ; teaser : `episode-plan`, et
+  extrait entier retiré) ; `TEASER_PROMPT` l'interdit (le rôle « reaction » doit relancer avec du fond). E22 : le
+  « Super intéressant. » du teaser (13:10) retiré.
+
 ## Sous-titres : double contrôle à l'écoute (retour d'Arthur, 08/10/2026 : « dans les sous-titres il oublie quelques
 mots des fois, faudrait une sorte de boucle de double check »)
 
@@ -382,6 +402,10 @@ short -> `preview` libère le port ; 16:9 inutile -> `formats: ["9x16"]` ; tél�
   sélection : les clips multi-segments ont besoin de l'épisode entier.
 
 ## Pièges connus (déjà résolus — ne pas réintroduire)
+
+- `build` ne supprime QUE l'ancienne version d'un short de clips.json (même numéro, autre titre) — avant le 09/10/2026
+  il supprimait aussi le teaser (99) et ses variantes, en plein rendu. Vidéo redécoupée (`recut`) -> `analysis.json`
+  refait : sinon les visages de l'ancienne découpe cadrent la nouvelle (écran partagé vide en haut, short 1 E22).
 
 - Téléchargements Dropbox : dans le navigateur, les fichiers de 13 Go se coupent vers 50 min (E22 : deux fois, les
   3 caméras à ~70 %) et restent sous leur nom final, illisibles (« moov atom not found »). `clipper/fetch.py` liste

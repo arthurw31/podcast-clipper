@@ -513,7 +513,7 @@ Le script, DANS CET ORDRE (8 à 12 extraits) :
 2. developpement — la phrase qui précise ou durcit la thèse (3–6 s).
 3. pingpong — une question COURTE et directe de l'animateur puis la réponse courte de l'invité, idéalement avec un
    CHIFFRE (2–5 s chacune, deux extraits qui se suivent).
-4. reaction — l'animateur réagit en une phrase courte (« Ah ouais ? », « Super intéressant », « Exactement »…)
+4. reaction — INTERDIT d'utiliser une réaction vide (« Super intéressant », « Ah ouais », « Exactement »… : n'apporte rien, retour d'Arthur 09/10/2026) ; si l'animateur réagit, ce doit être une phrase qui relance avec du fond
    (1–3 s), seulement si l'épisode en contient une vraie.
 5. histoire — une anecdote concrète, un moment vécu, un exemple chiffré (5–8 s).
 6. conviction — ce que l'invité défend, sa vision (4–6 s).

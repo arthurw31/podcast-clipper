@@ -121,3 +121,25 @@ def missing(caps: list[dict], heard: list[dict]) -> list[str]:
         if op == "insert" or (op == "replace" and j2 - j1 > i2 - i1):
             miss.append(" ".join(w["w"] for w in heard[j1:j2]))
     return miss
+
+
+KEYWORDS_PROMPT = """Tu choisis les MOTS-CLÉS mis en valeur dans les sous-titres d'un short vidéo (un mot-clé = écrit dans une
+autre police, en couleur). Règles :
+- environ un mot-clé tous les 6 à 10 mots, jamais deux à la suite ;
+- uniquement des mots porteurs de sens : chiffres (« 3000 agents »), concepts forts, mots inattendus, la conclusion ;
+  jamais un petit mot (le, de, et, que, c'est, en fait, donc…) ;
+- copie les mots EXACTEMENT comme dans le texte (1 à 3 mots par mot-clé).
+Rends UNIQUEMENT un JSON : {"keywords": ["…", "…"]}"""
+
+
+def pick_keywords(text: str, cfg=None) -> list[str]:
+    """Mots-clés d'un short qui n'en a pas (Arthur, 09/10/2026 : variante B — mot-clé en serif italique jaune)."""
+    from .llm import ask_json
+    model = ((cfg.get("selection") or {}).get("model") if cfg is not None else None) or "claude-sonnet-5"
+    try:
+        out = ask_json(KEYWORDS_PROMPT, text, model=model)
+        kws = [str(k).strip() for k in out.get("keywords", []) if str(k).strip()]
+    except Exception:  # noqa: BLE001
+        return []
+    low = text.lower()
+    return [k for k in kws if k.lower() in low]

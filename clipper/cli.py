@@ -289,8 +289,15 @@ def cmd_build(a: argparse.Namespace) -> list[Path]:
     only = _parse_only(a.only)
     # projets d'une ancienne sélection : on les retire pour ne pas les rendre par erreur
     keep = {f"clip_{c['index']:02d}_{slugify(c.get('title', ''))}" for c in clips["clips"]}
+    # seulement l'ANCIENNE version d'un short de clips.json (même numéro, autre titre) ; jamais le teaser (99) ni ses
+    # variantes (97, 98…) qui ne sont pas dans clips.json (09/10/2026 : un build avait supprimé le teaser en plein rendu)
+    idx_keep = {c["index"] for c in clips["clips"]}
     for d in (ep / "clips").glob("clip_*") if (ep / "clips").exists() else []:
-        if d.is_dir() and d.name not in keep:
+        try:
+            d_idx = int(d.name.split("_")[1])
+        except (IndexError, ValueError):
+            continue
+        if d.is_dir() and d.name not in keep and d_idx in idx_keep:
             shutil.rmtree(d, ignore_errors=True)
             console.print(f"[dim]projet obsolète supprimé : {d.name}[/dim]")
     todo = []
@@ -655,6 +662,12 @@ def cmd_episode_plan(a: argparse.Namespace) -> None:
     from .episode import editorial_order
     teaser = teaser_clip(words, teaser_plan, a.guest, a.company, wav=spec["audio"], transcript=transcript,
                          editor=lambda ext: editorial_order(ext, brand))
+    # réactions vides (« Super intéressant »…) : jamais dans le teaser (Arthur, 09/10/2026 : « ça n'apporte rien »)
+    from .fillers import drop_reactions
+    segs = []
+    for sg in teaser["segments"]:
+        segs += drop_reactions(sg, words, Path(spec["audio"]), log=console.print)
+    teaser["segments"] = segs
     # écoute finale : ce que le spectateur entendra, mot pour mot (‖ = raccord)
     from .verify import audit, audit_flags, audit_joins
     heard = audit(teaser["segments"], spec["audio"], ep / "work" / "teaser_audit.wav")
@@ -877,7 +890,8 @@ def cmd_qa(a: argparse.Namespace) -> str:
         if a.render:
             final = ep / "renders" / f"{proj.name}_{fmt}.mp4"
             apercu = ep / "apercus" / f"{proj.name}_{fmt}_apercu.mp4"
-            render_f = final if final.exists() else apercu
+            # après un aperçu (polish) on contrôle l'APERÇU ; sinon le MP4 final s'il existe
+            render_f = apercu if getattr(a, "preview_check", False) or not final.exists() else final
         status, lines = qa_short(c, proj, wav, brand.cfg, fmt=fmt, render=render_f, work=out_dir)
         (out_dir / f"clip_{c['index']:02d}.md").write_text(
             f"# QA short {c['index']} — {c.get('hook_title') or c.get('title')} — {status}\n\n" + "\n".join(lines) + "\n",
@@ -934,6 +948,20 @@ def cmd_polish(a: argparse.Namespace) -> None:
             c2, _heard = clean_clip(c, wav, brand.cfg, log=lambda m: console.print(m), work=ep / "work")
             console.print(f"  3/3 « euh » collés aux mots : {c['duration']:.1f} -> {c2['duration']:.1f} s")
             c = _mark(c2, "fillers")
+        if "reactions" not in done:
+            from .fillers import drop_reactions
+            segs = []
+            for sg in c["segments"]:
+                segs += drop_reactions(sg, words, wav, log=lambda m: console.print(m))
+            c = _mark(dict(c, segments=segs, duration=round(sum(float(x["duration"]) for x in segs), 2)), "reactions")
+            console.print("  réactions vides (« super intéressant »…) : contrôlées")
+        cap = brand.cfg.captions
+        if cap.get("highlight_keywords") and cap.get("auto_keywords") and not c.get("keywords"):
+            from .caption_check import pick_keywords
+            text = " ".join(w["w"] for sg in c["segments"] for w in words
+                            if float(sg["start"]) - 0.05 <= float(w["s"]) <= float(sg["end"]))
+            c = dict(c, keywords=pick_keywords(text, brand.cfg))
+            console.print(f"  mots-clés des sous-titres : {', '.join(c['keywords']) or 'aucun'}")
         data["clips"][i] = c
         (ep / "clips.json").write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
     if not idx:
@@ -950,7 +978,7 @@ def cmd_polish(a: argparse.Namespace) -> None:
     cmd_preview(argparse.Namespace(brand=a.brand, input=a.input, clip=sel, formats=a.formats, port="3002",
                                    no_open=True, stop=False, mp4=True, fps=a.fps))
     console.rule("Contrôle qualité des aperçus")
-    cmd_qa(argparse.Namespace(**{**vars(a), "only": sel, "render": True, "episode": False}))
+    cmd_qa(argparse.Namespace(**{**vars(a), "only": sel, "render": True, "episode": False, "preview_check": True}))
     console.print("[bold]Prochaine étape[/bold] : regarder les planches d'images (output/…/qa/), envoyer les liens des aperçus "
                   "à Arthur ; après sa validation seulement : render --only N, puis qa --render --only N.")
 

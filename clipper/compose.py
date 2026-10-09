@@ -237,6 +237,16 @@ def _smooth_plan(plan: list[dict], shots: list[dict], junctions: list[float], fr
     return _punch_junctions(plan, junctions, fr)
 
 
+def _calm_check(multicam: dict, limit: float):
+    """Écran partagé seulement si celui qui écoute est calme (pas de geste parasite : se gratter, s'étirer…)."""
+    from .multicam import listener_motion
+
+    def ok(a: float, b: float, who: str) -> bool:
+        cam = (multicam.get("cams") or {}).get(who)
+        return not cam or listener_motion(Path(cam), a, b) <= limit
+    return ok
+
+
 def _punch_junctions(plan: list[dict], junctions: list[float], fr: Cfg) -> list[dict]:
     """Jonction de segments sur la même caméra = « jump cut » (même cadre, le visage saute). Comme un monteur,
     on en fait un punch-in : le morceau après la jonction est resserré (`junction_punch`, ex. 1.15)."""
@@ -415,11 +425,13 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
         cams = clip.get("cams") or short_cams(
             segments, clip.get("turns", []), all_words(transcript),
             every=tuple(mc.get("split_every", (6.5, 9.5))), length=tuple(mc.get("split_len", (2.4, 3.2))),
-            first_after=float(mc.get("first_after", 11.5)), seed=int(clip.get("index", 1)))
+            first_after=float(mc.get("first_after", 11.5)), seed=int(clip.get("index", 1)),
+            calm=_calm_check(multicam, float(mc.get("max_listener_motion", 3.0))))
         stamp = json.dumps([segments, cams or clip.get("turns", []), outro_d], sort_keys=True, default=str)
         stamp_f = assets / "source.multicam.stamp"
         stale = stale or not stamp_f.exists() or stamp_f.read_text(encoding="utf-8") != stamp
-    if force or stale or not src_clip.exists():
+    recut = bool(force or stale or not src_clip.exists())
+    if recut:
         console.print(f"  découpe de {len(segments)} segment(s) source…")
         parts = []
         for j, sg in enumerate(segments):
@@ -466,7 +478,9 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
         outro_d = max(0.0, D_total - D_speech)
 
     # ---- 2. analyse (plans, visages, locuteur) ----
-    analysis = analyze(src_clip, cfg, proj / "analysis.json", force=force)
+    # vidéo redécoupée -> analyse (plans, visages) refaite : sinon les visages de l'ANCIENNE découpe cadrent la nouvelle
+    # (short 1 E22, 09/10/2026 : écran partagé déplacé, cadrage resté sur l'ancien -> image vide en haut)
+    analysis = analyze(src_clip, cfg, proj / "analysis.json", force=force or recut)
 
     # ---- 3. mots (temps relatifs au clip assemblé) ----
     # un mot à cheval sur une coupe (« euh » retiré au milieu de « redéployer ») est gardé dans le morceau où on

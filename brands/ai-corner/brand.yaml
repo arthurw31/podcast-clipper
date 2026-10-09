@@ -43,12 +43,41 @@ colors:
   text: "#FFFFFF"
   background: "#000000"
 
+# Sous-titres « variante B » choisie par l'équipe (Arthur, 09/10/2026 : « on a choisi la variante B, bold capitals avec
+# le mot-clé en serif italique minuscule jaune ; adoucis un peu la partie bold capital pour que ça fasse plus fluide »).
+# Adouci : Metropolis Bold (700) au lieu d'ExtraBold, espacement un peu plus large, pas de trait blanc qui épaissit,
+# ombre en dégradé, mots qui apparaissent en fondu. Vaut pour les shorts ET le teaser (section teaser plus bas).
+captions:
+  uppercase: true
+  weight: 700
+  font_family: ""
+  font_size: 62
+  letter_spacing: "0.025em"
+  line_height: 1.02
+  color: "#FFFFFF"
+  stroke_width: 0
+  text_shadow: "0 0 2px rgba(0,0,0,.55), 0 0 8px rgba(0,0,0,.5), 0 0 18px rgba(0,0,0,.42), 0 2px 32px rgba(0,0,0,.36), 0 4px 56px rgba(0,0,0,.3)"
+  highlight_keywords: true
+  highlight_color: "#F2E86D"
+  keyword_pop: false
+  keyword_style:
+    uppercase: false
+    italic: true
+    weight: 600
+    scale: 1.14
+    letter_spacing: "0"
+    color: "#F2E86D"
+  reveal: word
+  word_fade: 0.16
+  auto_keywords: true        # shorts sans mots-clés : choisis par le LLM sur le texte entendu (caption_check.pick_keywords)
+
 fonts:
   family: "Metropolis"
   caption: "fonts/Metropolis-BoldItalic.ttf"      # jamais utilisé (italic: false) mais requis
   caption_upright: "fonts/Metropolis-Bold.ttf"
   display: "fonts/Metropolis-ExtraBold.ttf"
-  captions_alt: "fonts/Arimo-VF.ttf"                # sous-titres des shorts : Arimo = Arial (mêmes mesures)
+  captions_alt: "fonts/Metropolis-Bold.ttf"         # sous-titres « variante B adoucie » (09/10/2026) ; avant : Arimo (Arial, style DUST)
+  keyword: "fonts/Lora-Italic-VF.ttf"               # mot-clé en serif italique (variante B)
   hook: "fonts/FiraSansCondensed-Bold.ttf"        # bulle-titre des shorts (police condensée du monteur)
 
 outro:
@@ -133,30 +162,31 @@ teaser:
   guest_logo:
     enabled: false
   fonts:
-    caption_upright: "fonts/Metropolis-ExtraBold.ttf"
-    captions_alt: ""         # pas d'Arimo ici : la police de la marque (Metropolis)
+    caption_upright: "fonts/Metropolis-Bold.ttf"
+    captions_alt: "fonts/Metropolis-Bold.ttf"   # variante B adoucie (09/10/2026)
   captions:
     uppercase: true
     italic: false
-    weight: 800
+    weight: 700
     font_family: ""
-    line_height: 1.0
-    letter_spacing: "0.01em"
+    line_height: 1.02
+    letter_spacing: "0.025em"
     color: "#FFFFFF"
-    highlight_color: "#258AF3"
+    highlight_color: "#F2E86D"   # variante B : mot-clé en serif italique minuscule jaune (avant : bleu #258AF3)
     highlight_keywords: true
-    keyword_pop: true
+    keyword_pop: false
     # contraste renforcé (retour d'Arthur, 08/10/2026 : « accentue l'ombre autour des sous-titres ») : contour sombre
     # derrière les lettres (paint-order) + halo serré + ombre portée large.
     # Ombre en dégradé (retour d'Arthur, 08/10/2026 : « fais un effet plus dégradé sur l'ombre autour ») : plus de
     # contour net ni d'ombre portée dure ; halo en couches de flou croissant et d'opacité décroissante, contour fin.
     text_shadow: "0 0 2px rgba(0,0,0,.6), 0 0 8px rgba(0,0,0,.55), 0 0 18px rgba(0,0,0,.45), 0 2px 32px rgba(0,0,0,.4), 0 4px 56px rgba(0,0,0,.35), 0 6px 90px rgba(0,0,0,.25)"
-    stroke_width: 3
+    stroke_width: 0
     stroke_color: "rgba(0,0,0,.4)"
     align: left
     stagger_lines: true
     stagger_offset: 0.12
-    reveal: typewriter
+    reveal: word               # fondu mot à mot (plus fluide que la machine à écrire, 09/10/2026)
+    word_fade: 0.14
     entrance: slide-left
     reveal_reflow: false
     word_fade: 0

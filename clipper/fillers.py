@@ -176,3 +176,67 @@ def clean_clip(clip: dict, wav: Path, cfg=None, log=print, work: Path | None = N
         heard = audit(segs, wav, out_wav, cfg)
     clip = dict(clip, segments=segs, duration=round(sum(s["duration"] for s in segs), 2))
     return clip, heard
+
+
+# Réactions qui n'apportent rien (Arthur, 09/10/2026 : « Thomas dit "super intéressant" mais il faudrait pas ça, ça
+# n'apporte rien »). Retirées des shorts quand elles forment une prise de parole isolée (entre deux pauses), et
+# interdites dans le script du teaser (TEASER_PROMPT).
+REACTIONS = {"super interessant", "tres interessant", "interessant", "c'est interessant", "ah ouais", "ouais",
+             "ah oui", "oui", "d'accord", "ok", "ok d'accord", "exactement", "c'est clair", "carrement", "top",
+             "genial", "super", "incroyable", "trop bien", "je vois", "bien sur", "tout a fait", "c'est vrai",
+             "ah bon", "waouh", "wow", "ah", "hum", "mmh", "effectivement", "absolument", "clairement"}
+
+
+def _is_reaction(ws: list[dict]) -> bool:
+    txt = " ".join(_norm(w["w"]) for w in ws).strip()
+    txt = " ".join(t for t in txt.split() if t)
+    for lead in ("ok ", "ah ", "oui ", "ouais "):
+        if txt.startswith(lead) and txt[len(lead):] in REACTIONS:
+            return True
+    return txt in REACTIONS
+
+
+def drop_reactions(seg: dict, words: list[dict], wav: Path, log=print, gap: float = 0.25,
+                   max_len: float = 2.2) -> list[dict]:
+    """Retire de `seg` les réactions vides prononcées seules (groupe de mots entre deux pauses ≥ `gap`, ≤ `max_len` s)."""
+    s0, s1 = float(seg["start"]), float(seg["end"])
+    ws = [w for w in words if s0 - 0.05 <= float(w["s"]) and float(w["e"]) <= s1 + 0.05]
+    groups, cur = [], []
+    for w in ws:
+        if cur and float(w["s"]) - float(cur[-1]["e"]) >= gap:
+            groups.append(cur)
+            cur = []
+        cur.append(w)
+    if cur:
+        groups.append(cur)
+    if len(groups) == 1 and float(groups[0][-1]["e"]) - float(groups[0][0]["s"]) <= max_len and _is_reaction(groups[0]):
+        log(f"    extrait retiré (réaction vide) : « {' '.join(w['w'] for w in groups[0])} »")
+        return []
+    holes = []
+    for k, g in enumerate(groups):
+        if len(groups) == 1 or float(g[-1]["e"]) - float(g[0]["s"]) > max_len or not _is_reaction(g):
+            continue
+        prev_e = float(groups[k - 1][-1]["e"]) if k else s0
+        next_s = float(groups[k + 1][0]["s"]) if k + 1 < len(groups) else s1
+        a = s0 if k == 0 else _quiet(wav, prev_e, float(g[0]["s"]))
+        b = s1 if k + 1 == len(groups) else _quiet(wav, float(g[-1]["e"]), next_s)
+        holes.append((a, b))
+        log(f"    réaction retirée : « {' '.join(w['w'] for w in g)} » ({a:.2f}-{b:.2f})")
+    if not holes:
+        return [seg]
+    pieces, cur_t = [], s0
+    for a, b in holes:
+        if a - cur_t >= 0.25:
+            pieces.append((cur_t, a))
+        cur_t = b
+    if s1 - cur_t >= 0.25:
+        pieces.append((cur_t, s1))
+    out = []
+    for i, (a, b) in enumerate(pieces):
+        pc = dict(seg, start=round(a, 3), end=round(b, 3), duration=round(b - a, 3))
+        if i < len(pieces) - 1:
+            pc["end_text"] = ""
+        if i > 0:
+            pc["start_text"] = ""
+        out.append(pc)
+    return out
