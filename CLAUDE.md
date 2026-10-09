@@ -11,17 +11,19 @@ ce fichier résume ce qu'il faut savoir pour **modifier** le projet sans casser 
 > [docs/REPRISE.md](docs/REPRISE.md) — à lire en premier dans une nouvelle session.
 
 ## Règle de maintenance : le schéma suit le process (Arthur, 09/10/2026 : « mets à jour le schéma d'architecture à chaque fois
-qu'on modifie le process »)
+qu'on modifie le process » ; précisé le même jour : « le schéma, c'est celui de GitHub, on met à jour que celui-là »)
 
+Le SEUL schéma à tenir à jour est celui de GitHub : « Vue d'ensemble » du [README](README.md) (mermaid, les étapes citent leur
+commande). La page partagée qui avait été publiée en plus (artifact, docs/schema.html) a été supprimée : ne pas la recréer.
 À CHAQUE modification du process (nouvelle commande, étape ajoutée, retirée ou déplacée, nouvelle validation humaine, nouveau
 livrable), dans le MÊME commit :
-1. le schéma d'ensemble du [README](README.md) (« Vue d'ensemble », mermaid : les étapes citent leur commande) ;
+1. le schéma d'ensemble du README ;
 2. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (liste « commandes » du bloc cli.py, tableau des briques, parcours des fichiers) ;
-3. la page [docs/schema.html](docs/schema.html), puis la republier avec l'outil Artifact en passant
-   `url: https://claude.ai/artifact/QLSVE4DsDZncRH5qxQQMf9` (même lien pour l'équipe) ;
-4. lancer `python scripts/check_schema.py` : il échoue si une commande du CLI manque dans ARCHITECTURE, si une étape du
-   process (liste `PROCESS` du script) manque dans le README ou la page, ou si une validation humaine disparaît. Une
-   nouvelle étape du process s'ajoute aussi à `PROCESS` dans le script.
+3. lancer `python scripts/check_schema.py` : il échoue si une commande du CLI manque dans ARCHITECTURE, si une étape du
+   process (liste `PROCESS` du script) manque dans le schéma du README, ou si une validation humaine disparaît. Une nouvelle
+   étape du process s'ajoute aussi à `PROCESS` dans le script ;
+4. pousser sur GitHub (c'est ce que l'équipe lit) après avoir vérifié `git show --stat` (seulement les fichiers de la
+   modification, aucun modèle .onnx), puis regarder le rendu sur github.com.
 Puis noter la demande et sa date dans la section concernée de ce fichier.
 
 ## Point d'entrée utilisateur
