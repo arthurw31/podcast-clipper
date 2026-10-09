@@ -1,16 +1,18 @@
 # Comment fonctionne le framework « Podcast → shorts »
 
-Un épisode entier entre, cinq shorts verticaux montés et leurs posts LinkedIn sortent. Claude fait le travail
+Les rushs d'un tournage entrent (3 caméras + micro) ; sortent cinq shorts verticaux montés et leurs posts
+LinkedIn, l'épisode complet monté avec son teaser, et les miniatures YouTube. Le schéma d'ensemble est dans le
+[README](../README.md#vue-densemble--des-rushs-du-tournage-à-tous-les-livrables) ; cette page détaille les shorts. Claude fait le travail
 répétitif (transcrire, repérer, couper, monter, rédiger) ; l'équipe garde les décisions éditoriales :
 **quels passages**, **ce qu'il faut absolument inclure**, et la **validation des shorts** en aperçu avant le rendu final.
 
 > Ce qui a été validé (et ce qu'il faut éviter) est résumé dans [BONNES_PRATIQUES.md](BONNES_PRATIQUES.md).
 
-## Le workflow en 5 étapes
+## Les shorts en 5 étapes
 
 ```mermaid
 flowchart TD
-    A["1 · Dépôt<br/>épisode 4K + logo de l'invité<br/>dans le dossier depot/"] --> B["Transcription<br/>Whisper, mot à mot, horodatée"]
+    A["1 · Dépôt<br/>rushs (lien Dropbox) ou épisode monté<br/>+ logo de l'invité"] --> B["Transcription<br/>Whisper, mot à mot, horodatée"]
     B --> C{{"2 · Claude propose ~10 passages<br/>3 lectures en parallèle<br/>(cas concret · position tranchée · humain)<br/>puis un jury garde les 10 meilleurs"}}
     C --> D["3 · L'équipe choisit 5 passages<br/>+ demandes particulières<br/>« il faut le passage où il dit… »"]
     D --> E["Calage des coupes<br/>début et fin de phrase · contrôle mot à mot"]
@@ -67,7 +69,7 @@ flowchart LR
     GL --> S
     S --> P["pick + check<br/>choix humain, coupes vérifiées"]
     P --> AN["analysis<br/>plans, visages, fausses coupes"]
-    AN --> RF["reframe<br/>cadrage vertical, punch-in"]
+    AN --> RF["reframe<br/>cadrage vertical : gros plan de celui qui parle,<br/>écran partagé quand l'autre écoute"]
     RF --> CO["compose<br/>HyperFrames : sous-titres, bulle,<br/>logos, light leak, carte de fin"]
     BY --> CO
     AS --> CO
@@ -78,9 +80,10 @@ flowchart LR
 
 - **Jamais couper une pensée** : Claude cite les premiers et derniers mots de chaque passage ; le code cale la
   coupe exactement sur ces mots, puis on vérifie mot à mot (`check`).
-- **Montage fluide** : seules les vraies coupes de caméra de l'épisode sont gardées (les fausses coupes sont
-  détectées par différence d'image) ; un raccord entre deux passages devient un léger zoom.
-- **Netteté** : le recadrage vertical est fait par FFmpeg à partir de la source 4K, puis rendu en 1080×1920.
+- **Montage fluide** : depuis les rushs, gros plan sur celui qui parle et écran partagé de temps en temps
+  (seulement si celui qui écoute est calme) ; flash lumineux seulement quand l'angle change ; aucun zoom (AI Corner).
+- **Netteté** : le recadrage vertical est fait par FFmpeg à partir de la meilleure source (rushs 1080p, 4K quand
+  elle existe), puis rendu en 1080×1920.
 
 ## Modifier le format (tout est dans des fichiers texte)
 

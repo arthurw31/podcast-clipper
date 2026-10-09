@@ -17,17 +17,55 @@ Deux façons de l'utiliser :
 
 > **Bonnes pratiques validées** (sous-titres, coupes, shorts, teaser, épisode complet) : [docs/BONNES_PRATIQUES.md](docs/BONNES_PRATIQUES.md).
 
-## Le workflow en 5 étapes
+## Vue d'ensemble : des rushs du tournage à tous les livrables
 
 ```mermaid
-flowchart LR
-    A["1 · Dépôt<br/>épisode 4K dans depot/"] --> B["2 · Claude propose<br/>~10 passages"]
-    B --> C["3 · Vous en choisissez 5<br/>+ demandes particulières"]
-    C --> D["4 · Claude monte les 5 shorts<br/>vous les regardez en aperçu instantané<br/>et demandez vos retouches"]
-    D --> E["5 · Rendu final unique<br/>5 MP4 1080×1920 + 5 posts LinkedIn"]
-    classDef human fill:#258AF3,color:#fff,stroke:#151D53;
-    class C,D human;
+flowchart TD
+    IN[/"1 · Dépôt des rushs (lien Dropbox)<br/>CAM 1 gros plan invité · CAM 2 plan large<br/>CAM 3 gros plan animateur · micro WAV"/]
+    IN --> FE["2 · fetch : téléchargement avec reprise, taille vérifiée<br/>+ synchro du micro sur les caméras (multicam.json)"]
+    FE --> TR["3 · transcribe : texte mot à mot (Whisper)<br/>+ qui parle quand (empreintes vocales)"]
+    TR --> S1
+    TR --> E1
+    TR --> M1
+
+    subgraph SH["5 shorts verticaux 9:16"]
+        direction TB
+        S1{{"propose : Claude propose ~10 passages"}} --> S2["L'équipe choisit 5 passages<br/>+ demandes particulières"]
+        S2 --> S3["polish : « euh » et blancs retirés,<br/>gros plan / écran partagé, sous-titres<br/>vérifiés à l'écoute, carte de fin"]
+        S3 --> S4["qa + aperçus MP4"]
+        S4 --> S5["L'équipe valide les aperçus"]
+        S5 -->|retouche| S3
+        S5 -->|validé| S6["render 1080p + qa final<br/>posts : 1 post LinkedIn par short"]
+    end
+
+    subgraph EP["Épisode complet + teaser"]
+        direction TB
+        E1{{"episode-plan : dérushage, liste de plans,<br/>raccords nettoyés, teaser scripté, chapitres"}} --> E2["episode-render --proxy : aperçu 540p"]
+        E2 --> E3["L'équipe valide l'aperçu"]
+        E3 --> E4["episode-render 1080p + qa --episode<br/>teaser HyperFrames + corps FFmpeg, -16 LUFS"]
+    end
+
+    subgraph MI["Miniatures YouTube"]
+        direction TB
+        M1["thumbnail : une image toutes les 3 s<br/>netteté, regard, sourire"] --> M2{{"Claude : jury visuel + 5 titres"}}
+        M2 --> M3["Composition sur le gabarit Canva<br/>(thumbnail-template)"]
+        M3 --> M4["L'équipe choisit une variante"]
+    end
+
+    S6 --> L1[("5 shorts MP4<br/>+ 5 posts LinkedIn")]
+    E4 --> L2[("Épisode 1080p avec teaser<br/>+ description YouTube et chapitres")]
+    M4 --> L3[("Miniature 1280×720 + HD")]
+
+    classDef human fill:#FFF2DF,stroke:#C26A00,color:#3A2810;
+    classDef llm fill:#EFEBFF,stroke:#6B4FD8,color:#251C47;
+    classDef deliver fill:#E2F5EC,stroke:#0F7A55,color:#0F3127;
+    class IN,S2,S5,E3,M4 human;
+    class S1,E1,M2 llm;
+    class L1,L2,L3 deliver;
 ```
+
+Légende : orange = décision ou validation humaine · violet = Claude rédige ou choisit · vert = livrables · le reste
+est automatique. Aucune vidéo finale n'est rendue sans validation sur un aperçu.
 
 - Guide d'utilisation (workflow, « quel fichier modifier pour changer le format ») : **[docs/FRAMEWORK.md](docs/FRAMEWORK.md)**
 - Fonctionnement technique (briques, fichiers produits, montage d'un short) : **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**
@@ -97,18 +135,20 @@ seul au premier lancement.
 ## 3. Premiers shorts (mode guidé)
 
 1. Ouvrez le dossier du projet dans **Claude Code**.
-2. Déposez dans `depot/` l'épisode (de préférence la version **4K**) et le logo de l'entreprise invitée.
-   Rushs ou épisode sur **Dropbox** : collez simplement le lien à Claude, qui les télécharge lui-même
-   (`python -m clipper fetch "<lien>"` : reprise automatique après coupure, taille vérifiée).
+2. Collez à Claude le **lien Dropbox** des rushs (3 caméras + micro) : il les télécharge lui-même
+   (`python -m clipper fetch "<lien>"` : reprise automatique après coupure, taille vérifiée). Un épisode déjà
+   monté (de préférence en **4K**) peut aussi être déposé dans `depot/`. Ajoutez le logo de l'entreprise invitée.
 3. Écrivez par exemple :
 
    > Fais-moi 5 shorts de ce podcast. Invité : Quentin Amaudry, CEO de Mendo.
 
 4. Claude (skill `podcast-clips`) range les fichiers, transcrit l'épisode, puis vous propose une dizaine de
    passages (titre, timecodes, extrait). Vous répondez avec vos 5 numéros et vos demandes éventuelles
-   (« il faut absolument le passage où il parle de… »). Claude monte les 5 shorts et vous les ouvre en
-   **aperçu instantané** dans le navigateur : vous les regardez, demandez vos retouches, et le rendu final
+   (« il faut absolument le passage où il parle de… »). Claude monte les 5 shorts et vous envoie un
+   **aperçu MP4** de chacun : vous les regardez dans votre lecteur, demandez vos retouches, et le rendu final
    des MP4 n'est lancé qu'une fois tout validé. Claude vous envoie les 5 MP4 et les 5 posts LinkedIn.
+   Même principe pour l'épisode complet avec son teaser (« monte l'épisode en entier ») et pour les
+   miniatures YouTube (« fais les miniatures »).
 
 Vous pouvez aussi taper `/podcast-clips` pour lancer le workflow directement.
 
@@ -204,12 +244,15 @@ output/<marque>/<episode>/
   transcript.json          ← transcription mot à mot
   clips/clip_01_<titre>/   ← projet HyperFrames de chaque clip (retouche manuelle possible) + captions_check.txt
   apercus/                 ← aperçus MP4 rapides à valider avant le rendu final
+  episode/                 ← épisode complet monté (aperçu 540p puis 1080p) + description_youtube.md
+  miniatures/              ← miniatures YouTube : variante_N.jpg (1280×720), _HD.png, planche.jpg, titres.md
   qa/                      ← rapports de contrôle (clip_NN.md, episode.md) + planches d'images
 ```
 
 **Corriger un clip** : modifiez `clips.json` (ou demandez à Claude), puis `python -m clipper polish … --only N`
 (montage + contrôles + aperçu MP4) ; après validation, `python -m clipper render … --only N` puis `qa … --only N --render`.
-Pour une retouche fine, `preview` ouvre le Studio HyperFrames (timeline, déplacement des éléments).
+Pour une retouche fine, `preview --open` ouvre le Studio HyperFrames (timeline, déplacement des éléments) ;
+la validation se fait sur les aperçus MP4.
 
 ## 7. Ce que garantit le montage
 

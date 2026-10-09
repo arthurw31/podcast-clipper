@@ -12,7 +12,7 @@ flowchart TB
     end
 
     subgraph PY["Package Python clipper/ (python -m clipper …)"]
-        CLI["cli.py<br/>commandes : transcribe, propose, pick,<br/>find, check, build, preview, posts, render, doctor"]
+        CLI["cli.py<br/>commandes : fetch, transcribe, propose, pick, polish, qa,<br/>build, preview, render, posts, episode-plan, episode-render,<br/>thumbnail, thumbnail-template, doctor"]
         CFG["config.py<br/>fusion de la configuration"]
         TR["transcribe.py"]
         SEL["select_clips.py"]
@@ -24,6 +24,10 @@ flowchart TB
         MED["media.py"]
         REN["render.py"]
         PO["posts.py"]
+        MC["multicam.py<br/>rushs 3 caméras"]
+        CHK["verify.py · fillers.py<br/>caption_check.py · qa.py"]
+        EPI["episode.py · diarize.py<br/>épisode complet + teaser"]
+        TH["thumbnail.py · canva_template.py<br/>miniatures"]
     end
 
     subgraph EXT["Outils installés sur le PC"]
@@ -41,7 +45,10 @@ flowchart TB
     SEL --> LLM
     PO --> LLM
     LLM --> CL
-    CO --> AN & RF & CAP & MED
+    CLI --> CHK & EPI & TH
+    CO --> AN & RF & CAP & MED & MC
+    EPI --> FF & HF
+    TH --> LLM & CV
     AN --> CV
     AN --> FF
     MED --> FF
@@ -60,24 +67,28 @@ flowchart TB
 | `captions.py` | Regroupe les mots en blocs de sous-titres (3 lignes, mot à mot). |
 | `compose.py` | Assemble les passages, lisse les coupes, recadre avec FFmpeg, écrit la composition HTML HyperFrames (sous-titres, bulle-titre, logos, light leak, carte de fin). |
 | `media.py` | Toutes les opérations FFmpeg : découpe, concaténation, recadrage Lanczos, animation de fin. |
-| `render.py` | Rendu de la composition en MP4 par HyperFrames (Chrome headless), lint, captures. La commande `preview` lance HyperFrames Studio en arrière-plan (un port par short) pour lire les shorts en direct, sans rendu. |
+| `render.py` | Rendu de la composition en MP4 par HyperFrames (Chrome headless invisible), lint, captures. `preview --mp4` produit l'aperçu brouillon (12 i/s) validé par l'équipe ; `preview --open` lance le Studio pour une retouche fine. |
+| `multicam.py` | Rushs 3 caméras : gros plan de celui qui parle, écran partagé quand l'autre écoute (et seulement s'il est calme), son du micro. |
+| `verify.py`, `fillers.py`, `caption_check.py`, `qa.py` | Contrôles « à l'oreille » : vraies fins de phrase, « euh » retirés sans perdre un mot, sous-titres écoutés deux fois, rapport OK / ATTENTION / ÉCHEC avant chaque aperçu et après chaque rendu. |
+| `episode.py`, `diarize.py` | Épisode complet : dérushage par Claude, qui parle (empreintes vocales), liste de plans façon monteur, teaser scripté, chapitres ; corps rendu en FFmpeg, teaser en HyperFrames. |
+| `thumbnail.py`, `canva_template.py` | Miniatures YouTube : photos où les deux sourient en se regardant (détecteur d'expressions + jury visuel Claude), détourage, composition sur le gabarit Canva importé du PPTX de l'équipe. |
 | `posts.py` | Rédige le post LinkedIn de chaque short avec `posts.md` (méthode + exemples). |
 
 ## 2. Le parcours d'un épisode, fichier par fichier
 
 ```mermaid
 flowchart TD
-    EP[("depot/ → brands/marque/episodes/<br/>épisode 4K .mp4")]
+    EP[("brands/marque/episodes/<br/>rushs 3 caméras + micro (multicam.json)<br/>ou épisode monté .mp4")]
 
     EP -->|transcribe<br/>faster-whisper| T["transcript.json<br/>mots + horaires"]
     T -->|propose<br/>Claude × 3 angles + jury| CA["candidates.json / .md<br/>~10 passages"]
     CA -->|pick<br/>choix humain| CJ["clips.json<br/>5 shorts : passages, titre, tours de parole"]
     CJ -->|find / check<br/>ajustements à la main| CJ
 
-    CJ --> B
+    CJ -->|polish : tighten, verify, fillers,<br/>réactions vides, mots-clés| B
     subgraph B["build — un dossier par short : clips/clip_NN_titre/"]
         direction TB
-        S1["assets/source.mp4<br/>passages découpés et assemblés<br/>(FFmpeg, quasi sans perte)"]
+        S1["assets/source.mp4<br/>passages découpés et assemblés, plan par plan<br/>dans les rushs (FFmpeg, quasi sans perte)"]
         S2["analysis.json<br/>plans + visages"]
         S3["plan de caméras<br/>(reframe + lissage des coupes)"]
         S4["assets/reframed_9x16.mp4<br/>recadrage vertical FFmpeg Lanczos"]
@@ -87,13 +98,17 @@ flowchart TD
         S5 --> S6
     end
 
-    B -->|preview<br/>HyperFrames Studio, lecture en direct| PV["Aperçu instantané<br/>localhost:3002, 3003…<br/>validation par l'équipe"]
-    PV -->|retouche : clips.json puis build --only N| CJ
-    PV -->|validé : render<br/>HyperFrames + Chrome| R["renders/clip_NN_titre_9x16.mp4<br/>1080×1920"]
+    B -->|qa puis preview --mp4| PV["Aperçu MP4 (apercus/)<br/>+ qa --render (planche d'images)<br/>validation par l'équipe"]
+    PV -->|retouche : clips.json puis polish --only N| CJ
+    PV -->|validé : render + qa --render<br/>HyperFrames + Chrome| R["renders/clip_NN_titre_9x16.mp4<br/>1080×1920"]
     CJ -->|posts<br/>Claude + posts.md| P["posts/clip_NN_titre.md<br/>post LinkedIn + description courte"]
     R --> OUT["Livraison : 5 MP4 + 5 posts<br/>+ summary.md"]
     P --> OUT
 ```
+
+L'épisode complet (`episode-plan` → `episode_plan.md` à relire → `episode-render --proxy` → `episode-render`, sorties
+dans `episode/`) et les miniatures (`thumbnail` → `miniatures/`) partent de la même transcription : voir le schéma
+d'ensemble du [README](../README.md).
 
 Tout est rangé dans `output/<marque>/<episode>/` (jamais versionné). Chaque fichier intermédiaire est
 lisible et modifiable : on peut corriger `clips.json` à la main puis relancer seulement `build` et `render`
@@ -111,16 +126,16 @@ sequenceDiagram
     participant HF as HyperFrames
 
     SK->>CO: build --only N
-    CO->>FF: découpe chaque passage dans l'épisode 4K, assemble
+    CO->>FF: découpe chaque passage dans les rushs (gros plan / écran partagé), assemble
     CO->>AN: plans et visages sur l'assemblage
     AN-->>CO: changements de plan, positions des visages
-    CO->>CO: plan de caméras + lissage<br/>(fausses coupes fusionnées, punch-in aux raccords)
+    CO->>CO: plan de caméras + lissage<br/>(fausses coupes fusionnées, aucun zoom pour AI Corner)
     CO->>FF: applique le plan : crop + agrandissement Lanczos → reframed_9x16.mp4
-    CO->>FF: animation de fin recadrée, accélérée à 2 s
+    CO->>FF: animation de fin AI Partners recadrée (carte de fin de 7 s)
     CO->>CO: sous-titres, bulle-titre, barre de logos → index.html
     CO->>HF: lint (contrôle de la composition)
-    SK->>HF: preview (serveur local, lecture en direct)
-    HF-->>SK: aperçu validé par l'utilisateur
+    SK->>HF: qa puis preview --mp4 (aperçu brouillon 12 i/s)
+    HF-->>SK: aperçu MP4 validé par l'utilisateur
     SK->>HF: render (une seule fois)
     HF-->>SK: MP4 1080×1920 (CRF 12)
 ```
@@ -130,7 +145,7 @@ sequenceDiagram
 | Règle | Où c'est codé |
 | --- | --- |
 | Ne jamais couper une pensée : coupes calées sur les premiers / derniers mots cités, marge audio limitée au silence disponible | `select_clips.snap_to_quotes`, `_snap` ; contrôle `clipper check` |
-| Pas de saccades : les fausses coupes sont détectées par différence d'image et fusionnées ; raccord entre passages = punch-in | `compose._smooth_plan`, `_frame_diff`, `_punch_junctions` |
+| Pas de saccades : les fausses coupes sont détectées par différence d'image et fusionnées ; raccord entre passages = coupe nette (AI Corner : aucun zoom, `junction_punch: 1.0`) | `compose._smooth_plan`, `_frame_diff`, `_punch_junctions` |
 | Netteté : recadrage par FFmpeg depuis la 4K, intermédiaires CRF 10, images PNG, rendu CRF 12 | `media.reframe_video`, `cut_segment`, `config/defaults.yaml` → `render` |
 | Posts sans invention : seule la transcription du short est fournie à Claude, consigne de ne rien ajouter | `posts.py` |
 | Navigateur bloqué par Windows : repli automatique sur Chrome / Edge installés | `render.fallback_browser` |
