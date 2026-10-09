@@ -28,8 +28,7 @@ est automatique. Aucune vidéo finale n'est rendue sans validation sur un aperç
 
 **Ce qui se fait en parallèle** : dès la transcription, les trois colonnes avancent en même temps (flèches pleines =
 étape suivante dans la colonne). Une **flèche en pointillés** = une étape qui attend le résultat d'une autre colonne :
-la description YouTube de l'épisode attend le titre validé ; l'outro des shorts attend la miniature choisie (et reprend
-la durée de l'épisode monté). Tout le reste n'attend rien : on peut monter, faire valider et rendre les shorts, monter
+la description YouTube de l'épisode attend le titre validé ; l'outro des shorts attend la miniature choisie. Tout le reste n'attend rien : on peut monter, faire valider et rendre les shorts, monter
 l'épisode et choisir le titre en même temps.
 
 - Guide d'utilisation (workflow, « quel fichier modifier pour changer le format ») : **[docs/FRAMEWORK.md](docs/FRAMEWORK.md)**

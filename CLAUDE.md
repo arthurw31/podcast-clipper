@@ -176,14 +176,15 @@ call to action avec la miniature ; on peut monter les shorts en parallèle, mais
 shorts il faut que la miniature soit validée »)
 
 - Design = **variante A** du test du 09/10 (`output/…/motion_design/outro_short/`, 4 variantes A–D faites par une autre
-  session) : animation AI Partners, logo, « L'ÉPISODE COMPLET », la miniature en carte YouTube (bouton lecture, durée, barre
-  de progression), flèche, bouton « Regarder l'épisode — lien en description » ; 7 s, 1080×1920, 30 i/s. Le test utilisait
-  une ancienne miniature et une durée « 47:10 » écrite à la main : `clipper/short_outro.py` prend la miniature CHOISIE
-  (`miniatures/miniature_finale.jpg`) et la durée du MP4 de l'épisode monté (final, sinon aperçu ; aucun badge sinon).
+  session) : animation AI Partners, logo, « L'ÉPISODE COMPLET », la miniature en carte YouTube (bouton lecture, barre de
+  progression), flèche, bouton « Regarder l'épisode — lien en description » ; 7 s, 1080×1920, 30 i/s. Le test utilisait
+  une ancienne miniature : `clipper/short_outro.py` prend la miniature CHOISIE (`miniatures/miniature_finale.jpg`). **Pas de
+  durée d'épisode** sur la carte (Arthur, 09/10/2026 : « enlève la durée, c'est pas important, ça enlève une dépendance ») :
+  l'outro ne dépend que de la miniature, pas du montage de l'épisode.
 - **Dépendances** : les shorts 9:16 se montent, se valident et se rendent SANS carte de fin (`format_overrides.9x16.outro.
   enabled: false` ; le teaser 16:9 garde sa fin logo). `python -m clipper outro --brand <m> --input <E>.mp4 [--only N]`
   refuse tant que `thumbnail --pick` n'a pas eu lieu ; sinon il rend l'outro UNE fois (HyperFrames, ~2 min 40, refaite si la
-  miniature, le texte ou la durée changent) et la colle à chaque short rendu -> `livrables/clip_NN_…_9x16.mp4` (dernière image
+  miniature ou le texte changent) et la colle à chaque short rendu -> `livrables/clip_NN_…_9x16.mp4` (dernière image
   tenue 0,4 s pendant le fondu : la voix n'est jamais raccourcie ; ré-encodage H.264 CRF 14, ~1 min par short). Un short rendu
   avec l'ancienne carte de fin intégrée (`id="outro"` dans sa composition) est signalé « À REFAIRE » (`build --only N --force`
   puis `render --only N`) au lieu de recevoir deux cartes de fin. Réglages : section `short_outro:` de brand.yaml.

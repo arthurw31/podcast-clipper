@@ -3,8 +3,8 @@
 Demande d'Arthur (09/10/2026) : « pour les shorts, mettre en outro la première des 4 outros en motion design (call to action
 avec la miniature) ; on peut monter les shorts en parallèle, mais pour créer l'outro et la rajouter à la fin des shorts il
 faut que la miniature soit validée ». Design = variante A du test du 09/10 (motion_design/outro_short/, autre session) :
-animation AI Partners en fond, logo, « L'ÉPISODE COMPLET », la miniature en carte YouTube (bouton lecture, durée, barre de
-progression), flèche, bouton « Regarder l'épisode — lien en description ». 7 s, 1080×1920, 30 i/s.
+animation AI Partners en fond, logo, « L'ÉPISODE COMPLET », la miniature en carte YouTube (bouton lecture, barre de
+progression ; sans durée : Arthur, 09/10/2026, « ça enlève une dépendance »), flèche, bouton « Regarder l'épisode — lien en description ». 7 s, 1080×1920, 30 i/s.
 
 Dépendances : les shorts se montent, se valident et se rendent SANS carte de fin (`format_overrides.9x16.outro.enabled:
 false`) ; cette étape n'attend que la miniature choisie (`thumbnail --pick`). L'outro est rendue UNE fois par épisode
@@ -47,7 +47,6 @@ html, body {{ width: 1080px; height: 1920px; overflow: hidden; background: #000;
 .card img {{ width: 100%; height: 100%; display: block; }}
 .play {{ position: absolute; left: 50%; top: 50%; width: 124px; height: 124px; margin: -62px 0 0 -62px; border-radius: 50%; background: rgba(255,255,255,.93); }}
 .play::after {{ content: ""; position: absolute; left: 48px; top: 31px; border-left: 52px solid #258AF3; border-top: 31px solid transparent; border-bottom: 31px solid transparent; }}
-.dur {{ position: absolute; right: 18px; bottom: 34px; background: rgba(0,0,0,.78); border-radius: 8px; padding: 6px 12px; font-size: 30px; }}
 .track {{ position: absolute; left: 18px; right: 18px; bottom: 12px; height: 10px; border-radius: 5px; background: rgba(255,255,255,.35); }}
 .fill {{ position: absolute; left: 0; top: 0; height: 100%; width: 100%; border-radius: 5px; background: #258AF3; transform-origin: left center; }}
 .btn {{ position: absolute; left: 50%; height: 96px; padding: 0 48px 0 96px; border-radius: 48px; background: #258AF3; white-space: nowrap;
@@ -60,7 +59,7 @@ html, body {{ width: 1080px; height: 1920px; overflow: hidden; background: #000;
 <div class="clip layer" id="ov" data-start="0" data-duration="{d}" data-track-index="2"><div class="veil"></div>
 <img class="logo" id="lg" src="assets/logo.png" alt="" style="top:300px; width:420px; margin-left:-210px" />
 <div class="title" id="tt" style="top:520px">{title}</div>
-<div class="card" id="cd" style="top:{y}px"><img src="assets/thumb.jpg" alt="" /><div class="play" id="cd-play"></div>{dur}<div class="track"><div class="fill" id="cd-fill"></div></div></div>
+<div class="card" id="cd" style="top:{y}px"><img src="assets/thumb.jpg" alt="" /><div class="play" id="cd-play"></div><div class="track"><div class="fill" id="cd-fill"></div></div></div>
 <svg class="layer" viewBox="0 0 1080 1920"><path id="ar" d="M 770 {a0} Q 760 {a1} 640 {a2}" fill="none" stroke="#258AF3" stroke-width="9" stroke-linecap="round" stroke-dasharray="400" stroke-dashoffset="400"/>
 <path id="ah" d="M 640 {a2} l 46 6 M 640 {a2} l 16 42" fill="none" stroke="#258AF3" stroke-width="9" stroke-linecap="round" opacity="0"/></svg>
 <div class="btn" id="bt" style="top:{by}px">{cta}</div>
@@ -85,20 +84,6 @@ tl.seek(0);
 """
 
 
-def _mmss(s: float) -> str:
-    s = int(round(s))
-    return f"{s // 3600}:{s % 3600 // 60:02d}:{s % 60:02d}" if s >= 3600 else f"{s // 60}:{s % 60:02d}"
-
-
-def episode_duration(ep: Path, video: Path) -> float | None:
-    """Durée de l'épisode monté (badge de la carte) : MP4 final, sinon aperçu ; aucune durée inventée."""
-    for name in (f"{video.stem}_episode.mp4", f"{video.stem}_episode_apercu.mp4"):
-        f = ep / "episode" / name
-        if f.exists():
-            return float(probe(f)["duration"])
-    return None
-
-
 def thumbnail(ep: Path) -> Path:
     f = ep / "miniatures" / "miniature_finale.jpg"
     if not f.exists() or not (ep / "miniatures" / "miniature_choisie.json").exists():
@@ -108,17 +93,17 @@ def thumbnail(ep: Path) -> Path:
 
 
 def build(brand, ep: Path, video: Path, force: bool = False) -> Path:
-    """Rend l'outro (7 s) une fois par épisode -> ep/outro_short/outro_9x16.mp4. Refaite si la miniature ou le texte change."""
+    """Rend l'outro (7 s) une fois par épisode -> ep/outro_short/outro_9x16.mp4. Refaite si la miniature ou le texte change.
+    Ne dépend que de la miniature choisie (aucune durée d'épisode affichée)."""
     from .render import lint, render
     cfg = brand.cfg.get("short_outro") or {}
     d = float(cfg.get("duration", 7.0))
     thumb = thumbnail(ep)
-    dur = episode_duration(ep, video)
     title = str(cfg.get("title", "L'épisode complet"))
     cta = str(cfg.get("cta", "Regarder l'épisode — lien en description"))
     proj = ep / "outro_short" / "9x16"
     out = ep / "outro_short" / "outro_9x16.mp4"
-    stamp = hashlib.sha256(thumb.read_bytes() + f"{title}|{cta}|{dur and _mmss(dur)}|{d}".encode()).hexdigest()[:16]
+    stamp = hashlib.sha256(thumb.read_bytes() + f"{title}|{cta}|{d}".encode()).hexdigest()[:16]
     stamp_f = out.with_suffix(".stamp")
     if out.exists() and not force and stamp_f.exists() and stamp_f.read_text() == stamp:
         return out
@@ -132,8 +117,7 @@ def build(brand, ep: Path, video: Path, force: bool = False) -> Path:
     shutil.copy2(brand.asset("fonts/Metropolis-Bold.ttf"), assets / "Metropolis-Bold.ttf")
     y = 640
     html = PAGE.format(tx=TX, tw=TW, th=TH, d=d, title=title, cta=cta, y=y, by=y + TH + 280,
-                       a0=y + TH + 250, a1=y + TH + 140, a2=y + TH + 50,
-                       dur=f'<div class="dur">{_mmss(dur)}</div>' if dur else "")
+                       a0=y + TH + 250, a1=y + TH + 140, a2=y + TH + 50)
     (proj / "index.html").write_text(html, encoding="utf-8")
     ok, findings = lint(proj)
     if not ok:
