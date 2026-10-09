@@ -231,8 +231,8 @@ shorts (aucune attente mutuelle) :
    miniature_finale.jpg` (+ `_HD.png`) : le livrable à téléverser sur YouTube avec le titre validé.
 
 `thumbnail` s'arrête s'il n'y a pas de titre validé ; la description YouTube de l'épisode reprend le même titre.
-Si tu modifies ce process, mets à jour le schéma de GitHub (README « Vue d'ensemble », docs/ARCHITECTURE.md) : voir CLAUDE.md,
-« Règle de maintenance », et lance `python scripts/check_schema.py`.
+Si tu modifies ce process, mets à jour le schéma de GitHub (`docs/schema.mmd` puis `python scripts/render_schema.py`,
+docs/ARCHITECTURE.md) : voir CLAUDE.md, « Règle de maintenance », et lance `python scripts/check_schema.py`.
 
 ## Retouches courantes
 

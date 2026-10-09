@@ -13,15 +13,20 @@ ce fichier résume ce qu'il faut savoir pour **modifier** le projet sans casser 
 ## Règle de maintenance : le schéma suit le process (Arthur, 09/10/2026 : « mets à jour le schéma d'architecture à chaque fois
 qu'on modifie le process » ; précisé le même jour : « le schéma, c'est celui de GitHub, on met à jour que celui-là »)
 
-Le SEUL schéma à tenir à jour est celui de GitHub : « Vue d'ensemble » du [README](README.md) (mermaid, les étapes citent leur
-commande). La page partagée qui avait été publiée en plus (artifact, docs/schema.html) a été supprimée : ne pas la recréer.
+Le SEUL schéma à tenir à jour est celui de GitHub, affiché par la « Vue d'ensemble » du [README](README.md). La page partagée
+publiée en plus (artifact, docs/schema.html) a été supprimée : ne pas la recréer. Le schéma est une IMAGE (`docs/schema.svg`)
+générée depuis la source Mermaid [docs/schema.mmd](docs/schema.mmd) : le même schéma en Mermaid direct affichait chez Arthur
+« Unable to render rich display — Cannot read properties of undefined (reading 'render') » (09/10/2026), alors qu'il se
+dessinait sans erreur avec Mermaid 10.0 à 12.1 et sur GitHub dans un autre navigateur. Dans les libellés, jamais de ligne
+qui commence par « + » après `<br/>` : en image, elle est prise pour une puce et effacée.
 À CHAQUE modification du process (nouvelle commande, étape ajoutée, retirée ou déplacée, nouvelle validation humaine, nouveau
 livrable), dans le MÊME commit :
-1. le schéma d'ensemble du README ;
+1. `docs/schema.mmd` (les étapes citent leur commande), puis `python scripts/render_schema.py` (Chrome sans fenêtre,
+   Mermaid 11.4.1 figé, ~15 s) et REGARDER l'image ;
 2. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (liste « commandes » du bloc cli.py, tableau des briques, parcours des fichiers) ;
 3. lancer `python scripts/check_schema.py` : il échoue si une commande du CLI manque dans ARCHITECTURE, si une étape du
-   process (liste `PROCESS` du script) manque dans le schéma du README, ou si une validation humaine disparaît. Une nouvelle
-   étape du process s'ajoute aussi à `PROCESS` dans le script ;
+   process (liste `PROCESS` du script) ou une validation humaine manque dans le schéma, ou si l'image n'a pas été
+   régénérée depuis la source (empreinte). Une nouvelle étape du process s'ajoute aussi à `PROCESS` dans le script ;
 4. pousser sur GitHub (c'est ce que l'équipe lit) après avoir vérifié `git show --stat` (seulement les fichiers de la
    modification, aucun modèle .onnx), puis regarder le rendu sur github.com.
 Puis noter la demande et sa date dans la section concernée de ce fichier.

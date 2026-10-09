@@ -1,0 +1,43 @@
+flowchart TD
+    IN[/"1 · Dépôt dans depot/ : 3 rushs MP4 + l'audio WAV<br/>gros plan invité · plan large · gros plan animateur · micro"/]
+    IN --> FE["2 · rushes : fichiers vérifiés, caméras reconnues (visages),<br/>micro synchronisé, rangement + multicam.json"]
+    FE --> TR["3 · transcribe : texte mot à mot (Whisper)<br/>et qui parle quand (empreintes vocales)"]
+    TR --> S1
+    TR --> E1
+    TR --> M1
+
+    subgraph SH["5 shorts verticaux 9:16"]
+        direction TB
+        S1{{"propose : Claude propose ~10 passages"}} --> S2["L'équipe choisit 5 passages (pick)<br/>et ses demandes particulières"]
+        S2 --> S3["polish : « euh » et blancs retirés,<br/>gros plan / écran partagé, sous-titres<br/>vérifiés à l'écoute, carte de fin"]
+        S3 --> S4["qa + aperçus MP4"]
+        S4 --> S5["L'équipe valide les aperçus"]
+        S5 -->|retouche| S3
+        S5 -->|validé| S6["render 1080p + qa final<br/>posts : 1 post LinkedIn par short"]
+    end
+
+    subgraph EP["Épisode complet + teaser"]
+        direction TB
+        E1{{"episode-plan : dérushage, liste de plans,<br/>raccords nettoyés, teaser scripté, chapitres"}} --> E2["episode-render --proxy : aperçu 540p"]
+        E2 --> E3["L'équipe valide l'aperçu"]
+        E3 --> E4["episode-render 1080p + qa --episode<br/>teaser HyperFrames + corps FFmpeg, -16 LUFS"]
+    end
+
+    subgraph MI["Titre + miniature YouTube"]
+        direction TB
+        M1{{"titles : Claude écrit des titres, chacun adossé à un<br/>passage de l'épisode, contrôlés → 5 propositions"}} --> M2["Planche « chaîne YouTube »<br/>5 vignettes avec leur titre"]
+        M2 --> M3["L'équipe marketing valide 1 titre<br/>(titles --pick N)"]
+        M3 --> M4["thumbnail : planche de 4 miniatures, photos où les deux<br/>sourient, gabarit Canva (thumbnail-template), titre validé"]
+        M4 --> M5["L'équipe choisit sa miniature préférée<br/>(thumbnail --pick N)"]
+    end
+
+    S6 --> L1[("5 shorts MP4<br/>et 5 posts LinkedIn")]
+    E4 --> L2[("Épisode 1080p avec teaser,<br/>description YouTube (titre validé)<br/>et chapitres")]
+    M5 --> L3[("Titre validé + miniature choisie<br/>1280×720 + HD")]
+
+    classDef human fill:#FFF2DF,stroke:#C26A00,color:#3A2810;
+    classDef llm fill:#EFEBFF,stroke:#6B4FD8,color:#251C47;
+    classDef deliver fill:#E2F5EC,stroke:#0F7A55,color:#0F3127;
+    class IN,S2,S5,E3,M3,M5 human;
+    class S1,E1,M1 llm;
+    class L1,L2,L3 deliver;

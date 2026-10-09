@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 """Vérifie que le schéma du process suit le code (règle d'Arthur, 09/10/2026 : « mets à jour le schéma d'architecture à chaque fois
-qu'on modifie le process » ; le schéma de référence est celui de GitHub : « Vue d'ensemble » du README). À lancer avant de
-commiter toute modification du process ; code de sortie 1 si un oubli est détecté.
+qu'on modifie le process » ; le schéma de référence est celui de GitHub, affiché par le README). À lancer avant de commiter
+toute modification du process ; code de sortie 1 si un oubli est détecté.
 
-Contrôles :
+Le schéma : source Mermaid `docs/schema.mmd` -> image `docs/schema.svg` (`python scripts/render_schema.py`), affichée par le
+README (« Vue d'ensemble »). Contrôles :
 1. chaque commande du CLI figure dans la liste « commandes » de docs/ARCHITECTURE.md ;
-2. chaque commande qui est une ÉTAPE du process (PROCESS) figure dans le schéma d'ensemble du README (mermaid) ;
-3. le schéma cite les étapes de validation humaine (`titles --pick`, `thumbnail --pick`).
+2. chaque commande qui est une ÉTAPE du process (PROCESS) figure dans docs/schema.mmd ;
+3. le schéma cite les validations humaines (`titles --pick`, `thumbnail --pick`) ;
+4. le README affiche docs/schema.svg et l'image a été régénérée depuis la source actuelle (empreinte).
 """
 from __future__ import annotations
 
@@ -17,6 +19,9 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from render_schema import OUT, SRC, source_hash  # noqa: E402
+
 # commandes qui sont une étape du process (les autres : utilitaires, sous-étapes de `polish`, recours)
 PROCESS = ["rushes", "transcribe", "propose", "pick", "polish", "qa", "render", "posts", "episode-plan", "episode-render",
            "titles", "thumbnail", "thumbnail-template"]
@@ -36,16 +41,11 @@ def mentions(text: str, cmd: str) -> bool:
     return re.search(rf"(?<![\w-]){re.escape(cmd)}(?![\w-])", text) is not None
 
 
-def section(text: str, start: str) -> str:
-    i = text.find(start)
-    return text[i:].split("\n## ", 2)[0] if i >= 0 else ""
-
-
 def main() -> int:
     cmds = cli_commands()
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     arch = (ROOT / "docs" / "ARCHITECTURE.md").read_text(encoding="utf-8")
-    overview = section(readme, "## Vue d'ensemble")
+    schema = SRC.read_text(encoding="utf-8") if SRC.exists() else ""
     cli_row = next((l for l in arch.splitlines() if "commandes :" in l), "")
     problems: list[str] = []
     for c in cmds:
@@ -54,16 +54,22 @@ def main() -> int:
     for c in PROCESS:
         if c not in cmds:
             problems.append(f"scripts/check_schema.py : `{c}` n'est plus une commande (mettre PROCESS à jour)")
-        elif not mentions(overview, c):
-            problems.append(f"README.md (Vue d'ensemble) : l'étape `{c}` n'est pas dans le schéma")
+        elif not mentions(schema, c):
+            problems.append(f"docs/schema.mmd : l'étape `{c}` n'est pas dans le schéma")
     for g in HUMAN_GATES:
-        if g not in overview:
-            problems.append(f"README.md (Vue d'ensemble) : la validation humaine `{g}` n'est pas dans le schéma")
+        if g not in schema:
+            problems.append(f"docs/schema.mmd : la validation humaine `{g}` n'est pas dans le schéma")
+    if "docs/schema.svg" not in readme:
+        problems.append("README.md : l'image docs/schema.svg n'est plus affichée")
+    svg = OUT.read_text(encoding="utf-8") if OUT.exists() else ""
+    if f"source-sha256: {source_hash(schema)}" not in svg:
+        problems.append("docs/schema.svg : image périmée, lancer `python scripts/render_schema.py`")
     if problems:
         print("Le schéma n'est pas à jour avec le process :")
         print("\n".join(f"  - {p}" for p in problems))
         return 1
-    print(f"Schéma à jour : {len(cmds)} commandes, {len(PROCESS)} étapes du process, {len(HUMAN_GATES)} validations humaines.")
+    print(f"Schéma à jour : {len(cmds)} commandes, {len(PROCESS)} étapes du process, {len(HUMAN_GATES)} validations "
+          "humaines, image régénérée.")
     return 0
 
 
