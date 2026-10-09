@@ -263,6 +263,11 @@ publication:
   episode_url: ""           # URL de l'épisode complet (surchargée par `--episode-url`)
   llm_backend: ""           # vide = selection.llm_backend
   llm_model: ""             # vide = selection.llm_model
+  contact_cta:              # ligne « travailler avec nous » ajoutée telle quelle à la fin des posts LinkedIn, des
+    enabled: true           # descriptions courtes et de la description YouTube de l'épisode (vide = rien)
+    url: ""
+    text_en: ""
+    text_fr: ""
 
 # ---------------------------------------------------------------- render ---
 render:

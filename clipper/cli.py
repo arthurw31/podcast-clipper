@@ -725,6 +725,18 @@ def _episode_inputs(a: argparse.Namespace):
     return brand, video, ep, spec, transcript
 
 
+def _contact(brand) -> str:
+    """Ligne « travailler avec nous » de la description YouTube (dans la langue du podcast)."""
+    from .posts import contact_line
+    return contact_line(brand.cfg.get("publication") or {}, str(brand.cfg.get("language") or "fr"))
+
+
+def _contact(brand: Brand) -> str:
+    """Ligne « travailler avec nous » de la description YouTube (dans la langue du podcast)."""
+    from .posts import contact_line
+    return contact_line(brand.cfg.get("publication") or {}, str(brand.cfg.get("language") or "fr"))
+
+
 def _episode_logo(brand: Brand) -> dict | None:
     lg = brand.cfg.get("episode_logo") or {}
     f = brand.asset(lg.get("file")) if lg else None
@@ -854,7 +866,8 @@ def cmd_episode_render(a: argparse.Namespace) -> None:
     out = out_dir / f"{video.stem}_episode{tag}{suffix}.mp4"
     assemble([t_v, body_v, end], [t_a, work / "body_audio.wav", end_duration(brand)], out, work)
     t_len = float(probe(t_v)["duration"])
-    (out_dir / "description_youtube.md").write_text(description(plan, edl["shots"], words, t_len, a.guest, a.company),
+    (out_dir / "description_youtube.md").write_text(description(plan, edl["shots"], words, t_len, a.guest, a.company,
+                                                               contact=_contact(brand)),
                                                    encoding="utf-8")
     console.print(f"[green]✓ {out}[/green]  ({probe(out)['duration'] / 60:.1f} min)")
 
@@ -978,7 +991,7 @@ def cmd_qa(a: argparse.Namespace) -> str:
     if a.episode:
         mp4 = ep / "episode" / f"{video.stem}_episode{'_apercu' if a.proxy else ''}.mp4"
         from .episode import end_duration
-        status, lines = qa_episode(ep, mp4, brand.cfg, end_len=end_duration(brand))
+        status, lines = qa_episode(ep, mp4, brand.cfg, end_len=end_duration(brand), src_wav=_wav_for(video))
         (out_dir / "episode.md").write_text(f"# QA épisode complet — {status}\n\n" + "\n".join(lines) + "\n", encoding="utf-8")
         console.rule(f"Épisode complet : {status}")
         console.print("\n".join(lines))

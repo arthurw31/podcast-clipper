@@ -71,8 +71,10 @@ réagit) ; jamais de mise en contexte ; chaque extrait se comprend seul et finit
   pendant 3,2 s, du côté de l'invité dans le plan large — nom en capitales Metropolis Bold, filet bleu #258AF3 qui
   se trace, rôle en dessous (« VP Global Data & AI · Coty »). Testés puis écartés : chiffre-clé animé (« 3 000 AGENTS
   IA ») et sons (whoosh, montée) — désactivés (`teaser.motion.stats` / `sfx`), réactivables.
-- **Carte de fin** : dernière image du teaser **floutée**, logo de l'émission au centre, **nom de l'invité** en
-  blanc et **entreprise** en couleur (jaune → **bleu #258AF3**, droit), ~3,5 s. Pas de bouton.
+- **Fin** (règle permanente d'Arthur jusqu'à nouvel ordre, 09/10/2026, retour de Mohamed) : **l'animation du logo
+  AI Partners** — lignes « montagne » qui se dessinent + logo blanc centré, 7 s, la même qu'à la fin des shorts
+  (`teaser.outro.background: video`). Pas de bouton, pas d'invité. Avant : dernière image floutée + nom de l'invité
+  + entreprise (~3,5 s).
 
 ## 6. Exigences de script (retour d'Arthur, 08/10/2026)
 

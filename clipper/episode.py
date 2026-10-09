@@ -283,13 +283,16 @@ def _snap_gap(words: list[dict], t: float, lo: float, hi: float) -> float:
 
 
 def build_edl(words: list[dict], ranges: list[tuple[float, float]], seed: int = 7,
-              break_every: tuple[float, float] = (15.0, 24.0), break_len: tuple[float, float] = (5.5, 8.0),
-              reaction_len: float = 1.5, reaction_rate: float = 1 / 60, min_shot: float = 2.0) -> list[dict]:
+              break_every: tuple[float, float] = (12.0, 19.0), break_len: tuple[float, float] = (5.5, 8.0),
+              reaction_len: float = 1.5, reaction_rate: float = 0.0, min_shot: float = 2.0) -> list[dict]:
     """Liste de plans [{start, end, cam}] en temps des rushs ; cam ∈ host | guest | wide | split.
 
     Gros plan de la personne qui parle ; changement d'orateur -> coupe 0,15 s avant son premier mot (dans le silence) ;
-    réponse longue -> respiration large / split toutes les 15–24 s ; ~1 réaction de 1,5 s par minute ; jonction de
-    dérushage -> changement de plan forcé (jamais de jump cut sur le même cadre)."""
+    réponse longue -> respiration large / split toutes les 12–19 s (15–24 s avant le 09/10/2026, quand les
+    réactions coupaient aussi les gros plans) ; jonction de dérushage -> changement de plan forcé
+    (jamais de jump cut sur le même cadre). Puis `enforce_speaker` : ON VOIT TOUJOURS CELUI QUI PARLE.
+    Réactions sur l'écoutant seul (`reaction_rate`, ~1/60 avant le 09/10/2026) : désactivées — elles montraient l'autre
+    pendant 1,5 s en pleine phrase ; l'écoutant se voit dans les respirations large / écran partagé."""
     rng = random.Random(seed)
     shots: list[dict] = []
     cycle = [["wide"], ["split"], ["wide", "split"], ["split"], ["wide"]]
@@ -330,7 +333,7 @@ def build_edl(words: list[dict], ranges: list[tuple[float, float]], seed: int = 
                 bs = _snap_gap(ws, nxt_break, nxt_break - 2.5, nxt_break + 2.5)
                 stretch = bs - cur
                 # réaction sur l'écoutant au milieu d'un long gros plan (~1 par minute)
-                if stretch > 12 and rng.random() < min(1.0, stretch * reaction_rate * 1.6):
+                if reaction_rate > 0 and stretch > 12 and rng.random() < min(1.0, stretch * reaction_rate * 1.6):
                     rs = _snap_gap(ws, cur + stretch * rng.uniform(0.4, 0.6), cur + 5, bs - 5)
                     shots.append({"start": cur, "end": rs, "cam": spk})
                     shots.append({"start": rs, "end": rs + reaction_len, "cam": other, "reaction": True})
@@ -358,7 +361,82 @@ def build_edl(words: list[dict], ranges: list[tuple[float, float]], seed: int = 
             clean[-1]["end"] = s["end"]
         else:
             clean.append(dict(s))
-    return clean
+    return enforce_speaker(clean, words, min_shot=min_shot)
+
+
+def speaker_runs(shot: dict, words: list[dict], tol: float = 0.4, join: float = 0.6) -> list[tuple[float, float]]:
+    """Passages d'un gros plan où l'on entend L'AUTRE personne (mots de l'autre réunis si < `join` s d'écart) :
+    [(début, fin)] de plus de `tol` s (un « oui » isolé de 0,2 s est toléré). Plan large / écran partagé : []."""
+    cam = shot["cam"]
+    if cam not in ("host", "guest"):
+        return []
+    runs: list[list[float]] = []
+    for w in words:
+        m = (w["s"] + w["e"]) / 2
+        if m < shot["start"] or m >= shot["end"] or w.get("spk", cam) == cam:
+            continue
+        a, b = max(shot["start"], w["s"]), min(shot["end"], w["e"])
+        if runs and a - runs[-1][1] < join:
+            runs[-1][1] = b
+        else:
+            runs.append([a, b])
+    return [(a, b) for a, b in runs if b - a > tol]
+
+
+def enforce_speaker(shots: list[dict], words: list[dict], min_shot: float = 2.0, solo: float = 2.5,
+                    passes: int = 3) -> list[dict]:
+    """On voit TOUJOURS celui qui parle (Arthur, 09/10/2026 : « soit un plan caméra avec que lui, soit un plan avec les
+    deux, mais il faut qu'on voie toujours celui qui parle »). Dans chaque gros plan, un passage où parle l'autre
+    devient : son gros plan s'il dure ≥ `solo` s, sinon un écran partagé (les deux visibles) d'au moins `min_shot` s ;
+    un gros plan restant plus court que `min_shot` passe aussi en écran partagé. Répété (`passes`) car un nouveau gros
+    plan peut à son tour contenir une réplique de l'autre (ping-pong rapide : E22 21:48 « globale ? » / « globale. Ok. »)."""
+    for _ in range(passes):
+        out: list[dict] = []
+        changed = False
+        for s in shots:
+            runs = speaker_runs(s, words)
+            if not runs:
+                out.append(s)
+                continue
+            changed = True
+            cam, other = s["cam"], ("guest" if s["cam"] == "host" else "host")
+            lo, hi = s["start"], s["end"]
+            pieces: list[list] = []
+            for a, b in runs:
+                a = max(lo, _snap_gap(words, a - 0.15, a - 0.6, a))
+                b = min(hi, _snap_gap(words, b + 0.15, b, b + 0.6))
+                c = other if b - a >= solo else "split"
+                if c == "split" and b - a < min_shot:
+                    pad = (min_shot - (b - a)) / 2
+                    a, b = max(lo, a - pad), min(hi, b + pad)
+                if pieces and a <= pieces[-1][1] + 1e-3:
+                    pieces[-1][1] = max(pieces[-1][1], b)
+                    if pieces[-1][2] != c:
+                        pieces[-1][2] = "split"
+                else:
+                    pieces.append([a, b, c])
+            seq, cur = [], lo
+            for a, b, c in pieces:
+                if a > cur:
+                    seq.append([cur, a, cam])
+                seq.append([a, b, c])
+                cur = b
+            if cur < hi:
+                seq.append([cur, hi, cam])
+            for p in seq:   # gros plan trop court -> écran partagé (les deux visibles : jamais faux)
+                if p[2] in ("host", "guest") and p[1] - p[0] < min_shot:
+                    p[2] = "split"
+            out += [{"start": a, "end": b, "cam": c} for a, b, c in seq if b - a > 0.04]
+        res: list[dict] = []
+        for s in out:   # plans contigus identiques réunis
+            if res and res[-1]["cam"] == s["cam"] and abs(res[-1]["end"] - s["start"]) < 0.05:
+                res[-1]["end"] = s["end"]
+            else:
+                res.append(dict(s))
+        shots = res
+        if not changed:
+            break
+    return shots
 
 
 # ------------------------------------------------------------------------------------------------ 4. rendu
@@ -822,7 +900,7 @@ def assemble(parts_video: list[Path], parts_audio: list[Path | float], dst: Path
 
 
 def description(plan: dict, shots: list[dict], words: list[dict], offset: float, guest: str, company: str,
-                fps: int = 24) -> str:
+                fps: int = 24, contact: str = "") -> str:
     """Titre + chapitres YouTube (temps de l'épisode monté, teaser compris) pour la description."""
     lines = [f"# {plan.get('youtube_title', '')}", "", f"Invité : {guest} ({company})", "", "## Chapitres", "",
              "0:00 Teaser"]
@@ -832,4 +910,6 @@ def description(plan: dict, shots: list[dict], words: list[dict], offset: float,
         o = out_time(shots, t, fps)
         if o is not None:
             lines.append(f"{_ts(o + offset)} {c['title']}")
+    if contact:
+        lines += ["", contact]
     return "\n".join(lines) + "\n"

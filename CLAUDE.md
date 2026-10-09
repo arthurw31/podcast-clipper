@@ -251,8 +251,19 @@ process pour les rendre mieux, et une étape où quelqu'un du marketing valide u
 `episode/description_youtube.md` (titre + chapitres aux temps du montage).
 - Style mesuré sur les montages du monteur (E20 MAIF, E21 Mendo — même studio que E22) : plan médian ≈ 10 s ;
   gros plans 76 %, large 14 %, écran partagé (2 gros plans côte à côte, animateur du côté où il est dans le large) 10 % ;
-  sur la personne qui parle 97 % du temps ; respiration large/split (~7 s) toutes les 15–24 s dans les longues
-  réponses ; ~1 réaction de 1,5 s par minute sur l'écoutant. `build_edl` reproduit ces proportions (E22 : 78/11/10 %).
+  sur la personne qui parle 97 % du temps ; respiration large/split (~7 s) toutes les 12–19 s dans les longues
+  réponses. `build_edl` reproduit ces proportions (E22 : 74/13/13 %, médiane 9 s).
+- **On voit TOUJOURS celui qui parle** (Arthur, 09/10/2026 : « des fois l'invité parle et la caméra est centrée sur
+  Thomas, et inversement — quand une personne parle, soit un plan avec que lui, soit un plan avec les deux, mais il
+  faut qu'on voie toujours celui qui parle ») : `episode.enforce_speaker` (fin de `build_edl`) — dans un gros plan,
+  toute réplique de l'autre de plus de 0,4 s (`speaker_runs`) devient son gros plan (≥ 2,5 s) ou un écran partagé
+  (≥ 2 s) ; gros plan restant < 2 s -> écran partagé ; répété 3 fois (ping-pong rapide). Les plans de **réaction**
+  sur l'écoutant seul sont **supprimés** (`reaction_rate: 0`) : ils montraient l'autre 1,5 s en pleine phrase.
+  E22 avant : 41 passages, 54 s hors champ (réactions, « bonjour Thomas », « Pardon », ping-pong 21:48 « Qui est
+  globale ? » / « Qui est globale. Ok. » fondu dans un seul plan par le nettoyage des plans < 2 s) ; après : 0.
+  `qa --episode` le contrôle deux fois : `speaker_visible` (tours de parole, ÉCHEC) et `voice_matches_shot`
+  (empreinte vocale WeSpeaker de chaque gros plan comparée aux deux voix, INDÉPENDANT de la diarisation -> ATTENTION
+  avec l'instant, à regarder : c'est lui qui attrape une erreur de « qui parle »).
 - Dérushage par le LLM (`PLAN_PROMPT`) : dernière prise de l'intro, au revoir, coupes hors antenne / question reposée
   (citations calées sur les mots) ; jonction de dérushage = changement de plan forcé (jamais de jump cut).
 - Qui parle : `diarize` = empreintes vocales WeSpeaker ResNet34 (ONNX, `models/`, téléchargé au 1er usage) + k-moyennes
@@ -315,7 +326,8 @@ les deux personnes (comme les shorts du monteur : un en haut, un en bas) pour mo
 
 - Script (`TEASER_PROMPT`, rôles these → developpement → pingpong → reaction → histoire → conviction → chute, mots-clés
   par extrait), coupes toutes les ~2 s (gros plan / large / réaction, `teaser_clip`), sous-titres géants Metropolis
-  ExtraBold blanc + mots-clés #258AF3 (section `teaser:` de brand.yaml), carte de fin floutée + invité + entreprise.
+  ExtraBold blanc + mots-clés #258AF3 (section `teaser:` de brand.yaml), fin = **animation AI Partners + logo** (7 s, comme les
+  shorts — règle permanente d'Arthur, 09/10/2026, retour de Mohamed ; avant : carte floutée + invité + entreprise).
 - Mots-clés en expressions (« 3000 agents ») : `captions.group_words` les découpe en mots (petits mots exclus).
 - Exigences : thèse sans hésitation, ping-pong indissociable (question + SA réponse), chute ≤ 6 s ; extraits
   écartés -> réserve courte et propre ; puis `editorial_order` (LLM, `EDITOR_PROMPT`) recompose l'ordre final à

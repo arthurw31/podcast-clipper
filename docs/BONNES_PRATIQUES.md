@@ -51,12 +51,18 @@ Résultat jugé « franchement plutôt bien » par Arthur (09/10/2026) : `output
 - **Un seul élément de motion design : la carte invité** (nom, filet bleu #258AF3 qui se trace, rôle, du côté de
   l'invité, 3 s au début). Testés puis écartés : chiffre-clé animé, sons (whoosh, montée) — « on va garder que la
   guest card » (09/10). Jamais : glitch, citation plein écran, mur de logos.
-- Logo AI PARTNERS en haut à droite (20 % de la largeur), carte de fin floutée + invité + entreprise.
+- Logo AI PARTNERS en haut à droite (20 % de la largeur).
+- **Fin du teaser = l'animation du logo AI Partners** (lignes « montagne » + logo blanc, 7 s), la même qu'à la fin des
+  shorts — règle permanente jusqu'à nouvel ordre (09/10, retour de Mohamed : « remplacer cette partie avec
+  l'animation ») ; plus de carte floutée avec l'invité.
 
 ## 5. L'épisode complet (16:9)
 
 - Style mesuré sur les épisodes montés par le monteur : gros plans ~76 %, plan large ~14 %, écran partagé ~10 %,
-  plan médian ~10 s, toujours sur la personne qui parle.
+  plan médian ~10 s.
+- **On voit toujours celui qui parle** : soit son gros plan, soit un plan avec les deux (large ou écran partagé) ;
+  jamais l'autre seul pendant qu'il parle, même 1 s (09/10 : « des fois l'invité parle et la caméra est sur Thomas »).
+  Pas de plan de réaction sur celui qui écoute seul. Contrôlé par `qa --episode` (tours de parole + empreinte vocale).
 - Dérushage : dernière prise de l'intro, coupes hors antenne / question reposée ; chaque raccord change de plan.
 - Teaser au début, **logo en haut à droite** (20 %), fin = animation AI Partners + logo de **8 s**.
 - Teaser et corps rendus séparément : retoucher le teaser ne refait pas le corps (~15 min au lieu d'1 h).

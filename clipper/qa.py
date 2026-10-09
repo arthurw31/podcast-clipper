@@ -185,14 +185,88 @@ def qa_short(clip: dict, proj: Path, wav: Path, cfg, fmt: str = "9x16", render: 
     return status, [f"- [{s}] {t}" for s, t in rows] + ["", f"Ce qu'on entend (‖ = raccord) : {heard}"]
 
 
-def qa_episode(ep: Path, mp4: Path, wav_cfg=None, end_len: float = 8.0) -> tuple[str, list[str]]:
-    """Épisode complet : réécoute de chaque raccord dans le MP4 final, volumes teaser / corps, images."""
-    from .episode import out_time
+def _hms(t: float) -> str:
+    return f"{int(t // 3600)}:{int(t % 3600 // 60):02d}:{t % 60:04.1f}" if t >= 3600 else f"{int(t // 60)}:{t % 60:04.1f}"
+
+
+def speaker_visible(shots: list[dict], words: list[dict], at=lambda t: t) -> list[tuple[str, str]]:
+    """On voit toujours celui qui parle (Arthur, 09/10/2026) : aucun passage > 0,4 s où l'on entend l'autre pendant un
+    gros plan (d'après les tours de parole du montage). `at` convertit un temps des rushs en temps de l'épisode."""
+    from .episode import speaker_runs
+    bad = [(s, a, b) for s in shots for a, b in speaker_runs(s, words)]
+    if not bad:
+        return [(OK, f"on voit toujours celui qui parle ({len(shots)} plans)")]
+    lst = "; ".join(f"{_hms(at(a))} ({b - a:.1f} s, gros plan {s['cam']})" for s, a, b in bad[:12])
+    return [(FAIL, f"orateur hors champ : {len(bad)} passage(s), {sum(b - a for _, a, b in bad):.0f} s — {lst}"
+                   f"{' …' if len(bad) > 12 else ''}\n    -> refaire `episode-plan` (enforce_speaker)")]
+
+
+def voice_matches_shot(shots: list[dict], words: list[dict], wav: Path, at=lambda t: t, win: float = 1.5,
+                       hop: float = 0.75, min_run: int = 3, margin: float = 0.05) -> list[tuple[str, str]]:
+    """Contrôle INDÉPENDANT des tours de parole : l'empreinte vocale entendue dans chaque gros plan est comparée aux
+    deux voix (moyennes des mots les plus sûrs de la diarisation). ≥ `min_run` fenêtres de suite (~2,5 s) plus proches
+    de l'autre voix = la diarisation s'est trompée -> ATTENTION avec l'instant, à regarder."""
+    from .diarize import embed_windows, load_audio
+    audio = load_audio(wav)
+    dur = len(audio) / 16000
+    cover = np.zeros(int(dur * 100) + 2, bool)
+    for w in words:
+        cover[int(w["s"] * 100):int(w["e"] * 100) + 1] = True
+    spans, owner = [], []
+    for k, s in enumerate(shots):
+        if s["cam"] not in ("host", "guest"):
+            continue
+        for t in np.arange(s["start"], s["end"] - win, hop):
+            if cover[int(t * 100):int((t + win) * 100)].mean() >= 0.6:
+                spans.append((float(t), float(t) + win))
+                owner.append(k)
+    sure = {"host": [], "guest": []}
+    for w in words:
+        if w.get("spk") in sure and float(w.get("spk_conf", 0)) >= 0.3 and w["e"] - w["s"] >= 0.25:
+            sure[w["spk"]].append((w["s"], w["e"]))
+    if not spans or not all(sure.values()):
+        return [(WARN, "voix / plan : pas assez de données pour le contrôle à l'oreille")]
+    rng = np.random.default_rng(0)
+    cent = {}
+    for spk, ws in sure.items():
+        pick = [ws[i] for i in rng.choice(len(ws), min(400, len(ws)), replace=False)]
+        e = embed_windows(audio, [((a + b) / 2 - win / 2, (a + b) / 2 + win / 2) for a, b in pick])
+        c = np.nan_to_num(e).mean(0)
+        cent[spk] = c / (np.linalg.norm(c) + 1e-9)
+    emb = np.nan_to_num(embed_windows(audio, spans))
+    flags, run = [], []
+    for (a, b), k, e in zip(spans, owner, emb):
+        shown = shots[k]["cam"]
+        other = "guest" if shown == "host" else "host"
+        wrong = float(e @ cent[other]) - float(e @ cent[shown]) > margin
+        if wrong and run and run[-1][1] == k and a - run[-1][0][1] < hop + 0.01 + win:
+            run[-1] = ((run[-1][0][0], b), k, run[-1][2] + 1)
+        elif wrong:
+            run.append(((a, b), k, 1))
+    flags = [(r, k) for r, k, n in run if n >= min_run]
+    if not flags:
+        return [(OK, f"voix entendue = personne montrée sur les {len(set(owner))} gros plans (contrôle par empreinte vocale)")]
+    lst = "; ".join(f"{_hms(at(a))}–{_hms(at(b))} (on voit {shots[k]['cam']})" for (a, b), k in flags[:12])
+    return [(WARN, f"voix / plan à vérifier (l'empreinte vocale entend l'autre personne) : {len(flags)} passage(s) — {lst}")]
+
+
+def qa_episode(ep: Path, mp4: Path, wav_cfg=None, end_len: float = 8.0, src_wav: Path | None = None) -> tuple[str, list[str]]:
+    """Épisode complet : réécoute de chaque raccord dans le MP4 final, volumes teaser / corps, on voit celui qui parle
+    (tours de parole + empreinte vocale indépendante, si `src_wav`), images."""
+    from .episode import _refine_boundaries, out_time
     from .verify import FILLERS, _norm, verbatim
     rows: list[tuple[str, str]] = []
     edl = json.loads((ep / "work" / "edl.json").read_text(encoding="utf-8"))
     teaser_v = ep / "work" / "episode" / ("teaser_v_apercu.mp4" if "apercu" in mp4.name else "teaser_v.mp4")
     T = float(probe(teaser_v)["duration"]) if teaser_v.exists() else 0.0
+    wf = ep / "work" / "diarized_words.json"
+    if wf.exists():
+        dw = json.loads(wf.read_text(encoding="utf-8"))
+        _refine_boundaries(dw)   # comme episode-plan
+        at = lambda t: T + (out_time(edl["shots"], t) or 0.0)
+        rows += speaker_visible(edl["shots"], dw, at)
+        if src_wav is not None and Path(src_wav).exists():
+            rows += voice_matches_shot(edl["shots"], dw, Path(src_wav), at)
     total = float(probe(mp4)["duration"])
     wav = ep / "work" / "qa_episode.wav"
     subprocess.run([FFMPEG, "-y", "-v", "error", "-i", str(mp4), "-vn", "-ac", "1", "-ar", "16000", str(wav)], check=True)

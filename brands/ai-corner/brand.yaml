@@ -110,6 +110,13 @@ publication:                 # posts LinkedIn en anglais, style de la page AI Pa
   language: en
   host_name: "Thomas Spitz"
   channels: "AI PARTNERS YouTube channel, Spotify, Ausha"
+  # CTA « bosser avec nous » (idée de Thomas, 09/10/2026 : « ça manque de call to action pour bosser avec nous » ; Arthur :
+  # « on mettra dans les descriptions YT et LinkedIn ») — pas dans la vidéo : la fin des shorts reste vers l'épisode
+  contact_cta:               # DÉSACTIVÉ : à activer seulement quand Arthur le demande
+    enabled: false
+    url: "https://weareaipartners.com"
+    text_en: "🤝 Want to scale AI in your company? Let's talk:"
+    text_fr: "🤝 Vous voulez déployer l'IA dans votre entreprise ? Parlons-en :"
 
 framing:
   wide_shot_mode: speaker
@@ -152,7 +159,7 @@ format_overrides:
 teaser:
   # Framework : docs/TEASER_FRAMEWORK.md (modèle « Dans la tête d'un CEO », 08/10/2026) adapté à la charte AI Partners :
   # sous-titres ÉNORMES en capitales, Metropolis ExtraBold droite (jamais d'italique), blanc + mots-clés bleu #258AF3,
-  # mot à mot avec 2e ligne décalée ; logo AI PARTNERS en haut à droite ; carte de fin floutée + invité + entreprise.
+  # mot à mot avec 2e ligne décalée ; logo AI PARTNERS en haut à droite ; fin = animation AI Partners + logo (comme les shorts, 09/10/2026).
   formats: ["16x9"]
   framing:                   # le teaser garde ses punch-in (validé tel quel ; seuls les shorts sont sans zoom)
     junction_punch: 1.15
@@ -212,15 +219,14 @@ teaser:
     zoom_amount: 0.06
     fx_every: 3
   outro:
-    duration: 3.5
-    background: blur-freeze  # dernière image floutée, comme les teasers de référence
-    blur: 22
-    darken: 0.25
+    # RÈGLE PERMANENTE jusqu'à nouvel ordre (Arthur, 09/10/2026, retour de Mohamed : « remplacer cette partie avec
+    # l'animation » ; Arthur : « mettre la vidéo d'animation de logo AI Partners, celle qu'on mettait à la fin des
+    # shorts ») : fin du teaser = animation officielle AI Partners (lignes « montagne ») + logo blanc centré, à la même
+    # vitesse que les shorts (7 s) ; plus de carte floutée avec l'invité et l'entreprise, pas de bouton.
+    duration: 7.0
+    background: video
     layout: center
-    show_guest: true
-    guest_color: "#FFFFFF"
-    company_color: "#258AF3"
-    company_italic: false
+    show_guest: false
     cta:
       enabled: false
   format_overrides:

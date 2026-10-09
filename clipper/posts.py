@@ -104,12 +104,14 @@ def write_posts(brand: Brand, ep: Path, clips: dict, transcript: dict, episode_u
     todo = [c for c in targets if force or not c.get("linkedin_post")]
     if not todo:
         console.print(f"[dim]Posts en cache : {posts_dir}[/dim]")
+        if _add_contact(targets, pub, language_of(cfg, pub, transcript)):
+            (ep / "clips.json").write_text(json.dumps(clips, ensure_ascii=False, indent=1), encoding="utf-8")
         _write_files(posts_dir, targets, clips)
         return clips
 
     brief = brand.posts_brief or "(aucun brief : langue du podcast, ton professionnel, 100–150 mots, CTA vers l'épisode complet)"
     episode_url = episode_url or str(pub.get("episode_url") or "")
-    language = str(pub.get("language") or "") or str(cfg.get("language") or transcript.get("language") or "fr")
+    language = language_of(cfg, pub, transcript)
     guest, company = clips.get("guest", ""), clips.get("company", "")
     clips_txt = []
     for c in todo:
@@ -154,10 +156,37 @@ def write_posts(brand: Brand, ep: Path, clips: dict, transcript: dict, episode_u
         c["linkedin_post"] = str(p.get("linkedin_post", "")).strip()
         c["short_description"] = str(p.get("short_description", "")).strip()
         c["post_variant"] = str(p.get("variant", ""))
+    _add_contact(todo, pub, language)
     (ep / "clips.json").write_text(json.dumps(clips, ensure_ascii=False, indent=1), encoding="utf-8")
     _write_files(posts_dir, targets, clips)
     console.print(f"[green]{len([c for c in todo if c.get('linkedin_post')])} post(s) rédigé(s)[/green] → {posts_dir}")
     return clips
+
+
+def language_of(cfg, pub: dict, transcript: dict) -> str:
+    return str(pub.get("language") or "") or str(cfg.get("language") or transcript.get("language") or "fr")
+
+
+def contact_line(pub: dict, language: str) -> str:
+    """Ligne « travailler avec nous » ajoutée telle quelle à la fin des textes publiés (pas laissée au LLM)."""
+    cta = pub.get("contact_cta") or {}
+    if not cta.get("enabled", True) or not cta.get("url"):
+        return ""
+    text = cta.get(f"text_{language[:2]}") or cta.get("text_en") or cta.get("text_fr") or ""
+    return f"{text} {cta['url']}".strip()
+
+
+def _add_contact(clips_list: list[dict], pub: dict, language: str) -> bool:
+    """Ajoute la ligne de contact au post LinkedIn et à la description courte (idempotent)."""
+    line, changed = contact_line(pub, language), False
+    if not line:
+        return False
+    for c in clips_list:
+        for k in ("linkedin_post", "short_description"):
+            if c.get(k) and str(pub["contact_cta"]["url"]) not in c[k]:
+                c[k] = c[k].rstrip() + "\n\n" + line
+                changed = True
+    return changed
 
 
 def _write_files(posts_dir: Path, clips_list: list[dict], clips: dict) -> None:
