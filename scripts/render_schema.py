@@ -64,6 +64,11 @@ def main() -> int:
     svg, n = re.subn(r'style="max-width: ([\d.]+)px;"', r'style="max-width: \1px; background-color: #ffffff;"', svg, count=1)
     if not n:
         svg = svg.replace("<svg ", '<svg style="background-color: #ffffff;" ', 1)
+    # taille réelle (celle du viewBox) : avec width="100%" et sans hauteur, l'image se réduisait à ~100 px dans le README
+    vb = re.search(r'viewBox="[\d.-]+ [\d.-]+ ([\d.]+) ([\d.]+)"', svg)
+    if vb:
+        w, h = (round(float(v)) for v in vb.groups())
+        svg = re.sub(r' width="100%"', f' width="{w}" height="{h}"', svg, count=1)
     import xml.etree.ElementTree as ET
     ET.fromstring(svg)                      # SVG valide, sinon GitHub affiche une image cassée
     svg = f"<!-- généré par scripts/render_schema.py depuis docs/schema.mmd ; source-sha256: {source_hash(src)} -->\n" + svg
