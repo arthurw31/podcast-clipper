@@ -14,9 +14,11 @@ ce fichier résume ce qu'il faut savoir pour **modifier** le projet sans casser 
 
 Arthur dépose ses fichiers (épisodes, clips de référence, logos, posts) dans `depot/` (non versionné) : les ranger
 dans `brands/<marque>/episodes|references|assets|assets/guests/` (voir `depot/README.md`). S'il est vide, regarder
-les fichiers récents de `~/Downloads`. Depuis E22 (06/10/2026), Arthur envoie surtout un **lien Dropbox** vers les
-rushs (3 caméras 1080p de 13–14 Go + 1 WAV) : `python -m clipper fetch "<lien>" --dest brands/<marque>/episodes/rushes/<E>`
-(jamais via le navigateur : coupure vers 50 min, fichier tronqué gardé sous son nom final).
+les fichiers récents de `~/Downloads`. Depuis E22, l'équipe livre des **rushs** : 3 caméras 1080p de 13–14 Go
+(gros plan invité, plan large, gros plan animateur) + 1 WAV du micro, **déposés dans `depot/`** (Arthur, 09/10/2026 :
+« on dépose les rushs MP4 et l'audio dans le dossier depot ») -> `python -m clipper rushes --brand <m> --episode E23
+--guest "Prénom Nom" --company X` (voir « Rushs déposés » plus bas). Si des rushs restent sur Dropbox :
+`python -m clipper fetch "<lien>"` (jamais via le navigateur : coupure vers 50 min, fichier tronqué gardé sous son nom).
 
 Le skill `.claude/skills/podcast-clips/SKILL.md` décrit le **workflow en 5 étapes** voulu par Arthur (05/10/2026) :
 dépôt de l'épisode (4K) → `propose` (~10 passages) → l'humain en choisit 5 + demandes particulières (`pick`,
@@ -53,7 +55,8 @@ python -m clipper qa … --only N [--render] | --episode   # contrôle qualité 
 python -m clipper fillers … --only N   # retire les « euh » collés aux mots (inclus dans polish)
 python -m clipper preview … [--clip all|N] [--stop] [--mp4]   # aperçu (Studio ports 3002+, ou MP4 brouillon --mp4), validé AVANT render
 python -m clipper new-brand <slug>   # copie brands/_template
-python -m clipper fetch "<lien Dropbox>" [--dest dossier] [--skip MIC]   # rushs : reprise auto, taille exacte vérifiée
+python -m clipper rushes --brand <m> --episode E23 --guest "…" --company "…" [--dry-run] [--host <fichier>]   # rushs de depot/
+python -m clipper fetch "<lien Dropbox>" [--dest dossier] [--skip MIC]   # rushs restés sur Dropbox : reprise auto, taille vérifiée
 npx hyperframes lint|check|snapshot --at 3,10 --no-end -o <dir>   # dans output/<brand>/<ep>/clips/<clip>/<format>/
 ```
 
@@ -161,6 +164,25 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
   Partners, présent dans tous les épisodes). E22 était nommé « thomas-spitz » : renommé le 09/10/2026 (demande
   d'Arthur, « pour être cohérent avec ce qu'on faisait avant ») — sources, dossier `output/…/e22-nicolas-comestaz-coty`,
   fichiers et chemins dans les JSON ; jonctions `assets/` des projets recréées (cible absolue).
+
+## Rushs déposés : `rushes` (Arthur, 09/10/2026 : « on dépose les rushs MP4 et l'audio dans le dossier depot »)
+
+- `clipper/ingest.py` : 3 vidéos + 1 audio lisibles dans `depot/` (un fichier tronqué — `ffprobe` en échec — est
+  ignoré et signalé : les anciens téléchargements partiels d'E22 de 9,3 Go y sont encore). Plan large = la caméra qui
+  montre 2 visages ; animateur = gros plan dont l'empreinte de visage (SFace, ONNX, `models/face_recognition_sface.onnx`,
+  alignement sur les 5 repères YuNet) ressemble le plus à `assets/host_face.jpg` (Thomas : 0,80 contre 0,20 pour
+  l'invité sur E22) ; sans photo de référence : couleurs comparées au plan large + `framing.host_side`.
+- **Le côté de l'animateur change d'un épisode à l'autre** (E21 à droite, E22 à GAUCHE alors que brand.yaml dit
+  `host_side: right`) : `rushes` le mesure dans le plan large et l'écrit dans `multicam.json` (`host_side`) -> passer
+  `--host-side` en conséquence.
+- Décalage du micro : corrélation (FFT) du son témoin du plan large avec le WAV, 90 s à ~10 min ; convention de
+  `multicam.json` : son caméra(t) = micro(t - `audio_delay`). E22 mesuré à **-0,037 / -0,042 s** sur les 3 caméras et à
+  3 moments, alors que le fichier E22 contient +0,037 (signe probablement inversé à la mesure manuelle du 06/10 : le
+  son des rendus E22 serait ~74 ms en retard sur l'image) — extraits de test `apercus/test_synchro_{A_actuel,B_mesure}.mp4`,
+  à trancher par Arthur avant de corriger E22.
+- Rangement : `episodes/rushes/<E>/{invite_<prénom>,large,animateur_<prénom>}.mp4`, `episodes/<E>_<invité>_<entreprise>.wav`,
+  `<base>.mp4` = lien dur vers le plan large, `<base>.multicam.json` ; planche `episodes/rushes_<E>.jpg` à REGARDER
+  (`--host <morceau de nom>` corrige l'animateur). Fichiers déplacés, jamais copiés. `--dry-run` : identifie sans déplacer.
 
 ## Rushs multicam (E22, 06/10/2026 : l'équipe livre 3 caméras + 1 WAV au lieu de l'épisode monté)
 

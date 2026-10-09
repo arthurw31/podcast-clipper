@@ -626,6 +626,27 @@ def cmd_thumbnail(a: argparse.Namespace) -> None:
     console.print(f"[green]{len(outs)} miniatures[/green] -> {ep / 'miniatures'} (planche.jpg, titres.md)")
 
 
+def cmd_rushes(a: argparse.Namespace) -> None:
+    """Rushs déposés dans depot/ (3 caméras + WAV) -> rangés, renommés, synchronisés, multicam.json écrit."""
+    from .ingest import ingest
+    brand = Brand(a.brand)
+    src = Path(a.source) if a.source else ROOT_DIR / "depot"
+    plan = ingest(brand, src, a.episode, a.guest, a.company, host_file=a.host or None, dry_run=a.dry_run)
+    r = plan["roles"]
+    console.print(f"Plan large : {r['wide']}\nAnimateur  : {r['host']}\nInvité     : {r['guest']}\n"
+                  f"Micro : {plan['audio']} (décalage {plan['audio_delay']:+.3f} s, pic {plan['sync_peak']})")
+    if plan.get("host_side"):
+        console.print(f"Animateur à {'gauche' if plan['host_side'] == 'left' else 'droite'} dans le plan large "
+                      f"-> --host-side {plan['host_side']}")
+    if not plan.get("sure", False):
+        console.print("[yellow]Attribution des caméras incertaine : regarder la planche, corriger avec --host <nom>[/yellow]")
+    console.print(f"Planche à vérifier : {plan['sheet']}")
+    if a.dry_run:
+        console.print("[dim]--dry-run : rien n'a été déplacé[/dim]")
+    else:
+        console.print(f"[green]Prêt[/green] : --input {plan['input']}")
+
+
 def cmd_thumbnail_template(a: argparse.Namespace) -> None:
     """Design Canva -> brands/<m>/assets/thumbnail/ (calques + template.json) : `thumbnail` le reproduit ensuite."""
     from .canva_template import import_pptx
@@ -1136,6 +1157,15 @@ def main(argv: list[str] | None = None) -> None:
     sp.add_argument("--host-frame", type=float, default=None, help="instant (s) de la photo de l'animateur")
     sp.add_argument("--guest-frame", type=float, default=None, help="instant (s) de la photo de l'invité")
     sp.set_defaults(fn=cmd_thumbnail)
+    sp = sub.add_parser("rushes", help="range les rushs déposés dans depot/ (3 caméras + WAV) : rôles, synchro, multicam.json")
+    sp.add_argument("--brand", required=True)
+    sp.add_argument("--episode", required=True, help="numéro de l'épisode, ex: E23")
+    sp.add_argument("--guest", required=True, help="prénom nom de l'invité (nom des fichiers)")
+    sp.add_argument("--company", default="", help="entreprise de l'invité")
+    sp.add_argument("--source", default="", help="dossier des rushs (défaut : depot/)")
+    sp.add_argument("--host", default="", help="corrige : morceau du nom de fichier de la caméra de l'animateur")
+    sp.add_argument("--dry-run", action="store_true", help="identifie et mesure sans rien déplacer")
+    sp.set_defaults(fn=cmd_rushes)
     sp = sub.add_parser("thumbnail-template", help="importe un design Canva (export PPTX + PNG) comme gabarit des miniatures")
     sp.add_argument("--brand", required=True)
     sp.add_argument("--pptx", required=True, help="export PowerPoint du design Canva")

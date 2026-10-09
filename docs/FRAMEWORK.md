@@ -12,7 +12,7 @@ répétitif (transcrire, repérer, couper, monter, rédiger) ; l'équipe garde l
 
 ```mermaid
 flowchart TD
-    A["1 · Dépôt<br/>rushs (lien Dropbox) ou épisode monté<br/>+ logo de l'invité"] --> B["Transcription<br/>Whisper, mot à mot, horodatée"]
+    A["1 · Dépôt dans depot/<br/>3 rushs MP4 + audio WAV (ou épisode monté)<br/>+ logo de l'invité"] --> B["Transcription<br/>Whisper, mot à mot, horodatée"]
     B --> C{{"2 · Claude propose ~10 passages<br/>3 lectures en parallèle<br/>(cas concret · position tranchée · humain)<br/>puis un jury garde les 10 meilleurs"}}
     C --> D["3 · L'équipe choisit 5 passages<br/>+ demandes particulières<br/>« il faut le passage où il dit… »"]
     D --> E["Calage des coupes<br/>début et fin de phrase · contrôle mot à mot"]
@@ -36,7 +36,7 @@ flowchart TD
 
 | Étape | Qui | Durée (PC sans GPU, épisode de 50 min) |
 | --- | --- | --- |
-| 1. Dépôt + transcription | vous déposez (ou collez le lien Dropbox), Claude télécharge et transcrit | ≈ 20 min (automatique) + téléchargement |
+| 1. Dépôt + transcription | vous déposez les rushs et l'audio dans `depot/`, Claude les range, les synchronise et transcrit | ≈ 1 min de rangement + ≈ 20 min de transcription (automatique) |
 | 2. 10 propositions | Claude | ≈ 8 min |
 | 3. Choix + demandes | **vous** | 2 min |
 | 4. Nettoyage + montage + contrôles + aperçus + posts | Claude prépare, **vous regardez les aperçus et validez** | ≈ 6–8 min par short (tout compris, en arrière-plan), ≈ 3 min par retouche |

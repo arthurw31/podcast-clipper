@@ -26,18 +26,29 @@ Si un point est KO : suis les indications (`-> …`), ou lance `scripts\setup.ps
 
 ## 1. Récupérer et ranger l'épisode
 
-0. **Lien Dropbox** (cas habituel depuis octobre 2026 : rushs de 13–14 Go par caméra) : ne demande jamais de
+0. **Rushs déposés dans `depot/`** (cas habituel depuis octobre 2026 : 3 caméras de 13–14 Go + l'audio WAV) :
+
+   ```bash
+   python -m clipper rushes --brand <marque> --episode <E-numéro> --guest "Prénom Nom" --company "Entreprise" --dry-run
+   ```
+
+   Regarde la planche `rushes_<E>.jpg` (invité / plan large / animateur bien attribués ?), puis relance sans
+   `--dry-run` (ajoute `--host <morceau du nom>` si l'animateur est mal reconnu). La commande range et renomme les
+   fichiers, mesure le décalage du micro et écrit `<E>_<invité>_<entreprise>.multicam.json` ; elle donne le
+   `--input` et le `--host-side` à utiliser ensuite. Un fichier illisible (téléchargement tronqué) est signalé : le
+   faire redéposer.
+
+   **Lien Dropbox** (si les rushs n'ont pas été déposés) : ne demande jamais de
    télécharger dans le navigateur — il coupe les gros fichiers au bout d'environ 50 min et garde un fichier tronqué
    illisible (« moov atom not found »). Lance toi-même, en arrière-plan (≈ 40 Go en 1 h 30) :
 
    ```bash
-   python -m clipper fetch "<lien Dropbox>" --dest brands/<marque>/episodes/rushes/<E-numéro>
+   python -m clipper fetch "<lien Dropbox>" --dest depot
    ```
 
    Reprise automatique après coupure (y compris d'un fichier partiel déjà présent : `--dest` vers son dossier),
    fichier déclaré complet seulement à la taille exacte annoncée par Dropbox ; si un fichier reste incomplet, relancer
-   la même commande. Puis renomme les caméras (`cam1_<personne>.mp4`, `cam2_large.mp4`…) et l'audio en
-   `brands/<marque>/episodes/<E-numéro>_<invite>.wav` (la transcription part de l'audio, sans attendre les vidéos).
+   la même commande. Puis range-les avec `rushes` comme ci-dessus.
 1. Regarde `depot/` (sinon les fichiers récents de Téléchargements). Vérifie toujours qu'une vidéo s'ouvre
    (`ffprobe`) : « moov atom not found » = téléchargement tronqué -> `fetch` (avec le lien) pour la compléter. Range chaque fichier et dis où tu l'as mis :
    épisode → `brands/<marque>/episodes/<E-numéro>_<invite>_<entreprise>.mp4` ; logo de l'entreprise invitée →

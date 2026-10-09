@@ -12,7 +12,7 @@ flowchart TB
     end
 
     subgraph PY["Package Python clipper/ (python -m clipper …)"]
-        CLI["cli.py<br/>commandes : fetch, transcribe, propose, pick, polish, qa,<br/>build, preview, render, posts, episode-plan, episode-render,<br/>thumbnail, thumbnail-template, doctor"]
+        CLI["cli.py<br/>commandes : rushes, fetch, transcribe, propose, pick, polish, qa,<br/>build, preview, render, posts, episode-plan, episode-render,<br/>thumbnail, thumbnail-template, doctor"]
         CFG["config.py<br/>fusion de la configuration"]
         TR["transcribe.py"]
         SEL["select_clips.py"]
@@ -25,6 +25,7 @@ flowchart TB
         REN["render.py"]
         PO["posts.py"]
         MC["multicam.py<br/>rushs 3 caméras"]
+        IG["ingest.py<br/>rushs déposés : rôles, synchro"]
         CHK["verify.py · fillers.py<br/>caption_check.py · qa.py"]
         EPI["episode.py · diarize.py<br/>épisode complet + teaser"]
         TH["thumbnail.py · canva_template.py<br/>miniatures"]
@@ -45,7 +46,8 @@ flowchart TB
     SEL --> LLM
     PO --> LLM
     LLM --> CL
-    CLI --> CHK & EPI & TH
+    CLI --> CHK & EPI & TH & IG
+    IG --> CV & FF
     CO --> AN & RF & CAP & MED & MC
     EPI --> FF & HF
     TH --> LLM & CV
@@ -68,6 +70,7 @@ flowchart TB
 | `compose.py` | Assemble les passages, lisse les coupes, recadre avec FFmpeg, écrit la composition HTML HyperFrames (sous-titres, bulle-titre, logos, light leak, carte de fin). |
 | `media.py` | Toutes les opérations FFmpeg : découpe, concaténation, recadrage Lanczos, animation de fin. |
 | `render.py` | Rendu de la composition en MP4 par HyperFrames (Chrome headless invisible), lint, captures. `preview --mp4` produit l'aperçu brouillon (12 i/s) validé par l'équipe ; `preview --open` lance le Studio pour une retouche fine. |
+| `ingest.py` | Commande `rushes` : prend les 3 rushs + le WAV déposés dans `depot/`, écarte un fichier tronqué, reconnaît le plan large (2 visages) et l'animateur (empreinte de visage SFace comparée à `assets/host_face.jpg`), mesure le décalage du micro par corrélation avec le son des caméras, range et renomme d'après l'invité, écrit `multicam.json` (avec le côté de l'animateur dans le plan large). |
 | `multicam.py` | Rushs 3 caméras : gros plan de celui qui parle, écran partagé quand l'autre écoute (et seulement s'il est calme), son du micro. |
 | `verify.py`, `fillers.py`, `caption_check.py`, `qa.py` | Contrôles « à l'oreille » : vraies fins de phrase, « euh » retirés sans perdre un mot, sous-titres écoutés deux fois, rapport OK / ATTENTION / ÉCHEC avant chaque aperçu et après chaque rendu. |
 | `episode.py`, `diarize.py` | Épisode complet : dérushage par Claude, qui parle (empreintes vocales), liste de plans façon monteur, teaser scripté, chapitres ; corps rendu en FFmpeg, teaser en HyperFrames. |

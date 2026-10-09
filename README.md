@@ -21,8 +21,8 @@ Deux façons de l'utiliser :
 
 ```mermaid
 flowchart TD
-    IN[/"1 · Dépôt des rushs (lien Dropbox)<br/>CAM 1 gros plan invité · CAM 2 plan large<br/>CAM 3 gros plan animateur · micro WAV"/]
-    IN --> FE["2 · fetch : téléchargement avec reprise, taille vérifiée<br/>+ synchro du micro sur les caméras (multicam.json)"]
+    IN[/"1 · Dépôt dans depot/ : 3 rushs MP4 + l'audio WAV<br/>gros plan invité · plan large · gros plan animateur · micro"/]
+    IN --> FE["2 · rushes : fichiers vérifiés, caméras reconnues (visages),<br/>micro synchronisé, rangement + multicam.json"]
     FE --> TR["3 · transcribe : texte mot à mot (Whisper)<br/>+ qui parle quand (empreintes vocales)"]
     TR --> S1
     TR --> E1
@@ -135,9 +135,10 @@ seul au premier lancement.
 ## 3. Premiers shorts (mode guidé)
 
 1. Ouvrez le dossier du projet dans **Claude Code**.
-2. Collez à Claude le **lien Dropbox** des rushs (3 caméras + micro) : il les télécharge lui-même
-   (`python -m clipper fetch "<lien>"` : reprise automatique après coupure, taille vérifiée). Un épisode déjà
-   monté (de préférence en **4K**) peut aussi être déposé dans `depot/`. Ajoutez le logo de l'entreprise invitée.
+2. Déposez dans `depot/` les **3 rushs MP4** (gros plan invité, plan large, gros plan animateur) et l'**audio
+   WAV** du micro, avec le logo de l'entreprise invitée. Claude les range lui-même (`python -m clipper rushes` :
+   chaque caméra reconnue à ses visages, micro synchronisé). Un épisode déjà monté (de préférence en **4K**) peut
+   aussi être déposé ; des rushs restés sur Dropbox se récupèrent avec `python -m clipper fetch "<lien>"`.
 3. Écrivez par exemple :
 
    > Fais-moi 5 shorts de ce podcast. Invité : Quentin Amaudry, CEO de Mendo.
