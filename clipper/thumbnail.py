@@ -24,6 +24,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from rich.console import Console
 
 from .analysis import _detector
+from .canva_template import compose_template
 from .media import FFMPEG, FFPROBE
 
 console = Console()
@@ -644,15 +645,24 @@ def make(brand, spec: dict, transcript: dict, ep: Path, guest: str, company: str
     glogo = load_logo(gpath, on_light=True) if gpath else None
     font = brand.asset(cfg.get("font", "fonts/" + STYLE["font"]))
     style = cfg.get("style") or {}
+    tpl_dir = brand.assets_dir / cfg.get("template", "thumbnail")
+    tpl = json.loads((tpl_dir / "template.json").read_text(encoding="utf-8")) if (tpl_dir / "template.json").exists() else None
+    if tpl:
+        console.print(f"[dim]Gabarit Canva : {tpl_dir}[/dim]")
+        glogo = load_logo(gpath, on_light=True, height=800) if gpath else None
     outs = []
     for i in range(min(n, len(titles))):
         h = chosen["host"][(i // 2) % len(chosen["host"])] if i else chosen["host"][0]
         g = chosen["guest"][(i % 2) % len(chosen["guest"])]
-        img = compose((_cut_cached(h, work), h), (_cut_cached(g, work), g), wide, aip, glogo,
-                      titles[i]["lines"], titles[i]["highlight"], font, style)
+        if tpl:
+            img = compose_template(tpl, tpl_dir, (_cut_cached(h, work), h), (_cut_cached(g, work), g), glogo,
+                                   titles[i]["lines"], titles[i]["highlight"], brand)
+        else:
+            img = compose((_cut_cached(h, work), h), (_cut_cached(g, work), g), wide, aip, glogo,
+                          titles[i]["lines"], titles[i]["highlight"], font, style)
         hd = out_dir / f"variante_{i + 1}_HD.png"
         img.save(hd)
-        sm = out_dir / f"variante_{i + 1}.jpg"
+        sm = out_dir / f"variante_{i + 1}.jpg"     # 16:9 YouTube (le gabarit Canva fait 1,8:1 : écart invisible)
         img.resize((1280, 720), Image.Resampling.LANCZOS).save(sm, quality=92)
         titles[i]["files"] = [sm.name, hd.name]
         titles[i]["photos"] = {"host": h["t"], "guest": g["t"]}

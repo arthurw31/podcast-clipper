@@ -135,6 +135,16 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
   et l'EXTÉRIEUR (`tile_depth` 0,22 : le dessous reste visible même si le côté passe derrière la personne ; une
   perspective forte déformait l'icône en losange) ; bandeau calé sur l'encre réelle du texte (jambages g/q compris),
   marge égale tout autour.
+- **Gabarit Canva** (09/10/2026 : l'équipe marketing fait les miniatures sur Canva, export PPTX + PNG dans
+  `references/thumbnails/canva/`) : `python -m clipper thumbnail-template --brand ai-corner --pptx … --png …`
+  (`clipper/canva_template.py`) range les VRAIS calques dans `assets/thumbnail/` (fond studio bleu, 2 cadres flous,
+  cubes vides animateur/invité, logo AI Partners, bandeau) + `template.json` (boîtes en px à 96 ppp = EMU/9525,
+  rotations, miroir `flipH` — Thomas est retourné vers l'invité —, police Montserrat Bold 125 px sur le bandeau /
+  ExtraBold 108 px hors bandeau, lignes de base et visages mesurés sur le PNG). Dès que `template.json` existe,
+  `thumbnail` compose dessus (`compose_template`) : nos photos détourées posées d'après les visages du design (pas
+  de découpe aux formes Canva : elles coupaient une épaule), logo de l'invité dans la boîte du logo (87 % de large).
+  Ordre des 10 calques attendu (design dupliqué) ; un autre design = refaire l'import. Contrôle : la reconstruction
+  du design d'origine depuis le gabarit diffère de son PNG de 3/255 en moyenne.
 - Les rushs E22 sont nommés « thomas-spitz » alors que Thomas Spitz est l'ANIMATEUR (CEO AI Partners, toujours là) ;
   l'invité est Nicolas Comestaz (Coty). Nommer les prochains épisodes d'après l'invité : `E23_<invite>_<entreprise>`.
 

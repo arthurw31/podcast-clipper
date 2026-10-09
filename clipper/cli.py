@@ -626,6 +626,16 @@ def cmd_thumbnail(a: argparse.Namespace) -> None:
     console.print(f"[green]{len(outs)} miniatures[/green] -> {ep / 'miniatures'} (planche.jpg, titres.md)")
 
 
+def cmd_thumbnail_template(a: argparse.Namespace) -> None:
+    """Design Canva -> brands/<m>/assets/thumbnail/ (calques + template.json) : `thumbnail` le reproduit ensuite."""
+    from .canva_template import import_pptx
+    brand = Brand(a.brand)
+    out = brand.assets_dir / "thumbnail"
+    tpl = import_pptx(Path(a.pptx), out, Path(a.png) if a.png else None, brand.assets_dir)
+    console.print(f"[green]Gabarit importé[/green] -> {out} ({len(tpl['layers'])} calques, titre "
+                  f"{tpl['title']['pill_style']['family']} {tpl['title']['pill_style']['weight']})")
+
+
 def cmd_fetch(a: argparse.Namespace) -> None:
     from .fetch import fetch
     dest = Path(a.dest) if a.dest else ROOT_DIR / "depot"
@@ -1118,6 +1128,11 @@ def main(argv: list[str] | None = None) -> None:
     sp.add_argument("--host-frame", type=float, default=None, help="instant (s) de la photo de l'animateur")
     sp.add_argument("--guest-frame", type=float, default=None, help="instant (s) de la photo de l'invité")
     sp.set_defaults(fn=cmd_thumbnail)
+    sp = sub.add_parser("thumbnail-template", help="importe un design Canva (export PPTX + PNG) comme gabarit des miniatures")
+    sp.add_argument("--brand", required=True)
+    sp.add_argument("--pptx", required=True, help="export PowerPoint du design Canva")
+    sp.add_argument("--png", default="", help="export PNG du même design (mesure visages et titre)")
+    sp.set_defaults(fn=cmd_thumbnail_template)
     sp = sub.add_parser("doctor", help="vérifie l'installation (FFmpeg, Node, HyperFrames, Python, clés)"); sp.set_defaults(fn=cmd_doctor)
 
     a = p.parse_args(argv)
