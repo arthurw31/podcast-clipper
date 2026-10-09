@@ -26,15 +26,11 @@ Deux façons de l'utiliser :
 Légende : orange = décision ou validation humaine · violet = Claude rédige ou choisit · vert = livrables · le reste
 est automatique. Aucune vidéo finale n'est rendue sans validation sur un aperçu.
 
-**Ce qui se fait en parallèle** : dès la transcription, les trois colonnes avancent en même temps (les flèches relient
-les étapes d'une même colonne). Deux étapes seulement attendent une autre colonne ; elles ont un **cadre bleu en
-pointillés** et la mention « ATTEND » :
-- **A** : la description YouTube de l'épisode attend le titre choisi par l'équipe (« DÉBLOQUE A », colonne Titre) ;
-- **B** : l'outro des shorts attend la miniature choisie (« DÉBLOQUE B ») ; elle reprend aussi la durée de l'épisode
-  monté s'il est déjà prêt.
-
-Tout le reste n'attend rien : on peut monter, faire valider et rendre les shorts, monter l'épisode et choisir le titre
-en même temps.
+**Ce qui se fait en parallèle** : dès la transcription, les trois colonnes avancent en même temps (flèches pleines =
+étape suivante dans la colonne). Une **flèche en pointillés** = une étape qui attend le résultat d'une autre colonne :
+la description YouTube de l'épisode attend le titre validé ; l'outro des shorts attend la miniature choisie (et reprend
+la durée de l'épisode monté). Tout le reste n'attend rien : on peut monter, faire valider et rendre les shorts, monter
+l'épisode et choisir le titre en même temps.
 
 - Guide d'utilisation (workflow, « quel fichier modifier pour changer le format ») : **[docs/FRAMEWORK.md](docs/FRAMEWORK.md)**
 - Fonctionnement technique (briques, fichiers produits, montage d'un short) : **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**
