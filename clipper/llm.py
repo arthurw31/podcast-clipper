@@ -46,38 +46,59 @@ def pick_backend(preferred: str = "auto") -> str:
 
 
 def ask_json(system: str, user: str, model: str = "claude-sonnet-5", backend: str = "auto",
-             max_tokens: int = 8000) -> dict:
+             max_tokens: int = 8000, images: list[Path] | None = None) -> dict:
+    """`images` : fichiers JPEG/PNG montrés au modèle (ex. planche de candidats des miniatures)."""
     backend = pick_backend(backend)
     console.print(f"[dim]LLM · {backend} · {model}[/dim]")
     if backend == "anthropic":
-        return _ask_anthropic(system, user, model, max_tokens)
-    return _ask_claude_cli(system, user, model)
+        return _ask_anthropic(system, user, model, max_tokens, images)
+    return _ask_claude_cli(system, user, model, images)
 
 
-def _ask_anthropic(system: str, user: str, model: str, max_tokens: int) -> dict:
+def _ask_anthropic(system: str, user: str, model: str, max_tokens: int, images: list[Path] | None = None) -> dict:
+    import base64
+
     import anthropic
 
     client = anthropic.Anthropic()
+    content: list | str = user
+    if images:
+        content = [{"type": "image", "source": {"type": "base64",
+                                                "media_type": "image/png" if p.suffix.lower() == ".png" else "image/jpeg",
+                                                "data": base64.b64encode(p.read_bytes()).decode()}} for p in images]
+        content.append({"type": "text", "text": user})
     msg = client.messages.create(
         model=model,
         max_tokens=max_tokens,
         system=system,
-        messages=[{"role": "user", "content": user}],
+        messages=[{"role": "user", "content": content}],
     )
     text = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text")
     return _extract_json(text)
 
 
-def _ask_claude_cli(system: str, user: str, model: str) -> dict:
+def _ask_claude_cli(system: str, user: str, model: str, images: list[Path] | None = None) -> dict:
     # alias courts acceptés par le CLI
     alias = {"claude-sonnet-5": "sonnet", "claude-opus-5": "opus", "claude-haiku-4-5-20251001": "haiku"}.get(model, model)
     prompt = f"{system}\n\n---\n\n{user}"
     # cwd neutre pour ne pas charger le contexte d'un projet Claude Code
     # ignore_cleanup_errors : sous Windows, un process fils de `claude` peut encore verrouiller le dossier à la sortie
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+        tools = ""
+        if images:   # le CLI ne prend pas d'image en entrée : copies dans le cwd + outil Read seul
+            names = []
+            for i, img in enumerate(images):
+                dst = Path(tmp) / f"image_{i + 1}{img.suffix.lower()}"
+                shutil.copy(img, dst)
+                names.append(dst.name)
+            prompt = (f"Commence par lire avec l'outil Read ces images du dossier courant : {', '.join(names)} "
+                      f"(dans cet ordre : image 1, image 2…).\n\n{prompt}")
+            tools = "Read"
         prompt_file = Path(tmp) / "prompt.txt"
         prompt_file.write_text(prompt, encoding="utf-8")
-        cmd = ["claude", "-p", "--output-format", "json", "--model", alias, "--tools", ""]
+        cmd = ["claude", "-p", "--output-format", "json", "--model", alias, "--tools", tools]
+        if tools:
+            cmd += ["--allowedTools", tools]
         with open(prompt_file, "r", encoding="utf-8") as fh:
             res = subprocess.run(cmd, stdin=fh, capture_output=True, text=True, encoding="utf-8",
                                  errors="replace", cwd=tmp, shell=(os.name == "nt"))

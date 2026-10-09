@@ -112,6 +112,32 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
    anglais, voix de la page AI Partners, sans hashtags. Les formats « nouvel épisode / preview » seulement sur demande. Sortie : `output/…/posts/clip_NN_<titre>.md` + champs
    `linkedin_post` / `short_description` dans `clips.json` + `summary.md`.
 
+## Miniatures YouTube : `thumbnail` (demande d'Arthur, 09/10/2026 : « automatise la création de miniatures, même style que les nôtres »)
+
+- Références : `brands/ai-corner/references/thumbnails/` (+ README d'analyse). Gabarit : animateur à gauche / invité à
+  droite détourés depuis LEUR caméra, studio flouté recoloré bleu, 2 icônes d'app 3D au centre (AI Partners / entreprise
+  invitée `assets/guests/<entreprise>.svg|png`), titre 2 lignes Metropolis ExtraBold, une ligne sur bandeau bleu arrondi.
+- `python -m clipper thumbnail --brand ai-corner --input E22_thomas-spitz.mp4 [--n 4] [--title "l1 | *l2"]
+  [--host-frame s] [--guest-frame s]` -> `output/…/miniatures/` (`variante_N.jpg` 1280×720, `_HD.png`, `planche.jpg`,
+  `titres.md`). Invité/entreprise lus dans clips.json. ~5 min (détourage ≈ 45 s par photo, CPU).
+- `clipper/thumbnail.py` : images clés toutes les 8 s -> note YuNet (netteté, regard vers le centre, sourire) ->
+  **jury visuel** (Claude regarde les planches `work/thumbnail/candidats_*.jpg` : `llm.ask_json(images=…)`, le CLI lit les
+  images avec l'outil Read) -> détourage BiRefNet-portrait en onnxruntime direct (`models/birefnet_portrait.onnx`, ~1 Go ;
+  **`rembg` inutilisable** : il importe numba, DLL bloquée par le contrôle des applications, comme `resvg-py`) -> logos
+  SVG rendus par Chrome headless -> composition PIL (réglages : `STYLE`, surchargeables par `thumbnail.style` dans brand.yaml).
+- Retour d'Arthur (09/10/2026) : « le logo de chaque invité un peu caché derrière la tête et l'épaule, plus en 3D,
+  tournés l'un vers l'autre comme les deux invités qui se regardent » -> calques fond -> icônes -> personnes ; `tile_x`
+  place chaque icône d'après le détourage (`tile_overlap` 0,16 de sa largeur cachée) ; `tile_3d` = vraie perspective
+  (rotation `yaw` ±36°, `tile_pitch` 10°, épaisseur `tile_depth` 0,2, focale 1,7× le côté), tranche visible côté
+  extérieur, logo décalé de 6 % vers le côté visible.
+- 2e retour (09/10/2026) : « encore plus en 3D, presque deux cubes » + « le bleu doit vraiment entourer le texte blanc,
+  un peu short en bas » -> face avant tournée modérément (±26°, pitch 6°) et épaisseur de cube extrudée vers le BAS
+  et l'EXTÉRIEUR (`tile_depth` 0,22 : le dessous reste visible même si le côté passe derrière la personne ; une
+  perspective forte déformait l'icône en losange) ; bandeau calé sur l'encre réelle du texte (jambages g/q compris),
+  marge égale tout autour.
+- Les rushs E22 sont nommés « thomas-spitz » alors que Thomas Spitz est l'ANIMATEUR (CEO AI Partners, toujours là) ;
+  l'invité est Nicolas Comestaz (Coty). Nommer les prochains épisodes d'après l'invité : `E23_<invite>_<entreprise>`.
+
 ## Rushs multicam (E22, 06/10/2026 : l'équipe livre 3 caméras + 1 WAV au lieu de l'épisode monté)
 
 - `clipper/multicam.py` : si `brands/<m>/episodes/<ep>.multicam.json` existe, `compose` découpe chaque passage avec
@@ -243,6 +269,8 @@ chose de subtil, que ça ne fasse pas trop »)
      (`clip["stats"]` : [{match, value, prefix, label}], ex. « PLUS DE / 3 000 / AGENTS IA ») ;
   3. sons Pixabay (`assets/sfx/`, licence dans CREDITS.md) : whoosh court sous chaque zoom-flou (gain 0,25 ≈ -31 dB),
      fin d'une montée (riser) sur les 2,4 s avant la carte de fin (0,15 ≈ -30 dB) — ≈ 13 dB sous les voix.
+- **Décision d'Arthur (09/10/2026, après le test) : « on va garder que la guest card »** -> `stats` et `sfx` désactivés
+  dans `teaser.motion` (code conservé, réactivable) ; seule la carte invité reste. Noté dans docs/TEASER_FRAMEWORK.md.
 - Jamais : glitch, citation plein écran, mur de logos, plus d'un élément graphique en plus des sous-titres et du logo.
 - Nombres découpés par Whisper (« 3 » « 000 ») recollés dans `caption_check._listen` (sinon « DE 3 3000 agents »).
 
@@ -259,8 +287,6 @@ fichier dans la réponse. Toujours un aperçu avant le rendu final.
 ## Fins d'extraits : jamais pendant que quelqu'un parle + respiration (retour d'Arthur, 08/10/2026)
 
 « Faut jamais que tu coupes avant que quelqu'un ait fini sa phrase, laisse même un mini temps à la fin pour que ça ne
-- **Décision d'Arthur (09/10/2026, après le test) : « on va garder que la guest card »** -> `stats` et `sfx` désactivés
-  dans `teaser.motion` (code conservé, réactivable) ; seule la carte invité reste. Noté dans docs/TEASER_FRAMEWORK.md.
 fasse pas effet coupé — et ça vaut pour toutes les formes de vidéo : teaser, short, podcast entier. »
 - `verify.pad_end(wav, t)` : la voix est finie au premier silence ≥ 0,12 s (< 20 % du niveau de parole — le souffle
   du micro de l'invité monte à ~10 %) ; fin = cet instant + 0,35 s, sans jamais atteindre la voix suivante (- 0,08 s) ;

@@ -606,6 +606,26 @@ def cmd_new_brand(a: argparse.Namespace) -> None:
     console.print(f"[green]Marque créée[/green] : {dst}\n  → éditez brand.yaml, guidelines.md et déposez logo.png dans assets/")
 
 
+def cmd_thumbnail(a: argparse.Namespace) -> None:
+    """Miniatures YouTube : photos choisies dans les gros plans, détourées, logos 3D, titre proposé par le LLM."""
+    from .multicam import load_spec
+    from .thumbnail import make
+    brand = Brand(a.brand)
+    video = resolve_input(brand, a.input)
+    ep = episode_dir(brand, video)
+    spec = load_spec(video)
+    if not spec:
+        sys.exit(f"Pas de {video.with_suffix('.multicam.json').name} : les miniatures partent des gros plans des rushs")
+    cj = ep / "clips.json"
+    meta = json.loads(cj.read_text(encoding="utf-8")) if cj.exists() else {}
+    guest, company = a.guest or meta.get("guest", ""), a.company or meta.get("company", "")
+    transcript = transcribe(spec.get("audio") or video, ep / "transcript.json", brand.cfg, ep / "work",
+                            names=[guest, company])
+    outs = make(brand, spec, transcript, ep, guest, company, n=a.n, title=a.title or None,
+                host_t=a.host_frame, guest_t=a.guest_frame, force=a.force)
+    console.print(f"[green]{len(outs)} miniatures[/green] -> {ep / 'miniatures'} (planche.jpg, titres.md)")
+
+
 def cmd_fetch(a: argparse.Namespace) -> None:
     from .fetch import fetch
     dest = Path(a.dest) if a.dest else ROOT_DIR / "depot"
@@ -1089,6 +1109,15 @@ def main(argv: list[str] | None = None) -> None:
     sp.add_argument("--skip", default="", help="fichiers à ignorer (morceaux de nom, ex: MIC,.wav)")
     sp.add_argument("--jobs", type=int, default=3, help="téléchargements en parallèle")
     sp.set_defaults(fn=cmd_fetch)
+    sp = sub.add_parser("thumbnail", help="miniatures YouTube de l'épisode (rushs multicam) -> output/…/miniatures/")
+    common(sp)
+    sp.add_argument("--guest", default="", help="nom de l'invité (défaut : clips.json)")
+    sp.add_argument("--company", default="", help="entreprise invitée -> logo brands/<m>/assets/guests/<entreprise>.svg|png")
+    sp.add_argument("--n", type=int, default=4, help="nombre de variantes")
+    sp.add_argument("--title", default="", help="titre imposé « ligne 1 | ligne 2 » ; * devant la ligne à mettre sur le bandeau")
+    sp.add_argument("--host-frame", type=float, default=None, help="instant (s) de la photo de l'animateur")
+    sp.add_argument("--guest-frame", type=float, default=None, help="instant (s) de la photo de l'invité")
+    sp.set_defaults(fn=cmd_thumbnail)
     sp = sub.add_parser("doctor", help="vérifie l'installation (FFmpeg, Node, HyperFrames, Python, clés)"); sp.set_defaults(fn=cmd_doctor)
 
     a = p.parse_args(argv)
