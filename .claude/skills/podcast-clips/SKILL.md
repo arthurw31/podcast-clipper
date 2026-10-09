@@ -225,10 +225,14 @@ shorts (aucune attente mutuelle) :
    façon chaîne YouTube) et lis `propositions.md` ; envoie les deux à Arthur pour l'équipe marketing (liens cliquables).
 2. L'équipe répond par un numéro (ou corrige une ligne) : `titles … --pick N [--lines "ligne 1 | *ligne 2"] --by <prénom>
    --note "<remarque>"`. Toute remarque de fond devient une ligne « À éviter » ou une règle dans `titles.md`.
-3. `python -m clipper thumbnail --brand <marque> --input <E>.mp4` : miniatures avec le titre validé (4 variantes de photos où
-   les deux sourient en se regardant). Regarde `miniatures/planche.jpg` avant de l'envoyer.
+3. `python -m clipper thumbnail --brand <marque> --input <E>.mp4` : planche numérotée de 4 miniatures avec le titre validé (photos
+   où les deux sourient en se regardant). Regarde `miniatures/planche.jpg` avant de l'envoyer à Arthur pour l'équipe.
+4. L'équipe répond par le numéro de sa préférée : `python -m clipper thumbnail … --pick N --by <prénom>` -> `miniatures/
+   miniature_finale.jpg` (+ `_HD.png`) : le livrable à téléverser sur YouTube avec le titre validé.
 
 `thumbnail` s'arrête s'il n'y a pas de titre validé ; la description YouTube de l'épisode reprend le même titre.
+Si tu modifies ce process, mets à jour le schéma (README, docs/ARCHITECTURE.md, docs/schema.html) : voir CLAUDE.md, « Règle de
+maintenance », et lance `python scripts/check_schema.py`.
 
 ## Retouches courantes
 

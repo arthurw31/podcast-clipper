@@ -10,6 +10,20 @@ ce fichier résume ce qu'il faut savoir pour **modifier** le projet sans casser 
 > **Reprise de session** : l'état du travail en cours (épisode, ce qui est validé, ce qui reste) est dans
 > [docs/REPRISE.md](docs/REPRISE.md) — à lire en premier dans une nouvelle session.
 
+## Règle de maintenance : le schéma suit le process (Arthur, 09/10/2026 : « mets à jour le schéma d'architecture à chaque fois
+qu'on modifie le process »)
+
+À CHAQUE modification du process (nouvelle commande, étape ajoutée, retirée ou déplacée, nouvelle validation humaine, nouveau
+livrable), dans le MÊME commit :
+1. le schéma d'ensemble du [README](README.md) (« Vue d'ensemble », mermaid : les étapes citent leur commande) ;
+2. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (liste « commandes » du bloc cli.py, tableau des briques, parcours des fichiers) ;
+3. la page [docs/schema.html](docs/schema.html), puis la republier avec l'outil Artifact en passant
+   `url: https://claude.ai/artifact/QLSVE4DsDZncRH5qxQQMf9` (même lien pour l'équipe) ;
+4. lancer `python scripts/check_schema.py` : il échoue si une commande du CLI manque dans ARCHITECTURE, si une étape du
+   process (liste `PROCESS` du script) manque dans le README ou la page, ou si une validation humaine disparaît. Une
+   nouvelle étape du process s'ajoute aussi à `PROCESS` dans le script.
+Puis noter la demande et sa date dans la section concernée de ce fichier.
+
 ## Point d'entrée utilisateur
 
 Arthur dépose ses fichiers (épisodes, clips de référence, logos, posts) dans `depot/` (non versionné) : les ranger
@@ -136,6 +150,9 @@ process pour les rendre mieux, et une étape où quelqu'un du marketing valide u
   aucun mot du métier -> jury (Claude, sans transcription) : 5 titres, ≥ 4 formules, une phrase d'explication pour
   l'équipe -> `titres/propositions.jpg` (planche « chaîne YouTube » : vignette réelle + titre, 6e case = dernier épisode
   publié pour comparer), `propositions.md` (justification, passage à l'horodatage, contrôles), `propositions.json`.
+- **Enchaînement voulu par Arthur (09/10/2026)** : l'agent propose 5 titres -> l'équipe marketing en choisit un -> Claude
+  fait les miniatures avec ce titre, en planche numérotée -> l'équipe choisit sa miniature préférée (`thumbnail --pick N` ->
+  `miniatures/miniature_finale.jpg` + `_HD.png` + `miniature_choisie.json`) = le livrable à téléverser sur YouTube.
 - **Validation par l'équipe marketing** : `titles --pick N [--lines "l1 | *l2"] [--youtube "…"] [--by Prénom] [--note "…"]` ->
   `titres/titre_valide.json` (avec les propositions écartées et la remarque : matière pour compléter titles.md) ; la
   description YouTube (`episode_title`, `episode-plan`) reprend ce titre ; **`thumbnail` refuse de tourner sans titre

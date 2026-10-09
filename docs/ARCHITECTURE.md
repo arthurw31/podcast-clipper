@@ -12,7 +12,7 @@ flowchart TB
     end
 
     subgraph PY["Package Python clipper/ (python -m clipper …)"]
-        CLI["cli.py<br/>commandes : rushes, fetch, transcribe, titles, propose, pick, polish, qa,<br/>build, preview, render, posts, episode-plan, episode-render,<br/>thumbnail, thumbnail-template, doctor"]
+        CLI["cli.py<br/>commandes : run, rushes, fetch, transcribe, titles, propose, select, pick, passages, find, check,<br/>polish (verify, fillers, tighten), qa, build, preview, render, posts, episode-plan, episode-render,<br/>thumbnail, thumbnail-template, new-brand, brands, doctor"]
         CFG["config.py<br/>fusion de la configuration"]
         TR["transcribe.py"]
         SEL["select_clips.py"]

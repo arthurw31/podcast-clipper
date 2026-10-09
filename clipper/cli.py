@@ -607,12 +607,18 @@ def cmd_new_brand(a: argparse.Namespace) -> None:
 
 
 def cmd_thumbnail(a: argparse.Namespace) -> None:
-    """Miniatures YouTube : photos choisies dans les gros plans, détourées, logos 3D, titre proposé par le LLM."""
+    """Miniatures YouTube : planche de variantes avec le titre validé ; `--pick N` = choix final de l'équipe."""
     from .multicam import load_spec
-    from .thumbnail import make
+    from .thumbnail import make, pick_variant
     brand = Brand(a.brand)
     video = resolve_input(brand, a.input)
     ep = episode_dir(brand, video)
+    if a.pick:
+        from .titles import episode_number
+        rec = pick_variant(ep, episode_number(video, ""), a.pick, a.by, a.note, a.out)
+        console.print(f"[green]Miniature choisie[/green] : variante {rec['variant']} -> {ep / a.out / 'miniature_finale.jpg'} "
+                      "(et _HD.png). C'est le livrable à téléverser sur YouTube avec le titre validé.")
+        return
     spec = load_spec(video)
     if not spec:
         sys.exit(f"Pas de {video.with_suffix('.multicam.json').name} : les miniatures partent des gros plans des rushs")
@@ -1200,6 +1206,9 @@ def main(argv: list[str] | None = None) -> None:
     sp.add_argument("--host-frame", type=float, default=None, help="instant (s) de la photo de l'animateur")
     sp.add_argument("--guest-frame", type=float, default=None, help="instant (s) de la photo de l'invité")
     sp.add_argument("--out", default="miniatures", help="dossier de sortie dans output/… (pour garder une autre version à côté)")
+    sp.add_argument("--pick", type=int, default=None, help="choix final : numéro de la miniature préférée sur la planche")
+    sp.add_argument("--by", default="", help="avec --pick : qui a choisi (prénom)")
+    sp.add_argument("--note", default="", help="avec --pick : remarque de l'équipe")
     sp.set_defaults(fn=cmd_thumbnail)
     sp = sub.add_parser("titles", help="titre de l'épisode : 5 propositions à faire valider par l'équipe marketing, puis --pick N")
     common(sp)

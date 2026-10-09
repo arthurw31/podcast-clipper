@@ -30,7 +30,7 @@ flowchart TD
 
     subgraph SH["5 shorts verticaux 9:16"]
         direction TB
-        S1{{"propose : Claude propose ~10 passages"}} --> S2["L'équipe choisit 5 passages<br/>+ demandes particulières"]
+        S1{{"propose : Claude propose ~10 passages"}} --> S2["L'équipe choisit 5 passages (pick)<br/>+ demandes particulières"]
         S2 --> S3["polish : « euh » et blancs retirés,<br/>gros plan / écran partagé, sous-titres<br/>vérifiés à l'écoute, carte de fin"]
         S3 --> S4["qa + aperçus MP4"]
         S4 --> S5["L'équipe valide les aperçus"]
@@ -49,13 +49,13 @@ flowchart TD
         direction TB
         M1{{"titles : Claude écrit des titres, chacun adossé à un<br/>passage de l'épisode, contrôlés → 5 propositions"}} --> M2["Planche « chaîne YouTube »<br/>5 vignettes avec leur titre"]
         M2 --> M3["L'équipe marketing valide 1 titre<br/>(titles --pick N)"]
-        M3 --> M4["thumbnail : photos où les deux sourient,<br/>gabarit Canva, titre validé"]
-        M4 --> M5["L'équipe choisit une variante de photo"]
+        M3 --> M4["thumbnail : planche de 4 miniatures, photos où les deux<br/>sourient, gabarit Canva (thumbnail-template), titre validé"]
+        M4 --> M5["L'équipe choisit sa miniature préférée<br/>(thumbnail --pick N)"]
     end
 
     S6 --> L1[("5 shorts MP4<br/>+ 5 posts LinkedIn")]
     E4 --> L2[("Épisode 1080p avec teaser<br/>+ description YouTube (titre validé) et chapitres")]
-    M5 --> L3[("Titre validé + miniature 1280×720 + HD")]
+    M5 --> L3[("Titre validé + miniature choisie<br/>1280×720 + HD")]
 
     classDef human fill:#FFF2DF,stroke:#C26A00,color:#3A2810;
     classDef llm fill:#EFEBFF,stroke:#6B4FD8,color:#251C47;

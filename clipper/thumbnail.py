@@ -15,6 +15,7 @@ la 2e ligne sur un bandeau bleu arrondi.
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -682,7 +683,7 @@ def make(brand, spec: dict, ep: Path, company: str, n: int = 4, title: str | Non
     out_dir.mkdir(parents=True, exist_ok=True)
     hs, gs = ctx["chosen"]["host"], ctx["chosen"]["guest"]
     combos = [(0, 0), (1, 0), (0, 1), (1, 1), (2, 0), (0, 2)]
-    outs, rows = [], []
+    outs, rows, variants = [], [], []
     for i, (hi, gi) in enumerate(combos[:n]):
         h, g = hs[hi % len(hs)], gs[gi % len(gs)]
         img = _compose_one(ctx, h, g, lines, hl)
@@ -693,13 +694,41 @@ def make(brand, spec: dict, ep: Path, company: str, n: int = 4, title: str | Non
         outs.append(sm)
         m = lambda t: f"{int(t) // 60}:{int(t) % 60:02d}"
         rows.append(f"{i + 1}. {sm.name} : photo animateur {m(h['t'])}, photo invité {m(g['t'])}")
+        variants.append({"n": i + 1, "file": sm.name, "hd": hd.name, "host_t": h["t"], "guest_t": g["t"]})
     if outs:
+        from .canva_template import font
+        from PIL import ImageDraw
         thumbs = [Image.open(p).resize((640, 360)) for p in outs]
         cols = 2
         sheet = Image.new("RGB", (cols * 650, ((len(thumbs) + 1) // cols) * 370), (24, 24, 24))
+        f_num = font(brand.assets_dir, "Montserrat", "Bold", 34)
         for k, t in enumerate(thumbs):
-            sheet.paste(t, ((k % cols) * 650 + 5, (k // cols) * 370 + 5))
+            x, y = (k % cols) * 650 + 5, (k // cols) * 370 + 5
+            sheet.paste(t, (x, y))
+            d = ImageDraw.Draw(sheet)                      # numéro : l'équipe répond « la 3 »
+            d.ellipse([x + 12, y + 12, x + 72, y + 72], fill=(37, 138, 243))
+            d.text((x + 42, y + 42), str(k + 1), font=f_num, fill=(255, 255, 255), anchor="mm")
         sheet.save(out_dir / "planche.jpg", quality=90)
     mark = " / ".join(f"[{l}]" if j == hl else l for j, l in enumerate(lines))
     (out_dir / "titres.md").write_text(f"# Miniatures\n\nTitre ({title_note}) : {mark}\n\n" + "\n".join(rows) + "\n", encoding="utf-8")
+    (out_dir / "variantes.json").write_text(json.dumps({"lines": lines, "highlight": hl, "variants": variants},
+                                                       ensure_ascii=False, indent=1), encoding="utf-8")
     return outs
+
+
+def pick_variant(ep: Path, number: str, pick: int, by: str = "", note: str = "", out_name: str = "miniatures") -> dict:
+    """Dernière étape : l'équipe a choisi sa miniature préférée sur la planche -> `miniature_finale.jpg` (1280×720, à téléverser
+    sur YouTube) + `miniature_finale_HD.png`, et `miniature_choisie.json` (variante, photos, titre, qui, quand)."""
+    from datetime import date
+    d = ep / out_name
+    src, hd = d / f"variante_{pick}.jpg", d / f"variante_{pick}_HD.png"
+    if not src.exists():
+        raise SystemExit(f"Variante {pick} introuvable dans {d} : lancer d'abord `thumbnail` (planche de miniatures)")
+    meta = json.loads((d / "variantes.json").read_text(encoding="utf-8")) if (d / "variantes.json").exists() else {}
+    shutil.copy2(src, d / "miniature_finale.jpg")
+    shutil.copy2(hd, d / "miniature_finale_HD.png")
+    rec = {"episode": number, "variant": pick, "lines": meta.get("lines"),
+           **next((v for v in meta.get("variants", []) if v["n"] == pick), {}),
+           "chosen_by": by, "chosen_on": date.today().isoformat(), "note": note}
+    (d / "miniature_choisie.json").write_text(json.dumps(rec, ensure_ascii=False, indent=1), encoding="utf-8")
+    return rec
