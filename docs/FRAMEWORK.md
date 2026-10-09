@@ -1,89 +1,35 @@
-# Comment fonctionne le framework « Podcast → shorts »
+# Guide pratique : délais, aperçus et quel fichier modifier
 
-Les rushs d'un tournage entrent (3 caméras + micro) ; sortent cinq shorts verticaux montés et leurs posts
-LinkedIn, l'épisode complet monté avec son teaser, et les miniatures YouTube. Le schéma d'ensemble est dans le
-[README](../README.md#vue-densemble--des-rushs-du-tournage-à-tous-les-livrables) ; cette page détaille les shorts. Claude fait le travail
-répétitif (transcrire, repérer, couper, monter, rédiger) ; l'équipe garde les décisions éditoriales :
-**quels passages**, **ce qu'il faut absolument inclure**, et la **validation des shorts** en aperçu avant le rendu final.
+Le process complet (rushs -> shorts, épisode + teaser, titre et miniature) est décrit par le **schéma du
+[README](../README.md#vue-densemble--des-rushs-du-tournage-à-tous-les-livrables)** : c'est la seule référence, tenue à
+jour à chaque changement. Cette page ne refait pas le schéma ; elle répond aux questions pratiques de l'équipe.
 
-> Ce qui a été validé (et ce qu'il faut éviter) est résumé dans [BONNES_PRATIQUES.md](BONNES_PRATIQUES.md).
+> Ce qui a été validé (et ce qu'il faut éviter) : [BONNES_PRATIQUES.md](BONNES_PRATIQUES.md). Fonctionnement technique :
+> [ARCHITECTURE.md](ARCHITECTURE.md).
 
-## Les shorts en 5 étapes
+## Combien de temps ? (PC sans GPU, épisode de 50 min)
 
-```mermaid
-flowchart TD
-    A["1 · Dépôt dans depot/<br/>3 rushs MP4 + audio WAV (ou épisode monté)<br/>+ logo de l'invité"] --> B["Transcription<br/>Whisper, mot à mot, horodatée"]
-    B --> C{{"2 · Claude propose ~10 passages<br/>3 lectures en parallèle<br/>(cas concret · position tranchée · humain)<br/>puis un jury garde les 10 meilleurs"}}
-    C --> D["3 · L'équipe choisit 5 passages<br/>+ demandes particulières<br/>« il faut le passage où il dit… »"]
-    D --> E["Calage des coupes<br/>début et fin de phrase · contrôle mot à mot"]
-    E --> N["4 · Nettoyage à l'écoute (polish)<br/>blancs et « euh » retirés · vraies fins de phrase<br/>+ respiration · aucun mot perdu"]
-    N --> F["4 · Montage des 5 shorts<br/>recadrage vertical · logos · bulle-titre<br/>sous-titres vérifiés à l'écoute · carte de fin"]
-    F --> Q1["Contrôle 1 (automatique)<br/>raccords · fins · sous-titres complets · durée"]
-    Q1 --> P["Aperçus MP4 rapides"]
-    P --> Q2["Contrôle 2 (automatique)<br/>format · volume · planche d'images regardée"]
-    Q2 --> V["4 · Contrôle 3 : l'équipe regarde les aperçus MP4<br/>et demande ses retouches"]
-    V -->|retouche| N
-    E --> G["4 · Rédaction des 5 posts LinkedIn<br/>méthode de la marque (posts.md)"]
-    V -->|validé| R["5 · Rendu final unique des 5 MP4<br/>1080×1920 + contrôle du fichier final"]
-    R --> H["5 · Livraison<br/>5 MP4 + 5 posts prêts à publier"]
-    G --> H
-
-    classDef human fill:#258AF3,color:#fff,stroke:#151D53;
-    classDef check fill:#E8F1FE,stroke:#258AF3;
-    class D,V human;
-    class Q1,Q2 check;
-```
-
-| Étape | Qui | Durée (PC sans GPU, épisode de 50 min) |
+| Étape | Qui | Durée |
 | --- | --- | --- |
-| 1. Dépôt + transcription | vous déposez les rushs et l'audio dans `depot/`, Claude les range, les synchronise et transcrit | ≈ 1 min de rangement + ≈ 20 min de transcription (automatique) |
-| 2. 10 propositions | Claude | ≈ 8 min |
-| 3. Choix + demandes | **vous** | 2 min |
-| 4. Nettoyage + montage + contrôles + aperçus + posts | Claude prépare, **vous regardez les aperçus et validez** | ≈ 6–8 min par short (tout compris, en arrière-plan), ≈ 3 min par retouche |
-| 5. Rendu final + contrôle + livraison | Claude | ≈ 10 min par short, 2 en parallèle, une seule fois |
+| Dépôt + transcription | vous déposez les 3 rushs MP4 et l'audio WAV dans `depot/`, Claude les range, les synchronise et transcrit | ≈ 1 min + ≈ 20 min (automatique) |
+| 10 passages proposés | Claude | ≈ 8 min |
+| Choix des 5 passages + demandes | **vous** | 2 min |
+| Nettoyage, montage, contrôle qualité, aperçus, posts | Claude prépare, **vous regardez les aperçus et validez** | ≈ 6–8 min par short, ≈ 3 min par retouche |
+| Rendu final des shorts | Claude | ≈ 10 min par short, 2 en parallèle, une seule fois |
+| 5 titres proposés -> choix | Claude, puis **vous** | quelques minutes |
+| 4 miniatures avec le titre choisi -> choix | Claude, puis **vous** | ≈ 5 min |
+| Outro des shorts (avec la miniature choisie) | Claude | ≈ 3 min + ≈ 1 min par short |
+| Épisode complet : aperçu 540p + contrôle | Claude | ≈ 15 min |
+| Épisode complet : rendu 1080p | Claude, après **votre** validation | ≈ 1 h |
 
-**Aperçu ou rendu ?** Un short est d'abord une « page » (vidéo + sous-titres, logos, transitions programmés par
-dessus). L'**aperçu MP4** en est une version rapide (image un peu saccadée, 12 images/s) à ouvrir dans votre lecteur
-vidéo habituel : idéal pour vérifier le contenu. Le **rendu** final la transforme en MP4 net et fluide image par image
-(≈ 10 min par short) : on ne le fait qu'une fois, après votre validation.
+## Aperçu ou rendu ?
 
-**Trois contrôles avant toute livraison.** Chaque retour de l'équipe est devenu une vérification automatique :
-aucun mot coupé à un raccord, aucune fin de phrase coupée (et un petit temps après), jamais le début de la phrase
-suivante, « euh » retirés sans perdre un mot, sous-titres vérifiés à l'écoute (deux écoutes indépendantes), flash
-lumineux seulement aux changements de plan, volume -16 LUFS. Rapport par short : `output/…/qa/`.
-
-## Ce qui se passe à l'intérieur
-
-(Version détaillée pour les curieux et les développeurs : [ARCHITECTURE.md](ARCHITECTURE.md).)
-
-```mermaid
-flowchart LR
-    subgraph Marque["brands/nom-de-la-marque/ (modifiable)"]
-        BY["brand.yaml<br/>charte, formats, durées"]
-        GL["guidelines.md<br/>ce qui fait un bon extrait"]
-        PM["posts.md<br/>méthode + posts de référence"]
-        AS["assets/<br/>logos, polices, animation de fin"]
-    end
-    EP[("Épisode")] --> T["transcribe<br/>faster-whisper"]
-    T --> S["propose / select<br/>Claude × 3 angles + jury"]
-    GL --> S
-    S --> P["pick + check<br/>choix humain, coupes vérifiées"]
-    P --> AN["analysis<br/>plans, visages, fausses coupes"]
-    AN --> RF["reframe<br/>cadrage vertical : gros plan de celui qui parle,<br/>écran partagé quand l'autre écoute"]
-    RF --> CO["compose<br/>HyperFrames : sous-titres, bulle,<br/>logos, light leak, carte de fin"]
-    BY --> CO
-    AS --> CO
-    CO --> R["render<br/>MP4 1080×1920"]
-    P --> PO["posts<br/>Claude"]
-    PM --> PO
-```
-
-- **Jamais couper une pensée** : Claude cite les premiers et derniers mots de chaque passage ; le code cale la
-  coupe exactement sur ces mots, puis on vérifie mot à mot (`check`).
-- **Montage fluide** : depuis les rushs, gros plan sur celui qui parle et écran partagé de temps en temps
-  (seulement si celui qui écoute est calme) ; flash lumineux seulement quand l'angle change ; aucun zoom (AI Corner).
-- **Netteté** : le recadrage vertical est fait par FFmpeg à partir de la meilleure source (rushs 1080p, 4K quand
-  elle existe), puis rendu en 1080×1920.
+Une vidéo est d'abord une « page » (images + sous-titres, logos, transitions programmés par dessus). L'**aperçu MP4**
+en est une version rapide (un peu saccadée, 12 images/s) à ouvrir dans votre lecteur vidéo habituel : idéal pour
+vérifier le contenu. Le **rendu** final la transforme en MP4 net et fluide (≈ 10 min par short) : on ne le fait
+qu'une fois, après votre validation. Avant qu'un aperçu vous soit montré, le contrôle qualité automatique est passé
+(aucun mot coupé à un raccord, fins de phrase complètes, « euh » retirés sans perdre un mot, sous-titres vérifiés à
+l'écoute, volume -16 LUFS) ; tant qu'il trouve un défaut, Claude corrige et recommence. Rapports : `output/…/qa/`.
 
 ## Modifier le format (tout est dans des fichiers texte)
 
@@ -93,8 +39,10 @@ flowchart LR
 | les formats (vertical, LinkedIn 16:9, carré) | `brand.yaml` → `formats` | `["9x16", "16x9"]` |
 | ce que Claude doit chercher / éviter | `brands/<marque>/guidelines.md` | « éviter les passages sur la levée de fonds » |
 | le style des posts LinkedIn | `brands/<marque>/posts.md` | coller de nouveaux posts publiés en exemples |
+| le style des titres d'épisode | `brands/<marque>/titles.md` | ajouter un titre refusé dans « À éviter » |
+| l'outro des shorts (texte, bouton, durée) | `brand.yaml` → `short_outro` | `cta: "Regarder l'épisode — lien en description"` |
+| le gabarit des miniatures | réimport du design Canva (`thumbnail-template`) | nouveau design exporté en PPTX + PNG |
 | les logos, la police, l'animation de fin | `brands/<marque>/assets/` | remplacer `outro_anim.mov` |
-| le texte du bouton de fin | `brand.yaml` → `outro.cta.text` | « ▶ L'ÉPISODE COMPLET SUR AI CORNER » |
 | le style de montage (bulle, sous-titres, coupes) | `config/presets/aip-short.yaml` | taille des sous-titres, durée de la bulle |
 | tout le reste (valeurs par défaut commentées) | `config/defaults.yaml` | — |
 

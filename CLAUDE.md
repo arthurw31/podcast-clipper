@@ -45,7 +45,8 @@ Le skill `.claude/skills/podcast-clips/SKILL.md` décrit le **workflow en 5 éta
 dépôt de l'épisode (4K) → `propose` (~10 passages) → l'humain en choisit 5 + demandes particulières (`pick`,
 `find`, `check`) → `build` + **`preview`** (aperçu instantané, retouches par `build --only N`) + `posts` → validation
 → `render` une seule fois → livraison des 5 MP4 et des 5 posts. Ne jamais monter avant le choix humain, ne jamais
-rendre avant la validation sur l'aperçu. Schéma et « quel fichier modifier » : `docs/FRAMEWORK.md` (destiné à l'équipe marketing, qui
+rendre avant la validation sur l'aperçu. Schéma : README (seule référence). Délais et « quel fichier modifier » : `docs/FRAMEWORK.md`, sans schéma depuis le
+09/10/2026 (Arthur : « ça n'a pas trop de sens de garder ça vu qu'on a déjà le schéma ») ; destiné à l'équipe marketing, qui
 installe via « clone … et installe tout ce qu'il faut » dans Claude Code — voir README).
 
 ## Installation sur une machine neuve (« installe tout ce qu'il faut »)

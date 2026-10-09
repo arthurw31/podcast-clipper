@@ -31,7 +31,7 @@ est automatique. Aucune vidéo finale n'est rendue sans validation sur un aperç
 la description YouTube de l'épisode attend le titre validé ; l'outro des shorts attend la miniature choisie. Tout le reste n'attend rien : on peut monter, faire valider et rendre les shorts, monter
 l'épisode et choisir le titre en même temps.
 
-- Guide d'utilisation (workflow, « quel fichier modifier pour changer le format ») : **[docs/FRAMEWORK.md](docs/FRAMEWORK.md)**
+- Guide pratique (délais, aperçu ou rendu, « quel fichier modifier pour changer le format ») : **[docs/FRAMEWORK.md](docs/FRAMEWORK.md)**
 - Fonctionnement technique (briques, fichiers produits, montage d'un short) : **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**
 
 ## Installation pour l'équipe (Windows ou Mac, ≈ 15 min)

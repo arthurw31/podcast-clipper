@@ -5,8 +5,8 @@ description: Pilote tout le process AI Corner avec le framework « clipper » de
 
 # Podcast → shorts, épisode complet, titre et miniature
 
-Tu pilotes le framework `clipper` (voir [CLAUDE.md](../../../CLAUDE.md), [README.md](../../../README.md) et le
-schéma [docs/FRAMEWORK.md](../../../docs/FRAMEWORK.md)). **Lis d'abord [docs/BONNES_PRATIQUES.md](../../../docs/BONNES_PRATIQUES.md)** :
+Tu pilotes le framework `clipper` (voir [CLAUDE.md](../../../CLAUDE.md), le schéma du process dans
+[README.md](../../../README.md) et le guide pratique [docs/FRAMEWORK.md](../../../docs/FRAMEWORK.md) : délais, quel fichier modifier). **Lis d'abord [docs/BONNES_PRATIQUES.md](../../../docs/BONNES_PRATIQUES.md)** :
 ce qui a été validé sur E22 (le résultat de référence) et ce qu'il ne faut plus jamais faire. L'utilisateur est un membre de l'équipe marketing :
 il ne tape aucune commande, tu fais tout et tu lui parles simplement (pas de jargon technique).
 
