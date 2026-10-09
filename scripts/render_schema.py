@@ -30,7 +30,7 @@ PAGE = """<!doctype html><meta charset="utf-8"><body><pre id="src">{src}</pre><p
 import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@{ver}/dist/mermaid.esm.min.mjs";
 mermaid.initialize({{startOnLoad: false, securityLevel: "strict", htmlLabels: false,
   flowchart: {{htmlLabels: false, curve: "basis", nodeSpacing: 40, rankSpacing: 45}},
-  themeVariables: {{fontFamily: "Arial, Helvetica, sans-serif", fontSize: "15px"}}}});
+  themeVariables: {{fontFamily: "Arial, Helvetica, sans-serif", fontSize: "18px"}}}});
 try {{
   const {{svg}} = await mermaid.render("schema", document.getElementById("src").textContent);
   document.getElementById("out").textContent = svg;

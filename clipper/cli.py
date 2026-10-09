@@ -657,20 +657,25 @@ def cmd_titles(a: argparse.Namespace) -> None:
     res = propose(brand, transcript, number, guest, company, out_dir, n=a.n, import_file=Path(a.import_file) if a.import_file else None)
     if not res["proposals"]:
         sys.exit("Aucune proposition n'a passé les contrôles : voir titres/propositions.json (rubrique « dropped »)")
-    imgs = render_proposals(brand, spec, ep, company, res["proposals"], force=a.force)
-    cards = [{"image": f, "title": p["youtube"], "number": p["rank"], "note": "AI Partners"}
-             for f, p in zip(imgs, res["proposals"])]
-    pub = published(brand)
-    ref = next((r for r in (brand.dir / "references" / "thumbnails").glob("*.jpg")), None) if pub else None
-    if ref and len(cards) % 3:                 # 6e case : dernier épisode publié, pour comparer dans le même décor
-        cards.append({"image": ref, "title": f"AI Corner {pub[0]['n']} | {pub[0]['title']}", "number": None,
-                      "note": "Dernier épisode publié (pour comparer)"})
-    sheet = cards_sheet(brand, cards, out_dir / "propositions.jpg")
-    md = write_md(res, out_dir / "propositions.md", base)
+    # Les titres se proposent en TEXTE (Arthur, 09/10/2026 : « Claude propose 5 titres en textuel, l'équipe en choisit un,
+    # et ENSUITE seulement Claude crée les miniatures avec le bon titre ») : la planche sur vignettes est facultative.
+    sheet = None
+    if a.planche:
+        imgs = render_proposals(brand, spec, ep, company, res["proposals"], force=a.force)
+        cards = [{"image": f, "title": p["youtube"], "number": p["rank"], "note": "AI Partners"}
+                 for f, p in zip(imgs, res["proposals"])]
+        pub = published(brand)
+        ref = next((r for r in (brand.dir / "references" / "thumbnails").glob("*.jpg")), None) if pub else None
+        if ref and len(cards) % 3:                 # 6e case : dernier épisode publié, pour comparer dans le même décor
+            cards.append({"image": ref, "title": f"AI Corner {pub[0]['n']} | {pub[0]['title']}", "number": None,
+                          "note": "Dernier épisode publié (pour comparer)"})
+        sheet = cards_sheet(brand, cards, out_dir / "propositions.jpg")
+    md = write_md(res, out_dir / "propositions.md", base, with_sheet=bool(sheet))
     for p in res["proposals"]:
         console.print(f"  {p['rank']}. [{p['status']}] {p['youtube']}")
-    console.print(f"[green]{len(res['proposals'])} propositions[/green] -> {sheet}\nListe et justifications : {md}\n"
-                  f"À valider par l'équipe marketing, puis : {base} --pick N")
+    console.print(f"[green]{len(res['proposals'])} titres proposés[/green] -> {md}"
+                  + (f"\nPlanche sur vignettes : {sheet}" if sheet else "")
+                  + f"\nL'équipe marketing en choisit un, puis : {base} --pick N  (ensuite seulement : thumbnail)")
 
 
 def cmd_rushes(a: argparse.Namespace) -> None:
@@ -833,6 +838,8 @@ def cmd_episode_render(a: argparse.Namespace) -> None:
     brand, video, ep, spec, transcript = _episode_inputs(a)
     edl = json.loads((ep / "work" / "edl.json").read_text(encoding="utf-8"))
     plan = json.loads((ep / "episode_plan.json").read_text(encoding="utf-8"))
+    from .titles import episode_title
+    plan["youtube_title"] = episode_title(ep)      # description YouTube : le titre validé par l'équipe (titles --pick)
     words = json.loads((ep / "work" / "diarized_words.json").read_text(encoding="utf-8"))
     teaser = json.loads((ep / "teaser_clip.json").read_text(encoding="utf-8"))
     proxy, fps = a.proxy, 24
@@ -870,6 +877,20 @@ def cmd_episode_render(a: argparse.Namespace) -> None:
                                                                contact=_contact(brand)),
                                                    encoding="utf-8")
     console.print(f"[green]✓ {out}[/green]  ({probe(out)['duration'] / 60:.1f} min)")
+    # contrôle qualité enchaîné, comme `polish` pour les shorts (Arthur, 09/10/2026 : « entre l'aperçu 540p et la
+    # validation de l'équipe, une phase de QA qui vérifie que c'est bien monté, et retouche ») : raccords réécoutés,
+    # celui qui parle visible, volumes. Un ÉCHEC = retoucher le plan et refaire l'aperçu AVANT de le montrer.
+    if not a.minutes:
+        from .qa import qa_episode
+        status, lines = qa_episode(ep, out, brand.cfg, end_len=end_duration(brand), src_wav=_wav_for(video))
+        qa_dir = ep / "qa"
+        qa_dir.mkdir(exist_ok=True)
+        rep = qa_dir / f"episode{tag}.md"
+        rep.write_text(f"# QA épisode complet{' (aperçu)' if proxy else ''} — {status}\n\n" + "\n".join(lines) + "\n",
+                       encoding="utf-8")
+        color = "red" if status == "ÉCHEC" else "yellow" if status == "ATTENTION" else "green"
+        console.print(f"[{color}]Contrôle qualité : {status}[/{color}] -> {rep}"
+                      + ("  (à retoucher avant de montrer l'aperçu)" if status == "ÉCHEC" else ""))
 
 
 def cmd_verify(a: argparse.Namespace) -> None:
@@ -1230,6 +1251,7 @@ def main(argv: list[str] | None = None) -> None:
     sp.add_argument("--company", default="", help="entreprise de l'invité (défaut : clips.json)")
     sp.add_argument("--n", type=int, default=5, help="nombre de propositions")
     sp.add_argument("--import-file", default="", help="titres déjà écrits (JSON) : contrôlés et présentés sans appeler Claude")
+    sp.add_argument("--planche", action="store_true", help="présente aussi chaque titre sur une vignette (facultatif : le choix se fait sur le texte)")
     sp.add_argument("--pick", type=int, default=None, help="valide la proposition N (choix de l'équipe marketing)")
     sp.add_argument("--lines", default="", help="avec --pick : corrige les lignes « ligne 1 | *ligne 2 » (* = ligne du bandeau)")
     sp.add_argument("--youtube", default="", help="avec --pick : corrige le titre YouTube complet")

@@ -208,7 +208,9 @@ python -m clipper qa     --brand <marque> --input <fichier> --only N --render   
 
 Sur demande (« monte l'épisode en entier ») : `python -m clipper episode-plan --brand <m> --input <ep>.mp4 --guest … --company … --host "…"`,
 présente `episode_plan.md` (durée, coupes du dérushage, extraits du teaser) et demande validation ; puis
-`episode-render … --proxy` (aperçu 540p, ~15 min, à envoyer avec SendUserFile) ; après validation seulement,
+`episode-render … --proxy` (aperçu 540p, ~15 min) : il enchaîne le contrôle qualité (`qa/episode_apercu.md` : raccords
+réécoutés, celui qui parle à l'image, volumes). Lis le rapport : ÉCHEC ou point à corriger -> retouche (plan, coupes, teaser) et
+nouvel aperçu, jusqu'à un contrôle propre ; ALORS seulement envoie l'aperçu (SendUserFile) ; après validation seulement,
 `episode-render …` (1080p, ~1 h, arrière-plan ; pour juger seulement teaser + raccord + volumes :
 `episode-render … --proxy --minutes 2`, ~5 min). Puis **`qa --episode`** : réécoute de chaque raccord DANS le MP4
 final (aucun « euh », aucun mot coupé, fin jamais pendant la voix), volumes teaser / épisode à ±1,5 LUFS, planche
@@ -220,9 +222,9 @@ chapitres). Teaser et corps sont rendus séparément : retoucher le teaser ne re
 Le titre de l'épisode est validé par l'équipe marketing AVANT les miniatures. À lancer après `transcribe`, en parallèle des
 shorts (aucune attente mutuelle) :
 
-1. `python -m clipper titles --brand <marque> --input <E>.mp4` : 5 titres contrôlés (chacun prouvé par un passage de
-   l'épisode, format `AI Corner E<n> | …`, brief `brands/<marque>/titles.md`). Ouvre `titres/propositions.jpg` (planche
-   façon chaîne YouTube) et lis `propositions.md` ; envoie les deux à Arthur pour l'équipe marketing (liens cliquables).
+1. `python -m clipper titles --brand <marque> --input <E>.mp4` : 5 titres contrôlés, en TEXTE (chacun prouvé par un passage
+   de l'épisode, format `AI Corner E<n> | …`, brief `brands/<marque>/titles.md`). Donne les 5 titres à Arthur pour l'équipe
+   marketing, avec le lien vers `titres/propositions.md`. Aucune miniature à ce stade.
 2. L'équipe répond par un numéro (ou corrige une ligne) : `titles … --pick N [--lines "ligne 1 | *ligne 2"] --by <prénom>
    --note "<remarque>"`. Toute remarque de fond devient une ligne « À éviter » ou une règle dans `titles.md`.
 3. `python -m clipper thumbnail --brand <marque> --input <E>.mp4` : planche numérotée de 4 miniatures avec le titre validé (photos

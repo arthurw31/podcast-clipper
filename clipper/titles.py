@@ -350,9 +350,10 @@ def _ts(t: float) -> str:
     return f"{int(t) // 60}:{int(t) % 60:02d}"
 
 
-def write_md(res: dict, out: Path, command: str) -> Path:
+def write_md(res: dict, out: Path, command: str, with_sheet: bool = False) -> Path:
     md = [f"# Titre de l'épisode {res['episode']} : 5 propositions à valider", "",
-          f"Invité : {res['guest']} ({res['company']}). Planche : `propositions.jpg` (les vignettes comme sur la chaîne).", ""]
+          f"Invité : {res['guest']} ({res['company']}). L'équipe marketing choisit UN titre ; les miniatures sont faites "
+          "ensuite avec ce titre." + (" Planche facultative : `propositions.jpg`." if with_sheet else ""), ""]
     for p in res["proposals"]:
         mark = " / ".join(f"[{l}]" if i == p["highlight"] else l for i, l in enumerate(p["lines"]))
         ev = p.get("evidence") or {}

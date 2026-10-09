@@ -155,9 +155,10 @@ process pour les rendre mieux, et une étape où quelqu'un du marketing valide u
   d'un seul tenant (`find_evidence`), aucun nom d'invité, aucun mot sensationnel, pas de copie (> 0,85) d'un titre publié ni
   d'un titre refusé (rubrique « À éviter » de titles.md, lue par `refused`) ; ATTENTION : proche (> 0,72), deux-points,
   aucun mot du métier -> jury (Claude, sans transcription) : 5 titres, ≥ 4 formules, une phrase d'explication pour
-  l'équipe -> `titres/propositions.jpg` (planche « chaîne YouTube » : vignette réelle + titre, 6e case = dernier épisode
-  publié pour comparer), `propositions.md` (justification, passage à l'horodatage, contrôles), `propositions.json`.
-- **Enchaînement voulu par Arthur (09/10/2026)** : l'agent propose 5 titres -> l'équipe marketing en choisit un -> Claude
+  l'équipe -> `titres/propositions.md` (les 5 titres en TEXTE, justification, passage à l'horodatage, contrôles) et
+  `propositions.json`. Planche des titres posés sur des vignettes : facultative (`titles --planche`), plus dans le process.
+- **Enchaînement voulu par Arthur (09/10/2026)** : « Claude propose 5 titres en textuel, l'équipe en choisit un, et ensuite
+  seulement Claude crée les miniatures avec le bon titre » : l'agent propose 5 titres -> l'équipe marketing en choisit un -> Claude
   fait les miniatures avec ce titre, en planche numérotée -> l'équipe choisit sa miniature préférée (`thumbnail --pick N` ->
   `miniatures/miniature_finale.jpg` + `_HD.png` + `miniature_choisie.json`) = le livrable à téléverser sur YouTube.
 - **Validation par l'équipe marketing** : `titles --pick N [--lines "l1 | *l2"] [--youtube "…"] [--by Prénom] [--note "…"]` ->
@@ -303,6 +304,12 @@ process pour les rendre mieux, et une étape où quelqu'un du marketing valide u
 - Fin de l'épisode : `episode_end.duration` (brand.yaml), 8 s depuis le 08/10/2026 (équipe : « trop rapide, x2 sur la
   longueur de l'animation ») ; même retour pour les shorts : `outro.duration` 3,5 -> 7 s. `end_card` lit le logo PNG
   avec `-loop 1` (sinon une seule image, transparente avant le fondu : logo invisible — bug présent jusqu'au 08/10).
+- **Contrôle qualité de l'aperçu** (Arthur, 09/10/2026 : « entre l'aperçu 540p et la validation de l'équipe, une phase de QA
+  qui vérifie que c'est bien monté, et retouche, exactement comme pour les shorts ») : `episode-render` enchaîne
+  `qa_episode` sur le MP4 qu'il vient de produire (sauf `--minutes`) -> `qa/episode_apercu.md` (aperçu) ou `qa/episode.md`
+  (final) : raccords réécoutés, celui qui parle à l'image (tours de parole + empreinte vocale), volumes, images. ÉCHEC ou
+  ATTENTION à regarder -> Claude retouche (`episode_plan.json`, coupes, teaser), refait l'aperçu et le contrôle, et ne montre
+  l'aperçu à l'équipe qu'ensuite. Le titre de la description YouTube = le titre validé (`episode_title`), aussi au rendu.
 - L'épisode entier n'est PAS rendu par HyperFrames (≈ 12× la durée = 9–10 h) : corps en FFmpeg, teaser en
   HyperFrames. Toujours montrer l'aperçu (Studio pour le teaser : `preview --clip 99 --formats 16x9`, 540p pour le
   corps) et attendre la confirmation d'Arthur avant tout MP4 final.
