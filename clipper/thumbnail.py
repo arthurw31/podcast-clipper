@@ -537,20 +537,6 @@ S'il n'y a aucun vrai sourire pour une personne, prends l'expression la plus cha
 Réponds UNIQUEMENT en JSON : {"host": [numéros du meilleur au moins bon, 3 maximum], "guest": [...],
 "host_smile": true/false, "guest_smile": true/false, "why": "1 phrase"}"""
 
-TITLE_PROMPT = """Tu écris le titre d'une miniature YouTube du podcast {brand} (épisode avec {guest}{company}).
-Style des miniatures déjà publiées (2 lignes, la ligne mise en avant est sur un bandeau bleu) :
-- « Combien vous coûte » / [bandeau] « vraiment votre IA ? »
-- [bandeau] « Comment la MAIF place l'humain » / « au cœur de sa transformation IA »
-- « Construire sa stratégie » / [bandeau] « GEO en 2026 »
-Règles : français ; 2 lignes de 12 à 26 caractères chacune, la plus courte possible ; une question ou une promesse
-concrète qui donne envie de cliquer, tirée de ce qui est VRAIMENT dit dans l'épisode (jamais inventé, pas de
-putaclic mensonger) ; le bandeau porte les mots forts (chiffre, nom de l'entreprise, idée choc) ; pas d'emoji, pas de
-guillemets, pas de point final (le « ? » est permis, précédé d'une espace insécable écrite comme une espace normale).
-Chaque ligne a du sens seule (jamais une ligne creuse comme « Chez X il y a ») ; nombres à la française (« 3 000 »).
-Propose {n} titres variés (question, chiffre, promesse, contraste).
-Réponds UNIQUEMENT en JSON : {{"titles": [{{"lines": ["ligne 1", "ligne 2"], "highlight": 0 ou 1, "why": "…"}}]}}"""
-
-
 def jury(sheets: list[Path], model: str = "claude-sonnet-5") -> dict | None:
     from .llm import ask_json
     try:
@@ -558,21 +544,6 @@ def jury(sheets: list[Path], model: str = "claude-sonnet-5") -> dict | None:
     except Exception as e:                  # noqa: BLE001 — le classement automatique reste disponible
         console.print(f"[yellow]Jury visuel indisponible ({e}) : classement automatique.[/yellow]")
         return None
-
-
-def propose_titles(transcript_text: str, brand_name: str, guest: str, company: str, n: int = 5,
-                   context: str = "", model: str = "claude-sonnet-5") -> list[dict]:
-    from .llm import ask_json
-    system = TITLE_PROMPT.format(brand=brand_name, guest=guest or "un invité",
-                                 company=f" ({company})" if company else "", n=n)
-    user = f"{context}\n\nTRANSCRIPTION DE L'ÉPISODE :\n{transcript_text[:90000]}".strip()
-    titles = ask_json(system, user, model=model).get("titles", [])
-    out = []
-    for t in titles:
-        lines = [str(x).strip() for x in t.get("lines", []) if str(x).strip()][:2]
-        if len(lines) == 2:
-            out.append({"lines": lines, "highlight": 1 if int(t.get("highlight", 1)) else 0, "why": t.get("why", "")})
-    return out
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -610,18 +581,12 @@ def _frame_at(scores: list[dict], t: float) -> dict:
     return min(scores, key=lambda s: abs(s["t"] - t))
 
 
-def make(brand, spec: dict, transcript: dict, ep: Path, guest: str, company: str, n: int = 4,
-         title: str | None = None, host_t: float | None = None, guest_t: float | None = None,
-         force: bool = False) -> list[Path]:
-    """Miniatures de l'épisode -> ep/miniatures/ : variante_N.jpg (1280×720) + variante_N_HD.png (1920×1080),
-    planche.jpg (toutes les variantes) et titres.md. Variantes = titres différents × meilleures photos."""
+def _context(brand, spec: dict, ep: Path, company: str, host_t: float | None = None, guest_t: float | None = None,
+             force: bool = False) -> dict:
+    """Photos retenues (classement + jury visuel) et éléments de la vignette (gabarit Canva, logos). Mis en cache."""
     cfg = brand.cfg.get("thumbnail") or {}
     work = ep / "work" / "thumbnail"
-    out_dir = ep / "miniatures"
-    out_dir.mkdir(parents=True, exist_ok=True)
     cams = spec["cams"]
-
-    # 1-2. photos : classement automatique puis jury visuel
     picks = {}
     for role, side in (("host", "left"), ("guest", "right")):
         # toutes les 3 s : un sourire dure peu (à 8 s, Thomas n'avait aucune image souriante)
@@ -648,64 +613,86 @@ def make(brand, spec: dict, transcript: dict, ep: Path, guest: str, company: str
             continue
         order = [int(i) - 1 for i in (verdict or {}).get(role, []) if 1 <= int(i) <= len(best[role])]
         chosen[role] = [best[role][i] for i in order] or best[role][:3]
+
     def mmss(t: float) -> str:
         return f"{int(t) // 60}:{int(t) % 60:02d}"
     console.print("Photos retenues : " + " ; ".join(
         r + " " + ", ".join(mmss(c["t"]) for c in chosen[r][:2]) for r in chosen))
 
-    # titres
-    tf = out_dir / "titres.json"
-    if title:
-        l1, _, l2 = title.partition("|")
-        hl = 0 if l1.strip().startswith("*") else 1
-        titles = [{"lines": [l1.strip(" *"), l2.strip(" *")], "highlight": hl, "why": "titre imposé"}]
-    elif tf.exists() and not force:
-        titles = json.loads(tf.read_text(encoding="utf-8"))
-    else:
-        text = " ".join(seg["text"].strip() for seg in transcript.get("segments", []))
-        ctx = ""
-        desc = ep / "episode" / "description_youtube.md"
-        if desc.exists():
-            ctx = "Titre YouTube prévu : " + desc.read_text(encoding="utf-8").splitlines()[0].lstrip("# ")
-        titles = propose_titles(text, brand.cfg.get("name") or brand.slug, guest, company, n=max(n, 5), context=ctx)
-        tf.write_text(json.dumps(titles, ensure_ascii=False, indent=1), encoding="utf-8")
-
-    # 3-4. composition
     wide_f = work / "wide.jpg"
     if not wide_f.exists() and cams.get("wide"):
         subprocess.run([FFMPEG, "-v", "error", "-y", "-ss", str(chosen["guest"][0]["t"]), "-i", str(cams["wide"]),
                         "-frames:v", "1", "-q:v", "2", str(wide_f)], check=True)
     wide = Image.open(wide_f) if wide_f.exists() else Image.open(chosen["guest"][0]["path"])
-    aip = load_logo(brand.asset(cfg.get("host_icon", "logo_icon.png")), on_light=False)
     gpath = guest_logo_path(brand, company)
     if not gpath:
         console.print(f"[yellow]Pas de logo pour « {company} » dans {brand.assets_dir / 'guests'} : icône invité omise.[/yellow]")
-    glogo = load_logo(gpath, on_light=True) if gpath else None
-    font = brand.asset(cfg.get("font", "fonts/" + STYLE["font"]))
-    style = cfg.get("style") or {}
     tpl_dir = brand.assets_dir / cfg.get("template", "thumbnail")
     tpl = json.loads((tpl_dir / "template.json").read_text(encoding="utf-8")) if (tpl_dir / "template.json").exists() else None
     if tpl:
         console.print(f"[dim]Gabarit Canva : {tpl_dir}[/dim]")
-        glogo = load_logo(gpath, on_light=True, height=800) if gpath else None
+    return {"brand": brand, "work": work, "chosen": chosen, "wide": wide, "tpl": tpl, "tpl_dir": tpl_dir,
+            "aip": load_logo(brand.asset(cfg.get("host_icon", "logo_icon.png")), on_light=False),
+            "glogo": load_logo(gpath, on_light=True, height=800 if tpl else 600) if gpath else None,
+            "font": brand.asset(cfg.get("font", "fonts/" + STYLE["font"])), "style": cfg.get("style") or {}}
+
+
+def _compose_one(ctx: dict, h: dict, g: dict, lines: list[str], highlight: int) -> Image.Image:
+    work = ctx["work"]
+    if ctx["tpl"]:
+        return compose_template(ctx["tpl"], ctx["tpl_dir"], (_cut_cached(h, work), h), (_cut_cached(g, work), g),
+                                ctx["glogo"], lines, highlight, ctx["brand"])
+    return compose((_cut_cached(h, work), h), (_cut_cached(g, work), g), ctx["wide"], ctx["aip"], ctx["glogo"],
+                   lines, highlight, ctx["font"], ctx["style"])
+
+
+def render_proposals(brand, spec: dict, ep: Path, company: str, proposals: list[dict], force: bool = False) -> list[Path]:
+    """Chaque titre proposé posé sur la meilleure paire de photos : ep/titres/vignettes/titre_N.jpg (présentation à l'équipe)."""
+    ctx = _context(brand, spec, ep, company, force=force)
+    h, g = ctx["chosen"]["host"][0], ctx["chosen"]["guest"][0]
+    out_dir = ep / "titres" / "vignettes"
+    out_dir.mkdir(parents=True, exist_ok=True)
     outs = []
-    for i in range(min(n, len(titles))):
-        h = chosen["host"][(i // 2) % len(chosen["host"])] if i else chosen["host"][0]
-        g = chosen["guest"][(i % 2) % len(chosen["guest"])]
-        if tpl:
-            img = compose_template(tpl, tpl_dir, (_cut_cached(h, work), h), (_cut_cached(g, work), g), glogo,
-                                   titles[i]["lines"], titles[i]["highlight"], brand)
-        else:
-            img = compose((_cut_cached(h, work), h), (_cut_cached(g, work), g), wide, aip, glogo,
-                          titles[i]["lines"], titles[i]["highlight"], font, style)
+    for p in proposals:
+        img = _compose_one(ctx, h, g, p["lines"], p["highlight"])
+        f = out_dir / f"titre_{p['rank']}.jpg"
+        img.resize((1280, 720), Image.Resampling.LANCZOS).save(f, quality=92)
+        outs.append(f)
+    return outs
+
+
+def make(brand, spec: dict, ep: Path, company: str, n: int = 4, title: str | None = None, host_t: float | None = None,
+         guest_t: float | None = None, force: bool = False, out_name: str = "miniatures") -> list[Path]:
+    """Miniatures de l'épisode -> ep/<out_name>/ (défaut miniatures/) : variante_N.jpg (1280×720) + variante_N_HD.png, planche.jpg et titres.md.
+    Le titre est CELUI QUE L'ÉQUIPE A VALIDÉ (`titles --pick`) ; les variantes diffèrent par les photos."""
+    from .titles import load_validated, parse_lines
+    if title:
+        lines, hl = parse_lines(title)
+        title_note = "titre imposé en ligne de commande"
+    else:
+        val = load_validated(ep)
+        if not val:
+            raise SystemExit("Aucun titre validé pour cet épisode : lancer d'abord `python -m clipper titles` (5 propositions), "
+                             "faire valider un titre par l'équipe marketing, puis `titles --pick N`. "
+                             "Pour passer outre : --title \"ligne 1 | ligne 2\".")
+        lines, hl = val["lines"], val["highlight"]
+        title_note = f"validé par {val.get('validated_by') or 'l’équipe'} le {val.get('validated_on')}"
+    ctx = _context(brand, spec, ep, company, host_t, guest_t, force)
+    out_dir = ep / out_name
+    out_dir.mkdir(parents=True, exist_ok=True)
+    hs, gs = ctx["chosen"]["host"], ctx["chosen"]["guest"]
+    combos = [(0, 0), (1, 0), (0, 1), (1, 1), (2, 0), (0, 2)]
+    outs, rows = [], []
+    for i, (hi, gi) in enumerate(combos[:n]):
+        h, g = hs[hi % len(hs)], gs[gi % len(gs)]
+        img = _compose_one(ctx, h, g, lines, hl)
         hd = out_dir / f"variante_{i + 1}_HD.png"
         img.save(hd)
         sm = out_dir / f"variante_{i + 1}.jpg"     # 16:9 YouTube (le gabarit Canva fait 1,8:1 : écart invisible)
         img.resize((1280, 720), Image.Resampling.LANCZOS).save(sm, quality=92)
-        titles[i]["files"] = [sm.name, hd.name]
-        titles[i]["photos"] = {"host": h["t"], "guest": g["t"]}
         outs.append(sm)
-    # planche de toutes les variantes + récapitulatif
+        m = lambda t: f"{int(t) // 60}:{int(t) % 60:02d}"
+        rows.append(f"{i + 1}. {sm.name} : photo animateur {m(h['t'])}, photo invité {m(g['t'])}")
     if outs:
         thumbs = [Image.open(p).resize((640, 360)) for p in outs]
         cols = 2
@@ -713,10 +700,6 @@ def make(brand, spec: dict, transcript: dict, ep: Path, guest: str, company: str
         for k, t in enumerate(thumbs):
             sheet.paste(t, ((k % cols) * 650 + 5, (k // cols) * 370 + 5))
         sheet.save(out_dir / "planche.jpg", quality=90)
-    md = ["# Miniatures\n"]
-    for i, t in enumerate(titles):
-        mark = " / ".join(f"[{l}]" if j == t["highlight"] else l for j, l in enumerate(t["lines"]))
-        f = f" -> {t['files'][0]}" if t.get("files") else " (titre de réserve)"
-        md.append(f"{i + 1}. {mark}{f}  \n   _{t.get('why', '')}_")
-    (out_dir / "titres.md").write_text("\n".join(md) + "\n", encoding="utf-8")
+    mark = " / ".join(f"[{l}]" if j == hl else l for j, l in enumerate(lines))
+    (out_dir / "titres.md").write_text(f"# Miniatures\n\nTitre ({title_note}) : {mark}\n\n" + "\n".join(rows) + "\n", encoding="utf-8")
     return outs

@@ -618,12 +618,53 @@ def cmd_thumbnail(a: argparse.Namespace) -> None:
         sys.exit(f"Pas de {video.with_suffix('.multicam.json').name} : les miniatures partent des gros plans des rushs")
     cj = ep / "clips.json"
     meta = json.loads(cj.read_text(encoding="utf-8")) if cj.exists() else {}
+    company = a.company or meta.get("company", "")
+    outs = make(brand, spec, ep, company, n=a.n, title=a.title or None,
+                host_t=a.host_frame, guest_t=a.guest_frame, force=a.force, out_name=a.out)
+    console.print(f"[green]{len(outs)} miniatures[/green] -> {ep / a.out} (planche.jpg, titres.md)")
+
+
+def cmd_titles(a: argparse.Namespace) -> None:
+    """Titre de l'épisode : 5 propositions contrôlées (planche « chaîne YouTube ») -> validation par l'équipe -> --pick N."""
+    from .multicam import load_spec
+    from .thumbnail import render_proposals
+    from .titles import cards_sheet, episode_number, propose, published, validate_pick, write_md
+    brand = Brand(a.brand)
+    video = resolve_input(brand, a.input)
+    ep = episode_dir(brand, video)
+    number = episode_number(video, a.number)
+    base = f"python -m clipper titles --brand {brand.slug} --input {Path(a.input).name}"
+    if a.pick or a.lines:
+        rec = validate_pick(ep, number, a.pick, a.lines, a.youtube, a.by, a.note)
+        console.print(f"[green]Titre validé[/green] : {rec['youtube']}\n"
+                      f"  vignette : {' / '.join(rec['lines'])} (bandeau : ligne {rec['highlight'] + 1})\n"
+                      "Suite : `thumbnail` compose les miniatures avec ce titre ; la description YouTube le reprend.")
+        return
+    spec = load_spec(video)
+    if not spec:
+        sys.exit(f"Pas de {video.with_suffix('.multicam.json').name} : les propositions sont présentées sur les vignettes des rushs")
+    cj = ep / "clips.json"
+    meta = json.loads(cj.read_text(encoding="utf-8")) if cj.exists() else {}
     guest, company = a.guest or meta.get("guest", ""), a.company or meta.get("company", "")
-    transcript = transcribe(spec.get("audio") or video, ep / "transcript.json", brand.cfg, ep / "work",
-                            names=[guest, company])
-    outs = make(brand, spec, transcript, ep, guest, company, n=a.n, title=a.title or None,
-                host_t=a.host_frame, guest_t=a.guest_frame, force=a.force)
-    console.print(f"[green]{len(outs)} miniatures[/green] -> {ep / 'miniatures'} (planche.jpg, titres.md)")
+    transcript = transcribe(spec.get("audio") or video, ep / "transcript.json", brand.cfg, ep / "work", names=[guest, company])
+    out_dir = ep / "titres"
+    res = propose(brand, transcript, number, guest, company, out_dir, n=a.n, import_file=Path(a.import_file) if a.import_file else None)
+    if not res["proposals"]:
+        sys.exit("Aucune proposition n'a passé les contrôles : voir titres/propositions.json (rubrique « dropped »)")
+    imgs = render_proposals(brand, spec, ep, company, res["proposals"], force=a.force)
+    cards = [{"image": f, "title": p["youtube"], "number": p["rank"], "note": "AI Partners"}
+             for f, p in zip(imgs, res["proposals"])]
+    pub = published(brand)
+    ref = next((r for r in (brand.dir / "references" / "thumbnails").glob("*.jpg")), None) if pub else None
+    if ref and len(cards) % 3:                 # 6e case : dernier épisode publié, pour comparer dans le même décor
+        cards.append({"image": ref, "title": f"AI Corner {pub[0]['n']} | {pub[0]['title']}", "number": None,
+                      "note": "Dernier épisode publié (pour comparer)"})
+    sheet = cards_sheet(brand, cards, out_dir / "propositions.jpg")
+    md = write_md(res, out_dir / "propositions.md", base)
+    for p in res["proposals"]:
+        console.print(f"  {p['rank']}. [{p['status']}] {p['youtube']}")
+    console.print(f"[green]{len(res['proposals'])} propositions[/green] -> {sheet}\nListe et justifications : {md}\n"
+                  f"À valider par l'équipe marketing, puis : {base} --pick N")
 
 
 def cmd_rushes(a: argparse.Namespace) -> None:
@@ -693,6 +734,8 @@ def cmd_episode_plan(a: argparse.Namespace) -> None:
     from .transcribe import all_words
     brand, video, ep, spec, transcript = _episode_inputs(a)
     plan = make_plan(transcript, brand, ep / "episode_plan.json", a.guest, a.company, a.host, force=a.force)
+    from .titles import episode_title
+    plan["youtube_title"] = episode_title(ep)      # un seul titre, validé par l'équipe (plus de titre du dérushage)
     wf = ep / "work" / "diarized_words.json"
     if wf.exists() and not a.force:
         words = json.loads(wf.read_text(encoding="utf-8"))
@@ -1153,10 +1196,24 @@ def main(argv: list[str] | None = None) -> None:
     sp.add_argument("--guest", default="", help="nom de l'invité (défaut : clips.json)")
     sp.add_argument("--company", default="", help="entreprise invitée -> logo brands/<m>/assets/guests/<entreprise>.svg|png")
     sp.add_argument("--n", type=int, default=4, help="nombre de variantes")
-    sp.add_argument("--title", default="", help="titre imposé « ligne 1 | ligne 2 » ; * devant la ligne à mettre sur le bandeau")
+    sp.add_argument("--title", default="", help="titre imposé « ligne 1 | ligne 2 » (sinon : le titre validé par `titles --pick`)")
     sp.add_argument("--host-frame", type=float, default=None, help="instant (s) de la photo de l'animateur")
     sp.add_argument("--guest-frame", type=float, default=None, help="instant (s) de la photo de l'invité")
+    sp.add_argument("--out", default="miniatures", help="dossier de sortie dans output/… (pour garder une autre version à côté)")
     sp.set_defaults(fn=cmd_thumbnail)
+    sp = sub.add_parser("titles", help="titre de l'épisode : 5 propositions à faire valider par l'équipe marketing, puis --pick N")
+    common(sp)
+    sp.add_argument("--number", default="", help="numéro de l'épisode, ex: E23 (défaut : début du nom du fichier)")
+    sp.add_argument("--guest", default="", help="nom de l'invité (défaut : clips.json)")
+    sp.add_argument("--company", default="", help="entreprise de l'invité (défaut : clips.json)")
+    sp.add_argument("--n", type=int, default=5, help="nombre de propositions")
+    sp.add_argument("--import-file", default="", help="titres déjà écrits (JSON) : contrôlés et présentés sans appeler Claude")
+    sp.add_argument("--pick", type=int, default=None, help="valide la proposition N (choix de l'équipe marketing)")
+    sp.add_argument("--lines", default="", help="avec --pick : corrige les lignes « ligne 1 | *ligne 2 » (* = ligne du bandeau)")
+    sp.add_argument("--youtube", default="", help="avec --pick : corrige le titre YouTube complet")
+    sp.add_argument("--by", default="", help="qui a validé (prénom)")
+    sp.add_argument("--note", default="", help="remarque de l'équipe (gardée avec les propositions écartées)")
+    sp.set_defaults(fn=cmd_titles)
     sp = sub.add_parser("rushes", help="range les rushs déposés dans depot/ (3 caméras + WAV) : rôles, synchro, multicam.json")
     sp.add_argument("--brand", required=True)
     sp.add_argument("--episode", required=True, help="numéro de l'épisode, ex: E23")

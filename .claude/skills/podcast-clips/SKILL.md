@@ -215,6 +215,21 @@ final (aucun « euh », aucun mot coupé, fin jamais pendant la voix), volumes t
 d'images (logo en haut à droite, carte de fin) à regarder. Joindre `episode/description_youtube.md` (titre +
 chapitres). Teaser et corps sont rendus séparément : retoucher le teaser ne refait pas le corps (~15 min au lieu d'1 h).
 
+## Titre et miniature de l'épisode (rushs multicam)
+
+Le titre de l'épisode est validé par l'équipe marketing AVANT les miniatures. À lancer après `transcribe`, en parallèle des
+shorts (aucune attente mutuelle) :
+
+1. `python -m clipper titles --brand <marque> --input <E>.mp4` : 5 titres contrôlés (chacun prouvé par un passage de
+   l'épisode, format `AI Corner E<n> | …`, brief `brands/<marque>/titles.md`). Ouvre `titres/propositions.jpg` (planche
+   façon chaîne YouTube) et lis `propositions.md` ; envoie les deux à Arthur pour l'équipe marketing (liens cliquables).
+2. L'équipe répond par un numéro (ou corrige une ligne) : `titles … --pick N [--lines "ligne 1 | *ligne 2"] --by <prénom>
+   --note "<remarque>"`. Toute remarque de fond devient une ligne « À éviter » ou une règle dans `titles.md`.
+3. `python -m clipper thumbnail --brand <marque> --input <E>.mp4` : miniatures avec le titre validé (4 variantes de photos où
+   les deux sourient en se regardant). Regarde `miniatures/planche.jpg` avant de l'envoyer.
+
+`thumbnail` s'arrête s'il n'y a pas de titre validé ; la description YouTube de l'épisode reprend le même titre.
+
 ## Retouches courantes
 
 | Demande | Action |

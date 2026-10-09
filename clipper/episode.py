@@ -48,8 +48,7 @@ Rends UNIQUEMENT un JSON :
              EXACTS retirés>", "reason": "<pourquoi>"} ],
   "teaser": [ {"start": <s>, "end": <s>, "start_text": "<premiers mots EXACTS>", "end_text": "<derniers mots EXACTS>",
                "why": "<pourquoi c'est fort>"} ],
-  "chapters": [ {"t": <s>, "start_text": "<premiers mots EXACTS>", "title": "<titre court>"} ],
-  "youtube_title": "<titre YouTube>"
+  "chapters": [ {"t": <s>, "start_text": "<premiers mots EXACTS>", "title": "<titre court>"} ]
 }
 
 Règles :

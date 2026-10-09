@@ -118,11 +118,41 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
    anglais, voix de la page AI Partners, sans hashtags. Les formats « nouvel épisode / preview » seulement sur demande. Sortie : `output/…/posts/clip_NN_<titre>.md` + champs
    `linkedin_post` / `short_description` dans `clips.json` + `summary.md`.
 
+## Titre de l'épisode : `titles` (Arthur, 09/10/2026 : « l'équipe m'a retourné que les titres n'étaient pas ouf ; réfléchis à un
+process pour les rendre mieux, et une étape où quelqu'un du marketing valide un titre parmi 5 propositions »)
+
+- **Cause** : le titre YouTube sortait du prompt de dérushage (`"youtube_title": "<titre YouTube>"`, aucun brief) et la vignette
+  avait son propre générateur ; E22 : `IA en entreprise chez Coty : 3000 agents, Microsoft Copilot et la vraie transformation`
+  (liste de mots-clés, pas de préfixe) et des vignettes qui énonçaient des faits internes (« Chez Coty il y a 3000 agents »).
+- **Un seul générateur** (`clipper/titles.py`, brief `brands/ai-corner/titles.md` = relevé des 16 titres publiés E06–E21,
+  captures d'Arthur) : format YouTube `AI Corner E<n> | <titre>` (sans nom d'invité depuis E16) ; vignette = le MÊME titre en 2
+  lignes ≤ 34 caractères, bandeau sur la ligne du sujet (2e ligne dans 12 cas sur 16) ; 5 formules (`comment`, `tension`,
+  `promesse`, `enjeu`, `constat`) ; le titre pose LA question du spectateur, l'invité est la preuve ; ton sobre.
+- **Process** : `python -m clipper titles --brand <m> --input <E>.mp4` (après `transcribe`, en parallèle de `propose`) :
+  Claude Opus écrit ~12 candidats avec `evidence` (horodatage + citation EXACTE de l'épisode) -> `check` : 2 lignes ≤ 34
+  (échec > 40), titre complet ≤ 80 (échec > 95), chiffres et noms propres présents dans la transcription, citation retrouvée
+  d'un seul tenant (`find_evidence`), aucun nom d'invité, aucun mot sensationnel, pas de copie (> 0,85) d'un titre publié ni
+  d'un titre refusé (rubrique « À éviter » de titles.md, lue par `refused`) ; ATTENTION : proche (> 0,72), deux-points,
+  aucun mot du métier -> jury (Claude, sans transcription) : 5 titres, ≥ 4 formules, une phrase d'explication pour
+  l'équipe -> `titres/propositions.jpg` (planche « chaîne YouTube » : vignette réelle + titre, 6e case = dernier épisode
+  publié pour comparer), `propositions.md` (justification, passage à l'horodatage, contrôles), `propositions.json`.
+- **Validation par l'équipe marketing** : `titles --pick N [--lines "l1 | *l2"] [--youtube "…"] [--by Prénom] [--note "…"]` ->
+  `titres/titre_valide.json` (avec les propositions écartées et la remarque : matière pour compléter titles.md) ; la
+  description YouTube (`episode_title`, `episode-plan`) reprend ce titre ; **`thumbnail` refuse de tourner sans titre
+  validé** (`--title "l1 | l2"` pour passer outre) et ne génère plus de titres : ses variantes ne diffèrent que par les photos.
+- Les contrôles attrapent les règles dures, pas le style : « Pourquoi Coty a / 10 fois le même agent ? » (refusé) est bloqué
+  seulement parce qu'il figure dans « À éviter ». Le style repose sur le brief, le jury et la validation humaine.
+- `titles --import-file x.json` : titres déjà écrits (même format que `candidates`) contrôlés et présentés sans appeler
+  Claude (limite d'abonnement atteinte le 09/10 : propositions E22 écrites dans la session à partir de la transcription).
+- Chaque remarque de l'équipe sur un titre -> ligne dans « À éviter » ou règle dans titles.md (puis noter ici).
+
 ## Miniatures YouTube : `thumbnail` (demande d'Arthur, 09/10/2026 : « automatise la création de miniatures, même style que les nôtres »)
 
 - Références : `brands/ai-corner/references/thumbnails/` (+ README d'analyse). Gabarit : animateur à gauche / invité à
   droite détourés depuis LEUR caméra, studio flouté recoloré bleu, 2 icônes d'app 3D au centre (AI Partners / entreprise
-  invitée `assets/guests/<entreprise>.svg|png`), titre 2 lignes Metropolis ExtraBold, une ligne sur bandeau bleu arrondi.
+  invitée `assets/guests/<entreprise>.svg|png`), titre 2 lignes Metropolis ExtraBold, une ligne sur bandeau bleu arrondi
+  (le titre vient de `titles` : voir la section précédente ; depuis le 09/10 ombre douce sous la ligne hors bandeau,
+  `title.shadow` dans template.json, 0 pour la retirer).
 - `python -m clipper thumbnail --brand ai-corner --input E22_nicolas-comestaz_coty.mp4 [--n 4] [--title "l1 | *l2"]
   [--host-frame s] [--guest-frame s]` -> `output/…/miniatures/` (`variante_N.jpg` 1280×720, `_HD.png`, `planche.jpg`,
   `titres.md`). Invité/entreprise lus dans clips.json. ~5 min (détourage ≈ 45 s par photo, CPU).

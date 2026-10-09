@@ -12,7 +12,7 @@ flowchart TB
     end
 
     subgraph PY["Package Python clipper/ (python -m clipper …)"]
-        CLI["cli.py<br/>commandes : rushes, fetch, transcribe, propose, pick, polish, qa,<br/>build, preview, render, posts, episode-plan, episode-render,<br/>thumbnail, thumbnail-template, doctor"]
+        CLI["cli.py<br/>commandes : rushes, fetch, transcribe, titles, propose, pick, polish, qa,<br/>build, preview, render, posts, episode-plan, episode-render,<br/>thumbnail, thumbnail-template, doctor"]
         CFG["config.py<br/>fusion de la configuration"]
         TR["transcribe.py"]
         SEL["select_clips.py"]
@@ -74,6 +74,7 @@ flowchart TB
 | `multicam.py` | Rushs 3 caméras : gros plan de celui qui parle, écran partagé quand l'autre écoute (et seulement s'il est calme), son du micro. |
 | `verify.py`, `fillers.py`, `caption_check.py`, `qa.py` | Contrôles « à l'oreille » : vraies fins de phrase, « euh » retirés sans perdre un mot, sous-titres écoutés deux fois, rapport OK / ATTENTION / ÉCHEC avant chaque aperçu et après chaque rendu. |
 | `episode.py`, `diarize.py` | Épisode complet : dérushage par Claude, qui parle (empreintes vocales), liste de plans façon monteur, teaser scripté, chapitres ; corps rendu en FFmpeg, teaser en HyperFrames. |
+| `titles.py` | Titre de l'épisode (un seul, pour YouTube et la vignette) : Claude écrit ~12 candidats d'après `brands/<m>/titles.md` (relevé des 16 titres publiés), chacun adossé à un passage réel de l'épisode ; contrôles automatiques (longueur, chiffres et noms présents dans la transcription, pas de nom d'invité, pas de copie d'un titre publié ou refusé) ; jury qui garde 5 titres de formules variées ; planche « chaîne YouTube » ; `--pick N` = validation par l'équipe marketing. |
 | `thumbnail.py`, `canva_template.py` | Miniatures YouTube : photos où les deux sourient en se regardant (détecteur d'expressions + jury visuel Claude), détourage, composition sur le gabarit Canva importé du PPTX de l'équipe. |
 | `posts.py` | Rédige le post LinkedIn de chaque short avec `posts.md` (méthode + exemples). |
 

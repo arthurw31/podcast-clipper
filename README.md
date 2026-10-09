@@ -45,22 +45,23 @@ flowchart TD
         E3 --> E4["episode-render 1080p + qa --episode<br/>teaser HyperFrames + corps FFmpeg, -16 LUFS"]
     end
 
-    subgraph MI["Miniatures YouTube"]
+    subgraph MI["Titre + miniature YouTube"]
         direction TB
-        M1["thumbnail : une image toutes les 3 s<br/>netteté, regard, sourire"] --> M2{{"Claude : jury visuel + 5 titres"}}
-        M2 --> M3["Composition sur le gabarit Canva<br/>(thumbnail-template)"]
-        M3 --> M4["L'équipe choisit une variante"]
+        M1{{"titles : Claude écrit des titres, chacun adossé à un<br/>passage de l'épisode, contrôlés → 5 propositions"}} --> M2["Planche « chaîne YouTube »<br/>5 vignettes avec leur titre"]
+        M2 --> M3["L'équipe marketing valide 1 titre<br/>(titles --pick N)"]
+        M3 --> M4["thumbnail : photos où les deux sourient,<br/>gabarit Canva, titre validé"]
+        M4 --> M5["L'équipe choisit une variante de photo"]
     end
 
     S6 --> L1[("5 shorts MP4<br/>+ 5 posts LinkedIn")]
-    E4 --> L2[("Épisode 1080p avec teaser<br/>+ description YouTube et chapitres")]
-    M4 --> L3[("Miniature 1280×720 + HD")]
+    E4 --> L2[("Épisode 1080p avec teaser<br/>+ description YouTube (titre validé) et chapitres")]
+    M5 --> L3[("Titre validé + miniature 1280×720 + HD")]
 
     classDef human fill:#FFF2DF,stroke:#C26A00,color:#3A2810;
     classDef llm fill:#EFEBFF,stroke:#6B4FD8,color:#251C47;
     classDef deliver fill:#E2F5EC,stroke:#0F7A55,color:#0F3127;
-    class IN,S2,S5,E3,M4 human;
-    class S1,E1,M2 llm;
+    class IN,S2,S5,E3,M3,M5 human;
+    class S1,E1,M1 llm;
     class L1,L2,L3 deliver;
 ```
 
