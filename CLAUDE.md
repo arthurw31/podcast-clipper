@@ -383,6 +383,8 @@ triple check, optimise-le pour la rapidité sans réduire la qualité »)
   planche d'images à REGARDER) -> liens à Arthur (3e contrôle, humain) -> `render` -> `qa --render` sur le final.
   Épisode complet : `qa --episode` (réécoute de chaque raccord dans le MP4 final, volumes, images).
 - `clipper/qa.py` : statuts OK / ATTENTION / ÉCHEC ; un ÉCHEC arrête `polish` avant l'aperçu (`--anyway` pour forcer).
+  **Boucle « à corriger »** (Arthur, 09/10/2026, comme pour l'épisode complet) : tant qu'un rapport `qa` ou une planche montre
+  un défaut, Claude retouche (`clips.json`, config) et relance `polish --only N` ; seuls les shorts propres vont en validation.
   Contrôles : raccords à l'écoute (mot coupé), fin pendant la voix (`_voice_at`), **début de la phrase suivante entendu
   en fin d'extrait** (`_new_sound_before_cut`), respiration de fin, sous-titres (`captions_check.txt`), lint, durée,
   transitions ; rendu : à jour, format, durée, -16 LUFS ±1,5, planche d'images.

@@ -166,6 +166,11 @@ python -m clipper polish --brand <marque> --input <fichier> --only 1,2,3,4,5    
 Les étapes 1–3 déjà faites sont sautées (`checks` dans `clips.json`) : relancer `polish` après une retouche ne
 recoupe rien deux fois. `--redo` repart des passages d'origine (`clips_before_tighten.json`).
 
+**Boucle « à corriger » (Arthur, 09/10/2026 : la même que pour l'épisode complet)** : lis chaque rapport `qa/clip_NN.md` et
+regarde chaque planche. Un ÉCHEC, une ATTENTION qui s'entend ou se voit (mot coupé, fin dans la voix, sous-titre manquant,
+visage mal cadré, volume) -> corrige toi-même (`clips.json` : passages, coupes, `hook_title` ; ou la config) et relance
+`polish --only N`, jusqu'à un contrôle propre. Seuls les shorts propres partent en validation ; dis ce que tu as corrigé.
+
 Puis le **3e contrôle, humain** : envoie à l'utilisateur les liens cliquables vers les MP4 (jamais seulement le
 Studio HyperFrames, qui bugue chez Arthur), un par short, avec le titre de la bulle, plus ce que le rapport `qa`
 signale (ATTENTION) et les instants à écouter de près :

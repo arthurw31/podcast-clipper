@@ -10,8 +10,9 @@ flowchart TD
         direction TB
         S1{{"propose : Claude propose ~10 passages"}} --> S2["L'équipe choisit 5 passages (pick)<br/>et ses demandes particulières"]
         S2 --> S3["polish : « euh » et blancs retirés,<br/>gros plan / écran partagé,<br/>sous-titres vérifiés à l'écoute"]
-        S3 --> S4["qa + aperçus MP4"]
-        S4 --> S5["L'équipe valide les aperçus"]
+        S3 --> S4["qa + aperçus MP4 : raccords réécoutés,<br/>fins de phrase, sous-titres complets,<br/>volume, images ; sinon Claude retouche"]
+        S4 -->|à corriger| S3
+        S4 -->|OK| S5["L'équipe valide les aperçus"]
         S5 -->|retouche| S3
         S5 -->|validé| S6["render 1080p + qa final, sans carte de fin<br/>posts : 1 post LinkedIn par short"]
         S6 --> S7["outro : carte YouTube avec la miniature<br/>choisie, ajoutée à la fin de chaque short"]
