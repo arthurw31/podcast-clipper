@@ -158,12 +158,13 @@ teaser:
     junction_punch: 1.15
     synthetic_punch: 1.18
   fps: 24                    # = rushs et corps de l'épisode (concaténation sans réencodage)
-  motion:                    # motion design DISCRET aux couleurs AI Partners (test du 09/10/2026)
+  motion:                    # motion design DISCRET aux couleurs AI Partners
+    # Arthur, 09/10/2026, après le test : « on va garder que la guest card » -> chiffre-clé et sons désactivés
     enabled: true
     accent: "#258AF3"
     lower_third: {enabled: true, at: 0.6, duration: 3.2}
-    stats: {enabled: true}
-    sfx: {enabled: true, whoosh: "sfx/whoosh-short.mp3", whoosh_volume: 0.25, riser: "sfx/riser.mp3", riser_volume: 0.15, riser_len: 2.4}
+    stats: {enabled: false}
+    sfx: {enabled: false, whoosh: "sfx/whoosh-short.mp3", whoosh_volume: 0.25, riser: "sfx/riser.mp3", riser_volume: 0.15, riser_len: 2.4}
   hook:
     enabled: false
   guest_logo:

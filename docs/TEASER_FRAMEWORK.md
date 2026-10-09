@@ -53,19 +53,24 @@ réagit) ; jamais de mise en contexte ; chaque extrait se comprend seul et finit
 | | Dans la tête d'un CEO | Adaptation AI Partners |
 |---|---|---|
 | Taille | énorme : ~10 % de la hauteur de l'image par ligne | idem (≈ 100 px en 1080p) |
-| Police | Montserrat ExtraBold *Italic* | **Metropolis ExtraBold, droite** (jamais d'italique) |
-| Casse | CAPITALES | CAPITALES |
-| Couleur | blanc + mots-clés **jaunes** | blanc + mots-clés **bleu AI Partners #258AF3** |
+| Police | Montserrat ExtraBold *Italic* | **Metropolis Bold, droite** ; mot-clé en **Lora italique minuscule** (variante B, 09/10/2026) |
+| Casse | CAPITALES | CAPITALES (mot-clé en minuscules) |
+| Couleur | blanc + mots-clés **jaunes** | blanc + mots-clés **jaunes #F2E86D** (variante B) |
 | Lignes | 1–2, 2e ligne décalée à droite | idem |
 | Apparition | mot à mot, glissé depuis la gauche | idem |
 | Position | moitié basse, ~60–80 % de la hauteur | idem |
 | Mots-clés | chiffres, mots forts (1–3 par phrase) | idem |
-| Ombre | ombre portée sombre, nette | **renforcée** : contour sombre derrière les lettres + halo serré + grande ombre portée (lisible sur tout fond) |
+| Ombre | ombre portée sombre, nette | ombre **en dégradé** (couches de flou croissant), sans contour |
+| Apparition (AIP) | | fondu mot à mot (0,14 s), plus fluide que la machine à écrire |
 
 ## 5. Habillage
 
 - **Logo** de l'émission en haut à droite pendant tout le teaser → **logo AI PARTNERS blanc** (même taille que
   dans l'épisode : 20 % de la largeur).
+- **Carte invité (seul motion design retenu, Arthur 09/10/2026 : « on va garder que la guest card »)** : à 0,6 s,
+  pendant 3,2 s, du côté de l'invité dans le plan large — nom en capitales Metropolis Bold, filet bleu #258AF3 qui
+  se trace, rôle en dessous (« VP Global Data & AI · Coty »). Testés puis écartés : chiffre-clé animé (« 3 000 AGENTS
+  IA ») et sons (whoosh, montée) — désactivés (`teaser.motion.stats` / `sfx`), réactivables.
 - **Carte de fin** : dernière image du teaser **floutée**, logo de l'émission au centre, **nom de l'invité** en
   blanc et **entreprise** en couleur (jaune → **bleu #258AF3**, droit), ~3,5 s. Pas de bouton.
 

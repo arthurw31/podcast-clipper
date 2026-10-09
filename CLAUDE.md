@@ -259,6 +259,8 @@ fichier dans la réponse. Toujours un aperçu avant le rendu final.
 ## Fins d'extraits : jamais pendant que quelqu'un parle + respiration (retour d'Arthur, 08/10/2026)
 
 « Faut jamais que tu coupes avant que quelqu'un ait fini sa phrase, laisse même un mini temps à la fin pour que ça ne
+- **Décision d'Arthur (09/10/2026, après le test) : « on va garder que la guest card »** -> `stats` et `sfx` désactivés
+  dans `teaser.motion` (code conservé, réactivable) ; seule la carte invité reste. Noté dans docs/TEASER_FRAMEWORK.md.
 fasse pas effet coupé — et ça vaut pour toutes les formes de vidéo : teaser, short, podcast entier. »
 - `verify.pad_end(wav, t)` : la voix est finie au premier silence ≥ 0,12 s (< 20 % du niveau de parole — le souffle
   du micro de l'invité monte à ~10 %) ; fin = cet instant + 0,35 s, sans jamais atteindre la voix suivante (- 0,08 s) ;
