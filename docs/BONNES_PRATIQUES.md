@@ -15,6 +15,7 @@ Résultat jugé « franchement plutôt bien » par Arthur (09/10/2026) : `output
 | Jamais couper une pensée : un extrait commence au début d'une phrase et finit sur une fin de phrase | « des fois ça coupe avant qu'il ait terminé sa phrase » (07/10) |
 | Jamais couper pendant que quelqu'un parle, et laisser **un petit temps (~0,35 s)** après la dernière syllabe | « laisse même un mini temps à la fin pour que ça ne fasse pas effet coupé » (08/10) |
 | … mais jamais au point d'entendre le **début de la phrase suivante** | trouvé par le contrôle qualité (« l'entreprise. ‖ É… », 08/10) |
+| … et **pas de blanc trop long** non plus : au plus ~0,35 s de silence après la voix en fin d'extrait | « après "top-down avec du leadership" il y a un petit blanc qui n'est pas ouf » (09/10, 1,4 s) |
 | Retirer les **« euh »**, y compris ceux collés aux mots, sans jamais perdre un mot | « l'invité le fait beaucoup, ce n'est pas assez dynamique » (08/10) |
 | **Aucune réaction vide** (« super intéressant », « ah ouais », « exactement »…) | « ça n'apporte rien » (09/10) |
 | Une reprise après une coupe de dérushage démarre sur un mot propre (pas de « euh, pour, pour… », pas de long blanc) | « vérifie bien plusieurs fois qu'il n'y a pas de euh laissé au montage » (08/10) |

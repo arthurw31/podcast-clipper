@@ -204,6 +204,17 @@ def pad_end(wav: Path, t: float, pad: float = 0.35, max_ext: float = 1.2, gap: f
     return round(max(t, new), 3)
 
 
+def trim_tail(wav: Path, start: float, end: float, keep: float = 0.35, max_tail: float = 0.5) -> float:
+    """Blanc trop long en fin d'extrait (Arthur, 09/10/2026 : « après "top-down avec du leadership" il y a un petit
+    blanc qui n'est pas ouf » — 1,4 s) : si plus de `max_tail` s de silence suivent la dernière voix, la fin est
+    ramenée à `keep` s après cette voix (même respiration que `pad_end`). Ne rallonge jamais."""
+    from .episode import _voice_blocks
+    bl = [b for b in _voice_blocks(wav, start, end) if b[1] - b[0] >= 0.06]
+    if not bl or end - bl[-1][1] <= max_tail:
+        return end
+    return round(bl[-1][1] + keep, 3)
+
+
 def trim_edges(sg: dict, wav: Path, look: float = 1.2) -> tuple[dict, list[str]]:
     """Bord qui commence sur la FIN d'un mot (ou finit sur le DÉBUT d'un mot) : un bout de voix, puis un blanc ≥ 0,2 s,
     puis la vraie parole -> on recale sur la parole (retour d'Arthur, teaser E22 : « il commence sur la fin d'un mot,
@@ -227,6 +238,10 @@ def trim_edges(sg: dict, wav: Path, look: float = 1.2) -> tuple[dict, list[str]]
     if e2 > s1 + 0.02:
         notes.append(f"fin prolongée de {e2 - s1:.2f} s (fin de la voix + respiration)")
         s1 = e2
+    e3 = trim_tail(wav, s0, s1)
+    if e3 < s1 - 0.02:
+        notes.append(f"blanc de fin raccourci de {s1 - e3:.2f} s")
+        s1 = e3
     if notes:
         sg = dict(sg, start=round(s0, 3), end=round(s1, 3), duration=round(s1 - s0, 3))
     return sg, notes

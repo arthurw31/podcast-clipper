@@ -128,6 +128,10 @@ def qa_short(clip: dict, proj: Path, wav: Path, cfg, fmt: str = "9x16", render: 
     nxt = [f"{float(segs[k]['end']):.2f}" for k in ends if _new_sound_before_cut(wav, float(segs[k]["end"]))]
     rows.append((FAIL if nxt else OK, "début de la phrase suivante : " + (f"entendu en fin d'extrait à {', '.join(nxt)}"
                                                                           if nxt else "jamais entendu")))
+    long_tail = [f"{float(segs[k]['end']):.2f} ({_tail_silence(wav, float(segs[k]['end'])):.1f} s)" for k in ends
+                 if _tail_silence(wav, float(segs[k]["end"])) > 0.6]
+    if long_tail:
+        rows.append((WARN, f"blanc trop long en fin d'extrait à {', '.join(long_tail)}"))
     tight = [f"{float(segs[k]['end']):.2f}" for k in ends if _tail_silence(wav, float(segs[k]["end"])) < 0.1
              and not _voice_at(wav, float(segs[k]["end"]))]
     if tight:

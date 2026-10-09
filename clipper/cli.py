@@ -692,6 +692,14 @@ def cmd_episode_plan(a: argparse.Namespace) -> None:
     from .episode import editorial_order
     teaser = teaser_clip(words, teaser_plan, a.guest, a.company, wav=spec["audio"], transcript=transcript,
                          editor=lambda ext: editorial_order(ext, brand))
+    # blanc trop long en fin d'extrait (> 0,5 s) ramené à 0,35 s après la voix (Arthur, 09/10/2026)
+    from .verify import trim_tail
+    segs_t = teaser["segments"]
+    for k, sg in enumerate(segs_t):
+        if k + 1 == len(segs_t) or segs_t[k + 1].get("orig") != sg.get("orig"):
+            e = trim_tail(Path(spec["audio"]), float(sg["start"]), float(sg["end"]))
+            if e < float(sg["end"]):
+                sg["end"], sg["duration"] = e, round(e - float(sg["start"]), 3)
     # réactions vides (« Super intéressant »…) : jamais dans le teaser (Arthur, 09/10/2026 : « ça n'apporte rien »)
     from .fillers import drop_reactions
     segs = []
