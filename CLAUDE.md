@@ -148,6 +148,14 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
   de découpe aux formes Canva : elles coupaient une épaule), logo de l'invité dans la boîte du logo (87 % de large).
   Ordre des 10 calques attendu (design dupliqué) ; un autre design = refaire l'import. Contrôle : la reconstruction
   du design d'origine depuis le gabarit diffère de son PNG de 3/255 en moyenne.
+- Choix des photos (Arthur, 09/10/2026 : « il faut que les deux se regardent avec une expression souriante ») :
+  images toutes les **3 s** (à 8 s, aucune image de Thomas souriant), expression mesurée par **FER+** (ONNX,
+  `models/emotion_ferplus.onnx`, probabilité « joie » : souriant 1,0 / neutre 0,0 — l'ancien indice largeur de bouche
+  prenait une bouche ouverte en pleine phrase pour un sourire), classement = joie d'abord + regard vers le centre ;
+  planches recadrées sur les VISAGES (16 candidats, 4×4) ; jury `JURY_PROMPT` : vrai sourire tourné vers l'autre.
+  E22 : Thomas 40:06, Nicolas 48:33. Si `claude -p` est indisponible (limite hebdo atteinte le 09/10), l'agent regarde
+  les planches et écrit lui-même `work/thumbnail/jury_v2.json` ({"host": [n°…], "guest": [n°…]}).
+- `cv2.imread` ne lit pas les chemins accentués (« Création… ») : `score_frame` lit avec `np.fromfile` + `imdecode`.
 - Les rushs E22 sont nommés « thomas-spitz » alors que Thomas Spitz est l'ANIMATEUR (CEO AI Partners, toujours là) ;
   l'invité est Nicolas Comestaz (Coty). Nommer les prochains épisodes d'après l'invité : `E23_<invite>_<entreprise>`.
 
@@ -304,6 +312,9 @@ fasse pas effet coupé — et ça vaut pour toutes les formes de vidéo : teaser
 - `verify.pad_end(wav, t)` : la voix est finie au premier silence ≥ 0,12 s (< 20 % du niveau de parole — le souffle
   du micro de l'invité monte à ~10 %) ; fin = cet instant + 0,35 s, sans jamais atteindre la voix suivante (- 0,08 s) ;
   ne raccourcit jamais ; voix qui continue > 1,2 s = phrase pas finie -> inchangé.
+- Blanc trop long en fin d'extrait (Arthur, 09/10/2026 : « après "top-down avec du leadership" il y a un petit blanc
+  qui n'est pas ouf » — 1,4 s) : `verify.trim_tail` ramène tout silence > 0,5 s après la dernière voix à 0,35 s
+  (`episode-plan` sur chaque fin d'extrait du teaser) ; `qa` signale un blanc de fin > 0,6 s.
 - Appelé partout : `trim_edges` (fin de chaque short et de chaque extrait du teaser), `episode.clean_join_starts`
   (fin de chaque partie du montage complet et fin de l'épisode).
 - Cas E22 : teaser « …en productivité » coupé sur la dernière syllabe (« -té » jusqu'à 1294,94, coupe à 1294,85) ;

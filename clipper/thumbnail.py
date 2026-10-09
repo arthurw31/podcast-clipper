@@ -66,11 +66,39 @@ def _time_base(video: Path) -> float:
 
 
 _DET: dict = {}
+EMO_MODEL = ROOT / "models" / "emotion_ferplus.onnx"
+EMO_URL = ("https://github.com/onnx/models/raw/main/validated/vision/body_analysis/emotion_ferplus/model/"
+           "emotion-ferplus-8.onnx")
+_EMO = None
+
+
+def happiness(gray: np.ndarray, box) -> float:
+    """Probabilité de « joie » (FER+, ONNX, 8 émotions) du visage `box` (x, y, w, h en px). Remplace l'ancien
+    indice largeur de bouche, qui prenait une bouche ouverte en pleine phrase pour un sourire."""
+    global _EMO
+    if _EMO is None:
+        import onnxruntime as ort
+        if not EMO_MODEL.exists():
+            import requests
+            EMO_MODEL.write_bytes(requests.get(EMO_URL, timeout=300).content)
+        _EMO = ort.InferenceSession(str(EMO_MODEL), providers=["CPUExecutionProvider"])
+    x, y, w, h = box
+    side = max(w, h) * 1.1
+    cx, cy = x + w / 2, y + h / 2
+    x0, y0 = int(max(0, cx - side / 2)), int(max(0, cy - side / 2))
+    crop = gray[y0:int(cy + side / 2), x0:int(cx + side / 2)]
+    if crop.size < 100:
+        return 0.0
+    inp = cv2.resize(crop, (64, 64)).astype(np.float32)[None, None]
+    out = _EMO.run(None, {_EMO.get_inputs()[0].name: inp})[0][0]
+    e = np.exp(out - out.max())
+    return float(e[1] / e.sum())          # ordre FER+ : neutre, joie, surprise, tristesse, colère, dégoût, peur, mépris
 
 
 def score_frame(path: Path, side: str) -> dict | None:
     """Note d'une image pour la miniature. side = 'left' (personne placée à gauche : doit regarder à droite)."""
-    img = cv2.imread(str(path))
+    # imdecode : cv2.imread ne lit pas les chemins accentués sous Windows (« Création clip… »)
+    img = cv2.imdecode(np.fromfile(str(path), np.uint8), cv2.IMREAD_COLOR)
     if img is None:
         return None
     h, w = img.shape[:2]
@@ -92,6 +120,7 @@ def score_frame(path: Path, side: str) -> dict | None:
     smile = float(np.linalg.norm(ml - mr) / eye_d)             # bouche large = sourire
     pitch = float((nose[1] - (re[1] + le[1]) / 2) / eye_d)     # grand = tête baissée
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    happy = happiness(gray, (x, y, fw, fh))
     x0, y0 = max(0, int(x)), max(0, int(y))
     face = gray[y0:int(y + fh), x0:int(x + fw)]
     if face.size < 100:
@@ -107,7 +136,7 @@ def score_frame(path: Path, side: str) -> dict | None:
     want = 1 if side == "left" else -1
     look = want * yaw                                          # regard vers le centre de la miniature
     return {"path": str(path), "t": float(path.stem[2:]), "conf": conf, "sharp": sharp, "yaw": yaw,
-            "look": look, "pitch": pitch, "smile": smile, "eyes": min(eyes), "face_h": float(fh / h),
+            "look": look, "pitch": pitch, "smile": smile, "happy": happy, "eyes": min(eyes), "face_h": float(fh / h),
             "face_cx": float((x + fw / 2) / w), "face_cy": float((y + fh / 2) / h)}
 
 
@@ -123,7 +152,8 @@ def rank(scores: list[dict]) -> list[dict]:
     for i, s in enumerate(scores):
         look = s["look"]
         look_pen = 0.0 if 0.0 <= look <= 0.35 else abs(look - min(max(look, 0.0), 0.35)) * 6
-        s["score"] = float(0.9 * min(zs[i], 2.0) + 1.0 * min(ze[i], 1.5) + 1.2 * min(zm[i], 2.5)
+        # le sourire compte le plus (Arthur, 09/10/2026 : « les deux se regardent avec une expression souriante »)
+        s["score"] = float(0.6 * min(zs[i], 2.0) + 0.6 * min(ze[i], 1.5) + 6.0 * s.get("happy", 0.0)
                            - look_pen - 12 * max(0.0, s["pitch"] - pitch0 - 0.06)   # tête baissée
                            - (2.0 if s["conf"] < 0.8 else 0.0))
     return sorted(scores, key=lambda s: -s["score"])
@@ -139,22 +169,24 @@ def best_frames(ranked: list[dict], n: int = 6, gap: float = 60.0) -> list[dict]
     return out
 
 
-def contact_sheet(cands: list[dict], out: Path, label: str) -> Path:
+def contact_sheet(cands: list[dict], out: Path, label: str, tile: int = 360, cols: int = 4) -> Path:
+    """Planche numérotée, recadrée sur le VISAGE (tête + épaules) : l'expression doit se lire en petit."""
     tiles = []
     for i, c in enumerate(cands):
         im = Image.open(c["path"]).convert("RGB")
-        im.thumbnail((640, 360))
+        fh = c["face_h"] * im.height
+        cx, cy = c["face_cx"] * im.width, c["face_cy"] * im.height
+        half = fh * 1.15
+        im = im.crop((int(cx - half), int(cy - half * 0.9), int(cx + half), int(cy + half * 1.1))).resize((tile, tile))
         d = ImageDraw.Draw(im)
         m, s = divmod(int(c["t"]), 60)
-        d.rectangle([0, 0, 640, 34], fill=(0, 0, 0))
-        d.text((8, 6), f"{label} {i + 1}  {m}:{s:02d}  score {c['score']:.1f}", fill=(255, 255, 255),
-               font=ImageFont.load_default(22))
+        d.rectangle([0, 0, tile, 30], fill=(0, 0, 0))
+        d.text((6, 4), f"{label} {i + 1}  ({m}:{s:02d})", fill=(255, 255, 255), font=ImageFont.load_default(20))
         tiles.append(im)
-    cols = 3
     rows = (len(tiles) + cols - 1) // cols
-    sheet = Image.new("RGB", (cols * 640, rows * 360), (20, 20, 20))
+    sheet = Image.new("RGB", (cols * tile, rows * tile), (20, 20, 20))
     for i, t in enumerate(tiles):
-        sheet.paste(t, ((i % cols) * 640, (i // cols) * 360))
+        sheet.paste(t, ((i % cols) * tile, (i // cols) * tile))
     sheet.save(out, quality=88)
     return out
 
@@ -491,14 +523,19 @@ def compose(host, guest, wide: Image.Image, aip_logo: Image.Image, guest_logo: I
 # 5. Choix par le LLM : images (planches) et titres
 # ---------------------------------------------------------------------------------------------------------------
 
-JURY_PROMPT = """Tu choisis les photos d'une miniature YouTube de podcast (deux personnes face à face, détourées).
-Image 1 = planche de l'ANIMATEUR (il sera placé à GAUCHE de la miniature, il doit regarder vers la droite de l'image).
-Image 2 = planche de l'INVITÉ (placé à DROITE, il doit regarder vers la gauche de l'image).
-Chaque vignette est numérotée (« host 3 », « guest 5 »…).
-Critères, dans l'ordre : yeux bien ouverts et regard à hauteur (jamais tête ou yeux baissés, jamais les yeux fermés) ;
-expression vivante et sympathique (sourire, ou en train d'expliquer avec énergie — pas une bouche tordue au milieu
-d'un mot) ; tourné vers l'autre personne ; visage net, pas caché par une main ou le micro.
-Réponds UNIQUEMENT en JSON : {"host": [numéros du meilleur au moins bon, 3 maximum], "guest": [...], "why": "1 phrase"}"""
+JURY_PROMPT = """Tu choisis les photos d'une miniature YouTube de podcast : les deux personnes sont détourées et
+placées face à face, elles doivent avoir l'air de SE REGARDER EN SOURIANT (complicité, bonne humeur).
+Image 1 = planche de l'ANIMATEUR (placé à GAUCHE de la miniature : il doit regarder vers la DROITE de l'image).
+Image 2 = planche de l'INVITÉ (placé à DROITE : il doit regarder vers la GAUCHE de l'image).
+Chaque vignette (gros plan du visage) est numérotée (« host 3 », « guest 5 »…).
+Critères, dans l'ordre :
+1. un VRAI sourire (bouche souriante, joues relevées, yeux rieurs) — un visage neutre, sérieux, qui parle la bouche
+   ouverte en pleine phrase ou qui grimace est à écarter, même net ;
+2. regard tourné vers l'autre personne (côté indiqué ci-dessus), jamais vers le bas ni face caméra ;
+3. yeux ouverts, visage net, pas caché par une main ou le micro.
+S'il n'y a aucun vrai sourire pour une personne, prends l'expression la plus chaleureuse et dis-le dans "why".
+Réponds UNIQUEMENT en JSON : {"host": [numéros du meilleur au moins bon, 3 maximum], "guest": [...],
+"host_smile": true/false, "guest_smile": true/false, "why": "1 phrase"}"""
 
 TITLE_PROMPT = """Tu écris le titre d'une miniature YouTube du podcast {brand} (épisode avec {guest}{company}).
 Style des miniatures déjà publiées (2 lignes, la ligne mise en avant est sur un bandeau bleu) :
@@ -587,8 +624,9 @@ def make(brand, spec: dict, transcript: dict, ep: Path, guest: str, company: str
     # 1-2. photos : classement automatique puis jury visuel
     picks = {}
     for role, side in (("host", "left"), ("guest", "right")):
-        frames = sample_frames(Path(cams[role]), work / f"frames_{role}")
-        sf = work / f"scores_{role}.json"
+        # toutes les 3 s : un sourire dure peu (à 8 s, Thomas n'avait aucune image souriante)
+        frames = sample_frames(Path(cams[role]), work / f"frames_{role}_3s", every=3.0)
+        sf = work / f"scores_{role}_3s.json"
         if sf.exists() and not force:
             ranked = json.loads(sf.read_text(encoding="utf-8"))
         else:
@@ -597,9 +635,9 @@ def make(brand, spec: dict, transcript: dict, ep: Path, guest: str, company: str
         picks[role] = ranked
     sheets, best = [], {}
     for role in ("host", "guest"):
-        best[role] = best_frames(picks[role], 9)
+        best[role] = best_frames(picks[role], 16, gap=20.0)
         sheets.append(contact_sheet(best[role], work / f"candidats_{role}.jpg", role))
-    jf = work / "jury.json"
+    jf = work / "jury_v2.json"
     verdict = json.loads(jf.read_text(encoding="utf-8")) if jf.exists() and not force else jury(sheets)
     if verdict:
         jf.write_text(json.dumps(verdict, ensure_ascii=False, indent=1), encoding="utf-8")
