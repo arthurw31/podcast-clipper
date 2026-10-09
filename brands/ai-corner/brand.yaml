@@ -132,6 +132,11 @@ framing:
   split_divider: 0           # pas de trait entre les deux images (shorts du monteur)
 
 format_overrides:
+  "9x16":
+    # Shorts : PAS de carte de fin intégrée au montage (Arthur, 09/10/2026) — l'outro « carte YouTube » avec la miniature
+    # validée est ajoutée après coup par `outro` (section short_outro). Le teaser (16:9) garde sa fin logo.
+    outro:
+      enabled: false
   "16x9":
     logo:
       enabled: false         # le master 16:9 a déjà le logo AI PARTNERS incrusté en haut à droite
@@ -153,6 +158,16 @@ format_overrides:
       cta:
         subtext: "Lien en description"
         font_size: 30
+
+# Outro des shorts (Arthur, 09/10/2026 : « mettre en outro la première des 4 outros en motion design, call to action avec la
+# miniature ») : variante A, rendue une fois par épisode APRÈS le choix de la miniature, collée à la fin de chaque short.
+short_outro:
+  duration: 7.0
+  title: "L'épisode complet"
+  cta: "Regarder l'épisode — lien en description"
+  video: "outro_anim.mov"      # animation AI Partners en fond
+  video_focus_x: 0.62
+  logo: "logo.png"
 
 # Teaser d'ouverture de l'épisode complet (commande episode, 07/10/2026) — calqué sur E20 MAIF : ~50 s de phrases fortes
 # sous-titrées, puis le logo AI Partners sur l'animation de la charte. Appliqué PAR-DESSUS la config ci-dessus.

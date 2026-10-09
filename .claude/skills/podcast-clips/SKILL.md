@@ -201,8 +201,12 @@ python -m clipper qa     --brand <marque> --input <fichier> --only N --render   
 - Ne réécrase jamais un MP4 déjà livré : renomme l'ancien (`…_v1_<date>.mp4`) avant le rendu (un fichier ouvert
   dans le lecteur de l'utilisateur bloque l'écriture).
 - `qa --render` doit être OK (ou ATTENTION expliquée) ; regarde la planche d'images du MP4 final.
-- Envoie les MP4 (`output/<marque>/<episode>/renders/`) avec SendUserFile, dans l'ordre ; colle pour chaque short le
-  titre, la durée et son **post LinkedIn** prêt à copier ; donne le chemin du dossier.
+- Les shorts sont rendus SANS carte de fin. Dès que l'équipe a choisi la miniature (`thumbnail --pick`, section « Titre et
+  miniature »), lance `python -m clipper outro --brand <marque> --input <fichier>` : l'outro « carte YouTube » avec la
+  miniature est rendue une fois et collée à chaque short -> `output/<marque>/<episode>/livrables/`. Un short signalé
+  « À REFAIRE » a encore l'ancienne carte intégrée : `build --only N --force` puis `render --only N`, puis relance `outro`.
+- Envoie les MP4 de `livrables/` (pas `renders/`) avec SendUserFile, dans l'ordre ; colle pour chaque short le titre, la
+  durée et son **post LinkedIn** prêt à copier ; donne le chemin du dossier.
 
 ## Épisode complet (rushs multicam -> épisode monté + teaser)
 

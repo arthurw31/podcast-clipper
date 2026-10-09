@@ -678,6 +678,21 @@ def cmd_titles(a: argparse.Namespace) -> None:
                   + f"\nL'équipe marketing en choisit un, puis : {base} --pick N  (ensuite seulement : thumbnail)")
 
 
+def cmd_outro(a: argparse.Namespace) -> None:
+    """Outro des shorts (carte YouTube avec la miniature validée) rendue une fois, puis collée à chaque short -> livrables/."""
+    from .short_outro import apply
+    brand = Brand(a.brand)
+    video = resolve_input(brand, a.input)
+    ep = episode_dir(brand, video)
+    rows = apply(brand, ep, video, only=_parse_only(a.only), force=a.force)
+    if not rows:
+        console.print("[yellow]Aucun short rendu dans renders/ : lancer `render` d'abord (l'outro est déjà prête).[/yellow]")
+    for r in rows:
+        color = {"OK": "green", "ATTENTION": "yellow"}.get(r["status"], "red")
+        console.print(f"  [{color}]{r['status']}[/{color}] {r['short']} : {r['msg']}")
+    console.print(f"Outro : {ep / 'outro_short' / 'outro_9x16.mp4'} ; shorts livrables : {ep / 'livrables'}")
+
+
 def cmd_rushes(a: argparse.Namespace) -> None:
     """Rushs déposés dans depot/ (3 caméras + WAV) -> rangés, renommés, synchronisés, multicam.json écrit."""
     from .ingest import ingest
@@ -1258,6 +1273,10 @@ def main(argv: list[str] | None = None) -> None:
     sp.add_argument("--by", default="", help="qui a validé (prénom)")
     sp.add_argument("--note", default="", help="remarque de l'équipe (gardée avec les propositions écartées)")
     sp.set_defaults(fn=cmd_titles)
+    sp = sub.add_parser("outro", help="après le choix de la miniature : outro des shorts (carte YouTube) collée à chaque short -> livrables/")
+    common(sp)
+    sp.add_argument("--only", default="", help="numéros des shorts, ex: 1,3 (défaut : tous les shorts rendus)")
+    sp.set_defaults(fn=cmd_outro)
     sp = sub.add_parser("rushes", help="range les rushs déposés dans depot/ (3 caméras + WAV) : rôles, synchro, multicam.json")
     sp.add_argument("--brand", required=True)
     sp.add_argument("--episode", required=True, help="numéro de l'épisode, ex: E23")

@@ -122,7 +122,7 @@ exporter `PYTHONIOENCODING=utf-8` avant tout `print` contenant des accents ou de
    `word_fade`), même position en écran partagé (`split_center: false`) ; split sans séparateur ; light leak
    aux raccords (`join_transition: leak`) **seulement quand l'angle de caméra change** (Arthur, 08/10/2026 : « les flashs
    lumineux de transition, que quand tu changes d'angle de caméra » : `montage.transition_min_diff` 25, différence
-   d'image de part et d'autre du raccord — même caméra 0,5–7, autre caméra ≈ 50 ; même caméra = coupe nette) ; 25–45 s ; pas de B-roll ; + carte de fin de **7 s** (3,5 s jusqu'au 08/10/2026 : « trop rapide, x2 ») sur l'animation
+   d'image de part et d'autre du raccord — même caméra 0,5–7, autre caméra ≈ 50 ; même caméra = coupe nette) ; 25–45 s ; pas de B-roll ; + carte de fin de **7 s** (3,5 s jusqu'au 08/10/2026 : « trop rapide, x2 » ; depuis le 09/10 les shorts n'ont plus cette carte intégrée : outro « carte YouTube » ajoutée par `outro`, voir plus bas — la description qui suit vaut pour le teaser) sur l'animation
    officielle AI Partners (`assets/outro_anim.mov`, lignes « montagne » qui se dessinent, recadrée au format et
    accélérée ×1,4 depuis le 08/10 — ×5 sur 2 s puis ×2,9 sur 3,5 s jugés trop rapides : `outro.background: video`, `media.prepare_outro_video`) + logo blanc + CTA **centrés** (`outro.layout: center`, voile radial). Bleu #258AF3,
    **jamais d'italique** — SAUF le mot-clé des sous-titres en serif italique (variante B choisie par l'équipe le 09/10/2026).
@@ -170,6 +170,24 @@ process pour les rendre mieux, et une étape où quelqu'un du marketing valide u
 - `titles --import-file x.json` : titres déjà écrits (même format que `candidates`) contrôlés et présentés sans appeler
   Claude (limite d'abonnement atteinte le 09/10 : propositions E22 écrites dans la session à partir de la transcription).
 - Chaque remarque de l'équipe sur un titre -> ligne dans « À éviter » ou règle dans titles.md (puis noter ici).
+
+## Outro des shorts : `outro` (Arthur, 09/10/2026 : « pour les shorts, mettre en outro la première des 4 outros en motion design,
+call to action avec la miniature ; on peut monter les shorts en parallèle, mais pour créer l'outro et la rajouter à la fin des
+shorts il faut que la miniature soit validée »)
+
+- Design = **variante A** du test du 09/10 (`output/…/motion_design/outro_short/`, 4 variantes A–D faites par une autre
+  session) : animation AI Partners, logo, « L'ÉPISODE COMPLET », la miniature en carte YouTube (bouton lecture, durée, barre
+  de progression), flèche, bouton « Regarder l'épisode — lien en description » ; 7 s, 1080×1920, 30 i/s. Le test utilisait
+  une ancienne miniature et une durée « 47:10 » écrite à la main : `clipper/short_outro.py` prend la miniature CHOISIE
+  (`miniatures/miniature_finale.jpg`) et la durée du MP4 de l'épisode monté (final, sinon aperçu ; aucun badge sinon).
+- **Dépendances** : les shorts 9:16 se montent, se valident et se rendent SANS carte de fin (`format_overrides.9x16.outro.
+  enabled: false` ; le teaser 16:9 garde sa fin logo). `python -m clipper outro --brand <m> --input <E>.mp4 [--only N]`
+  refuse tant que `thumbnail --pick` n'a pas eu lieu ; sinon il rend l'outro UNE fois (HyperFrames, ~2 min 40, refaite si la
+  miniature, le texte ou la durée changent) et la colle à chaque short rendu -> `livrables/clip_NN_…_9x16.mp4` (dernière image
+  tenue 0,4 s pendant le fondu : la voix n'est jamais raccourcie ; ré-encodage H.264 CRF 14, ~1 min par short). Un short rendu
+  avec l'ancienne carte de fin intégrée (`id="outro"` dans sa composition) est signalé « À REFAIRE » (`build --only N --force`
+  puis `render --only N`) au lieu de recevoir deux cartes de fin. Réglages : section `short_outro:` de brand.yaml.
+- Livrer les shorts depuis `livrables/` (et non `renders/`, qui n'a pas de carte de fin).
 
 ## Miniatures YouTube : `thumbnail` (demande d'Arthur, 09/10/2026 : « automatise la création de miniatures, même style que les nôtres »)
 

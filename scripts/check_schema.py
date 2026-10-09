@@ -24,7 +24,7 @@ from render_schema import OUT, SRC, source_hash  # noqa: E402
 
 # commandes qui sont une étape du process (les autres : utilitaires, sous-étapes de `polish`, recours)
 PROCESS = ["rushes", "transcribe", "propose", "pick", "polish", "qa", "render", "posts", "episode-plan", "episode-render",
-           "titles", "thumbnail", "thumbnail-template"]
+           "titles", "thumbnail", "thumbnail-template", "outro"]
 HUMAN_GATES = ["titles --pick", "thumbnail --pick"]
 
 

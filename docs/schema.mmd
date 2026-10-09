@@ -9,11 +9,12 @@ flowchart TD
     subgraph SH["5 shorts 9:16"]
         direction TB
         S1{{"propose : Claude propose ~10 passages"}} --> S2["L'équipe choisit 5 passages (pick)<br/>et ses demandes particulières"]
-        S2 --> S3["polish : « euh » et blancs retirés,<br/>gros plan / écran partagé, sous-titres<br/>vérifiés à l'écoute, carte de fin"]
+        S2 --> S3["polish : « euh » et blancs retirés,<br/>gros plan / écran partagé,<br/>sous-titres vérifiés à l'écoute"]
         S3 --> S4["qa + aperçus MP4"]
         S4 --> S5["L'équipe valide les aperçus"]
         S5 -->|retouche| S3
-        S5 -->|validé| S6["render 1080p + qa final<br/>posts : 1 post LinkedIn par short"]
+        S5 -->|validé| S6["render 1080p + qa final, sans carte de fin<br/>posts : 1 post LinkedIn par short"]
+        S6 --> S7["ATTEND B · outro : carte YouTube avec<br/>la miniature choisie, ajoutée à la fin<br/>de chaque short (rendue une fois)"]
     end
 
     subgraph EP["Épisode + teaser"]
@@ -22,7 +23,7 @@ flowchart TD
         E1 --> E2["qui parle quand (empreintes vocales),<br/>raccords nettoyés : sans hésitation,<br/>blanc ni mot coupé"]
         E2 --> E3["liste de plans façon monteur :<br/>gros plans, plan large, écran partagé ;<br/>on voit toujours celui qui parle"]
         E3 --> E4{{"teaser : Claude écrit le script<br/>(thèse, ping-pong, chute), extraits<br/>vérifiés à l'écoute, ordre relu"}}
-        E4 --> E5["chapitres et description YouTube<br/>(titre validé)"]
+        E4 --> E5["ATTEND A · chapitres et description<br/>YouTube avec le titre validé"]
         E5 --> E6["episode-render --proxy : aperçu 540p<br/>teaser, épisode et fin AI Partners"]
         E6 --> E7["qa --episode : raccords réécoutés,<br/>celui qui parle bien à l'image,<br/>volumes, images ; sinon Claude retouche"]
         E7 -->|OK| E8["L'équipe valide l'aperçu"]
@@ -33,18 +34,20 @@ flowchart TD
 
     subgraph MI["Titre puis miniature"]
         direction TB
-        M1{{"titles : Claude propose 5 titres en texte,<br/>chacun prouvé par un passage de l'épisode"}} --> M2["L'équipe marketing choisit 1 titre<br/>(titles --pick N)"]
+        M1{{"titles : Claude propose 5 titres en texte,<br/>chacun prouvé par un passage de l'épisode"}} --> M2["L'équipe marketing choisit 1 titre<br/>(titles --pick N) · DÉBLOQUE A"]
         M2 --> M3["thumbnail : planche de 4 miniatures avec ce titre,<br/>photos où les deux sourient,<br/>gabarit Canva (thumbnail-template)"]
-        M3 --> M4["L'équipe marketing choisit sa miniature<br/>(thumbnail --pick N)"]
+        M3 --> M4["L'équipe marketing choisit sa miniature<br/>(thumbnail --pick N) · DÉBLOQUE B"]
     end
 
-    S6 --> L1[("5 shorts MP4<br/>et 5 posts LinkedIn")]
+    S7 --> L1[("5 shorts MP4 avec outro<br/>et 5 posts LinkedIn")]
     E9 --> L2[("Épisode 1080p avec teaser,<br/>description YouTube (titre validé)<br/>et chapitres")]
     M4 --> L3[("Titre validé + miniature choisie<br/>1280×720 + HD")]
 
     classDef human fill:#FFF2DF,stroke:#C26A00,color:#3A2810;
     classDef llm fill:#EFEBFF,stroke:#6B4FD8,color:#251C47;
     classDef deliver fill:#E2F5EC,stroke:#0F7A55,color:#0F3127;
+    classDef wait fill:#EAF4FF,stroke:#258AF3,stroke-width:3px,stroke-dasharray:8 5,color:#0E1A2B;
     class IN,S2,S5,E8,M2,M4 human;
     class S1,E1,E4,M1 llm;
     class L1,L2,L3 deliver;
+    class E5,S7 wait;
