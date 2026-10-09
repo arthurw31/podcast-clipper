@@ -1,19 +1,37 @@
 ---
 name: podcast-clips
-description: Transforme un épisode de podcast (mp4, idéalement 4K) en 5 shorts verticaux montés + le post LinkedIn de chacun, avec le framework « clipper » de ce dépôt. Workflow en 5 étapes — l'utilisateur dépose l'épisode dans depot/, Claude transcrit et propose une dizaine de passages (thème, titre, timecodes, extrait), l'utilisateur en choisit 5 et ajoute ses demandes particulières (« il faut absolument le passage où il dit… »), puis Claude monte les 5 shorts (charte de la marque, sous-titres, logos, carte de fin) et rédige les posts LinkedIn. Déclencher sur « clip », « short », « reel », « découpe mon podcast », « fais des extraits », « nouveau podcast », « /podcast-clips », ou dès qu'un épisode est déposé dans depot/.
+description: Pilote tout le process AI Corner avec le framework « clipper » de ce dépôt, des rushs d'un tournage (3 caméras MP4 + audio WAV déposés dans depot/) jusqu'à tous les livrables, en trois colonnes parallèles — 5 shorts verticaux montés + leur post LinkedIn (10 passages proposés, l'équipe en choisit 5, contrôle qualité, validation, rendu, outro avec la miniature), l'épisode complet monté avec son teaser (dérushage, aperçu, contrôle qualité, validation, rendu 1080p), le titre puis la miniature YouTube (5 titres en texte, l'équipe en choisit un, puis 4 miniatures, l'équipe en choisit une). Déclencher sur « clip », « short », « reel », « découpe mon podcast », « fais des extraits », « nouveau podcast », « monte l'épisode », « teaser », « titre de l'épisode », « miniature », « /podcast-clips », ou dès que des rushs ou un épisode sont déposés dans depot/.
 ---
 
-# Podcast → 5 shorts + posts LinkedIn
+# Podcast → shorts, épisode complet, titre et miniature
 
 Tu pilotes le framework `clipper` (voir [CLAUDE.md](../../../CLAUDE.md), [README.md](../../../README.md) et le
 schéma [docs/FRAMEWORK.md](../../../docs/FRAMEWORK.md)). **Lis d'abord [docs/BONNES_PRATIQUES.md](../../../docs/BONNES_PRATIQUES.md)** :
 ce qui a été validé sur E22 (le résultat de référence) et ce qu'il ne faut plus jamais faire. L'utilisateur est un membre de l'équipe marketing :
 il ne tape aucune commande, tu fais tout et tu lui parles simplement (pas de jargon technique).
 
-Le workflow a **deux moments où l'humain décide** : le choix des passages (étape 3) et la validation des shorts
-en aperçu MP4 (étape 4). Ne monte rien avant le choix, ne rends rien avant la validation. Entre les deux, chaque
-vidéo passe **trois contrôles** : automatique sur le montage (`qa`), automatique sur l'aperçu (`qa --render` +
-planche d'images que tu regardes), puis l'humain.
+**Le process (schéma de référence : « Vue d'ensemble » du README, sur GitHub)** : dépôt des rushs -> `rushes` ->
+`transcribe`, puis **trois colonnes lancées en parallèle**, sans s'attendre :
+
+| Colonne | Étapes | Section |
+| --- | --- | --- |
+| 5 shorts 9:16 | `propose` -> l'équipe choisit 5 passages -> `polish` (+ `qa`, boucle « à corriger ») -> l'équipe valide les aperçus -> `render` + `posts` -> **`outro`** | 2 à 5 |
+| Épisode + teaser | `episode-plan` -> `episode-render --proxy` (+ `qa`, boucle « à corriger ») -> l'équipe valide l'aperçu -> `episode-render` 1080p | « Épisode complet » |
+| Titre puis miniature | `titles` (5 titres en texte) -> l'équipe en choisit un -> `thumbnail` (4 miniatures) -> l'équipe en choisit une | « Titre et miniature » |
+
+**Deux seules dépendances entre colonnes** (flèches en pointillés du schéma) :
+- **A** — la description YouTube de l'épisode prend le titre validé (`titles --pick`). Si l'épisode est rendu avant, la
+  description porte « (titre à valider…) » et `titles --pick` la corrige ensuite : rien n'est bloqué.
+- **B** — l'outro des shorts montre la miniature choisie : `outro` ne tourne qu'après `thumbnail --pick`. Le montage, la
+  validation et le rendu des shorts, eux, n'attendent pas.
+
+Dès que la transcription est prête, lance donc `propose` ET `titles` (en arrière-plan) et, si l'épisode complet est
+demandé, `episode-plan` : l'équipe peut choisir les passages et le titre pendant que le reste tourne.
+
+**Cinq moments où l'humain décide** (rien ne passe sans) : les 5 passages, la validation des aperçus des shorts, la
+validation de l'aperçu de l'épisode, le titre, la miniature. Avant chaque aperçu, la vidéo passe le contrôle
+automatique (`qa`) ; tant qu'il montre un défaut, tu corriges et tu recommences (boucle « à corriger ») avant de la
+montrer.
 
 ## 0. Environnement (une fois par machine)
 
@@ -53,13 +71,14 @@ Si un point est KO : suis les indications (`-> …`), ou lance `scripts\setup.ps
    (`ffprobe`) : « moov atom not found » = téléchargement tronqué -> `fetch` (avec le lien) pour la compléter. Range chaque fichier et dis où tu l'as mis :
    épisode → `brands/<marque>/episodes/<E-numéro>_<invite>_<entreprise>.mp4` ; logo de l'entreprise invitée →
    `brands/<marque>/assets/guests/<entreprise>.svg|png` ; clips de référence → `references/` ; logos/polices → `assets/`.
-2. Préfère toujours la **version 4K** de l'épisode si elle existe (bien plus net en vertical). Vérifie avec
-   `ffprobe` : 3840×2160 attendu ; si c'est du 1080p, signale-le en une phrase et continue.
+2. Cas normal : les rushs (3 caméras 1080p + WAV), rangés par `rushes`. Si on te donne au contraire un épisode déjà
+   monté, prends la **version 4K** si elle existe (bien plus nette en vertical ; `ffprobe` : 3840×2160) ; en 1080p,
+   signale-le en une phrase et continue.
 3. Demande en UNE salve (AskUserQuestion) uniquement ce qui manque :
    - la marque (`python -m clipper brands` ; par défaut `ai-corner`) ;
    - l'invité : prénom nom, **rôle**, entreprise, et son **logo** (SVG ou PNG transparent) s'il n'est pas déposé ;
-   - le côté de l'animateur dans le plan large (gauche / droite) — regarde une image de l'épisode pour le déduire
-     toi-même (`ffmpeg -ss 600 -i … -frames:v 1`) avant de demander ;
+   - le côté de l'animateur dans le plan large (gauche / droite) : donné par `rushes` (`--host-side`) ; pour un épisode
+     déjà monté, regarde une image (`ffmpeg -ss 600 -i … -frames:v 1`) pour le déduire toi-même avant de demander ;
    - le lien de l'épisode complet (YouTube) s'il existe déjà — sinon les posts finiront par « Link in the comments ».
 4. Lance la transcription **en arrière-plan** (≈ 20 min pour 50 min d'épisode sur CPU) :
 
@@ -161,7 +180,7 @@ python -m clipper polish --brand <marque> --input <fichier> --only 1,2,3,4,5    
 6. aperçus **MP4** (12 i/s, brouillon, 2 à la fois ; ≈ 2–3 min/short) dans `output/…/apercus/` ;
 7. `qa --render` — **2e contrôle** sur l'aperçu : format, durée, volume -16 LUFS, et une **planche d'images**
    (`qa/qa_images_NN.png`) que tu DOIS regarder (Read) avant d'envoyer le lien : visages cadrés, logos, bulle,
-   sous-titres, carte de fin.
+   sous-titres (pas de carte de fin : l'outro est ajoutée à la livraison, étape 5).
 
 Les étapes 1–3 déjà faites sont sautées (`checks` dans `clips.json`) : relancer `polish` après une retouche ne
 recoupe rien deux fois. `--redo` repart des passages d'origine (`clips_before_tighten.json`).
@@ -215,16 +234,23 @@ python -m clipper qa     --brand <marque> --input <fichier> --only N --render   
 
 ## Épisode complet (rushs multicam -> épisode monté + teaser)
 
-Sur demande (« monte l'épisode en entier ») : `python -m clipper episode-plan --brand <m> --input <ep>.mp4 --guest … --company … --host "…"`,
-présente `episode_plan.md` (durée, coupes du dérushage, extraits du teaser) et demande validation ; puis
-`episode-render … --proxy` (aperçu 540p, ~15 min) : il enchaîne le contrôle qualité (`qa/episode_apercu.md` : raccords
-réécoutés, celui qui parle à l'image, volumes). Lis le rapport : ÉCHEC ou point à corriger -> retouche (plan, coupes, teaser) et
-nouvel aperçu, jusqu'à un contrôle propre ; ALORS seulement envoie l'aperçu (SendUserFile) ; après validation seulement,
-`episode-render …` (1080p, ~1 h, arrière-plan ; pour juger seulement teaser + raccord + volumes :
-`episode-render … --proxy --minutes 2`, ~5 min). Puis **`qa --episode`** : réécoute de chaque raccord DANS le MP4
-final (aucun « euh », aucun mot coupé, fin jamais pendant la voix), volumes teaser / épisode à ±1,5 LUFS, planche
-d'images (logo en haut à droite, carte de fin) à regarder. Joindre `episode/description_youtube.md` (titre +
-chapitres). Teaser et corps sont rendus séparément : retoucher le teaser ne refait pas le corps (~15 min au lieu d'1 h).
+Sur demande (« monte l'épisode en entier »), dès la transcription prête :
+
+1. `python -m clipper episode-plan --brand <m> --input <ep>.mp4 --guest … --company … --host "…"` : dérushage par Claude
+   (dernière prise de l'intro, hors antenne, questions reposées, au revoir), qui parle quand, raccords nettoyés, liste de
+   plans façon monteur (on voit toujours celui qui parle), teaser scripté puis vérifié à l'écoute, chapitres. Relis
+   `episode_plan.md` toi-même (coupes, teaser, % de plans) : c'est ta matière pour l'étape 3.
+2. `episode-render … --proxy` (aperçu 540p, ~15 min) : il enchaîne le contrôle qualité (`qa/episode_apercu.md` : raccords
+   réécoutés, celui qui parle à l'image, volumes, images). **Boucle « à corriger »** : ÉCHEC ou point à corriger ->
+   retouche (`episode_plan.json`, coupes, teaser) et nouvel aperçu, jusqu'à un contrôle propre.
+3. ALORS seulement envoie l'aperçu (SendUserFile) avec le résumé de `episode_plan.md` (durée, coupes, extraits du
+   teaser) : l'équipe valide ou demande une retouche (retour à l'étape 2).
+4. Après validation seulement : `episode-render …` (1080p, ~1 h, arrière-plan ; pour juger seulement teaser + raccord +
+   volumes : `episode-render … --proxy --minutes 2`, ~5 min). Le contrôle du MP4 final est enchaîné automatiquement
+   (`qa/episode.md` : chaque raccord réécouté, aucun « euh », aucun mot coupé, volumes teaser / épisode à ±1,5 LUFS,
+   planche d'images à regarder). Joins `episode/description_youtube.md` (titre validé + chapitres ; dépendance A).
+
+Teaser et corps sont rendus séparément : retoucher le teaser ne refait pas le corps (~15 min au lieu d'1 h).
 
 ## Titre et miniature de l'épisode (rushs multicam)
 
@@ -241,9 +267,8 @@ shorts (aucune attente mutuelle) :
 4. L'équipe répond par le numéro de sa préférée : `python -m clipper thumbnail … --pick N --by <prénom>` -> `miniatures/
    miniature_finale.jpg` (+ `_HD.png`) : le livrable à téléverser sur YouTube avec le titre validé.
 
-`thumbnail` s'arrête s'il n'y a pas de titre validé ; la description YouTube de l'épisode reprend le même titre.
-Si tu modifies ce process, mets à jour le schéma de GitHub (`docs/schema.mmd` puis `python scripts/render_schema.py`,
-docs/ARCHITECTURE.md) : voir CLAUDE.md, « Règle de maintenance », et lance `python scripts/check_schema.py`.
+`thumbnail` s'arrête s'il n'y a pas de titre validé ; la description YouTube de l'épisode reprend le même titre. Dès la
+miniature choisie, lance `outro` (étape 5, dépendance B) si des shorts sont déjà rendus.
 
 ## Retouches courantes
 
@@ -255,13 +280,21 @@ docs/ARCHITECTURE.md) : voir CLAUDE.md, « Règle de maintenance », et lance `p
 | « il manque des mots dans les sous-titres » | lire `clips/<clip>/captions_check.txt` (RESTE = écart) ; `captions.double_check` doit être actif |
 | « c'est saccadé » | ne pas ajouter de coupes : voir `framing` (max_shot_len, min_reframe_len) dans `brand.yaml` |
 | « refais le post » | `posts --only N --force` (ajouter une consigne dans `posts.md` si c'est un défaut récurrent) |
+| « autre titre d'épisode » | `titles … --pick M` (ou `--lines`), puis `thumbnail` (nouvelle planche), choix, `thumbnail --pick N`, puis `outro` |
+| « autre miniature » | `thumbnail … --pick N` (autre numéro), puis `outro` : l'outro est re-rendue avec la nouvelle miniature |
+| « l'outro ne va pas » | réglages `short_outro:` de `brand.yaml` (texte du bouton, titre), puis `outro --force` |
 | « nouvelle marque / autre podcast » | `python -m clipper new-brand <slug>`, puis brand.yaml, guidelines.md, posts.md (voir README) |
 
 ## Garde-fous
 
 - Jamais de montage sans le choix explicite de l'utilisateur (étape 3), jamais de rendu final sans sa validation
-  sur l'aperçu (étape 4).
+  sur l'aperçu (étape 4) ; jamais de miniature avant le titre choisi, jamais d'outro avant la miniature choisie, jamais
+  de shorts livrés depuis `renders/` (sans outro) : toujours depuis `livrables/`.
+- Jamais d'aperçu montré à l'équipe tant que le contrôle `qa` signale un défaut que tu peux corriger.
 - Un short qui dépasse un peu la durée cible pour finir une idée est correct ; un short coupé au milieu ne l'est pas.
 - Ne modifie pas `config/defaults.yaml` pour un besoin propre à une marque : passe par `brands/<marque>/brand.yaml`.
 - Un retour de l'utilisateur sur le style qui vaut pour la suite (« moins de coupes », « logos plus grands »)
   se règle dans la config de la marque ou le preset, pas seulement sur ce short — et se note dans CLAUDE.md.
+- Toute modification du PROCESS (étape ajoutée, retirée, déplacée, nouvelle validation, nouvelle dépendance) : mets à
+  jour le schéma de GitHub (`docs/schema.mmd` puis `python scripts/render_schema.py`, `docs/ARCHITECTURE.md`), ce skill,
+  lance `python scripts/check_schema.py`, puis pousse (CLAUDE.md, « Règle de maintenance »).
