@@ -232,6 +232,20 @@ triple check, optimise-le pour la rapidité sans réduire la qualité »)
   est une occlusion dans un mot (« bien-t-ôt », 0,06 s) -> on va jusqu'à la vraie fin de la voix. Teaser E22 : 5 fins
   reculées de 0,1–0,35 s ; épisode : fins de partie 2406,19 -> 2405,99 et 2819,02 -> 2818,67 (début du hors antenne).
 
+## Motion design discret du teaser (test du 09/10/2026 : « ajoute du motion design aux couleurs d'AI Partners, quelque
+chose de subtil, que ça ne fasse pas trop »)
+
+- Section `motion:` (defaults : désactivée ; `teaser.motion` d'AI Corner : activée), `compose._motion_ctx` + template :
+  1. carte invité à 0,6 s pendant 3,2 s, **du côté de l'invité dans le plan large** (`framing.host_side` -> côté
+     opposé) : nom en capitales Metropolis Bold, filet bleu #258AF3 qui se trace, rôle en Metropolis Regular
+     (`clip["guest_role"]` dans teaser_clip.json) ;
+  2. chiffre-clé qui se compte (0 -> valeur en 0,9 s) en haut à droite sous le logo, au moment où le mot est entendu
+     (`clip["stats"]` : [{match, value, prefix, label}], ex. « PLUS DE / 3 000 / AGENTS IA ») ;
+  3. sons Pixabay (`assets/sfx/`, licence dans CREDITS.md) : whoosh court sous chaque zoom-flou (gain 0,25 ≈ -31 dB),
+     fin d'une montée (riser) sur les 2,4 s avant la carte de fin (0,15 ≈ -30 dB) — ≈ 13 dB sous les voix.
+- Jamais : glitch, citation plein écran, mur de logos, plus d'un élément graphique en plus des sous-titres et du logo.
+- Nombres découpés par Whisper (« 3 » « 000 ») recollés dans `caption_check._listen` (sinon « DE 3 3000 agents »).
+
 ## Aperçus en MP4 (retour d'Arthur, 08/10/2026 : « les aperçus dans HyperFrames buguent à chaque fois »)
 
 Le Studio HyperFrames ne suffit pas pour valider : donner à Arthur un MP4 brouillon à ouvrir dans son lecteur

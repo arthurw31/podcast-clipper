@@ -78,6 +78,7 @@ fonts:
   display: "fonts/Metropolis-ExtraBold.ttf"
   captions_alt: "fonts/Metropolis-Bold.ttf"         # sous-titres « variante B adoucie » (09/10/2026) ; avant : Arimo (Arial, style DUST)
   keyword: "fonts/Lora-Italic-VF.ttf"               # mot-clé en serif italique (variante B)
+  regular: "fonts/Metropolis-Regular.ttf"          # textes secondaires du motion design (rôle de l'invité)
   hook: "fonts/FiraSansCondensed-Bold.ttf"        # bulle-titre des shorts (police condensée du monteur)
 
 outro:
@@ -157,6 +158,12 @@ teaser:
     junction_punch: 1.15
     synthetic_punch: 1.18
   fps: 24                    # = rushs et corps de l'épisode (concaténation sans réencodage)
+  motion:                    # motion design DISCRET aux couleurs AI Partners (test du 09/10/2026)
+    enabled: true
+    accent: "#258AF3"
+    lower_third: {enabled: true, at: 0.6, duration: 3.2}
+    stats: {enabled: true}
+    sfx: {enabled: true, whoosh: "sfx/whoosh-short.mp3", whoosh_volume: 0.25, riser: "sfx/riser.mp3", riser_volume: 0.15, riser_len: 2.4}
   hook:
     enabled: false
   guest_logo:

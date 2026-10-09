@@ -129,6 +129,23 @@
       /* ---- logo de l'invité ---- */
       .guest-logo-img { position: absolute; height: {{ guest_logo.height_px }}px; width: auto; max-width: {{ guest_logo.max_w_px }}px; object-fit: contain; opacity: {{ guest_logo.opacity }}; {{ guest_logo.css_pos }} }
 
+{% if motion %}
+      /* ---- motion design discret (carte invité, chiffre-clé) ---- */
+{% if motion.lt and motion.lt.font_regular %}
+      @font-face { font-family: "MotionRegular"; src: url("assets/fonts/{{ motion.lt.font_regular }}") format("truetype"); font-weight: 400; }
+{% endif %}
+      .lt { position: absolute; {{ "right" if motion.lt and motion.lt.side == "right" else "left" }}: {{ (W * 0.06) | int }}px; top: {{ (H * 0.80) | int }}px; color: #fff; text-align: {{ "right" if motion.lt and motion.lt.side == "right" else "left" }};
+        text-shadow: 0 0 10px rgba(0,0,0,.55), 0 2px 24px rgba(0,0,0,.4); }
+      .lt-name { font-family: "{{ font.family }}"; font-weight: 700; font-size: {{ (H * 0.042) | int }}px; letter-spacing: 0.06em; text-transform: uppercase; overflow: hidden; }
+      .lt-name span { display: inline-block; }
+      .lt-rule { height: {{ [2, (H * 0.0037) | int] | max }}px; width: {{ (W * 0.16) | int }}px; background: {{ motion.accent }}; margin: {{ (H * 0.010) | int }}px 0; transform-origin: {{ "right" if motion.lt and motion.lt.side == "right" else "left" }} center; {% if motion.lt and motion.lt.side == "right" %}margin-left: auto;{% endif %} }
+      .lt-role { font-family: {{ '"MotionRegular", ' if motion.lt and motion.lt.font_regular else '' }}"{{ font.family }}"; font-weight: 400; font-size: {{ (H * 0.031) | int }}px; letter-spacing: 0.02em; opacity: .92; }
+      .stat { position: absolute; right: {{ (W * 0.06) | int }}px; top: {{ (H * 0.19) | int }}px; text-align: right; color: #fff;
+        text-shadow: 0 0 12px rgba(0,0,0,.5), 0 3px 30px rgba(0,0,0,.45); }
+      .stat-prefix { font-family: "{{ font.family }}"; font-weight: 700; font-size: {{ (H * 0.026) | int }}px; letter-spacing: 0.08em; }
+      .stat-num { font-family: "{{ font.family }}"; font-weight: 700; font-size: {{ (H * 0.13) | int }}px; line-height: 1; color: {{ motion.accent }}; font-variant-numeric: tabular-nums; }
+      .stat-label { font-family: "{{ font.family }}"; font-weight: 700; font-size: {{ (H * 0.034) | int }}px; letter-spacing: 0.06em; }
+{% endif %}
       /* ---- light leak (jonctions) ---- */
       .leak { position: absolute; left: -15%; top: -10%; width: 130%; height: 120%; opacity: 0; mix-blend-mode: screen;
               background: radial-gradient(ellipse 55% 45% at 30% 38%, rgba(255,190,90,.95) 0%, rgba(255,120,40,.75) 35%, rgba(230,70,20,.35) 60%, rgba(0,0,0,0) 80%); }
@@ -187,6 +204,23 @@
 {% endfor %}{% if e.layout == "split" and split_divider %}
       <div class="clip layer" id="div-{{ e.id }}" data-start="{{ e.t0 }}" data-duration="{{ (e.t1 - e.t0) | round(3) }}" data-track-index="1"><div class="divider"></div></div>
 {% endif %}{% endfor %}
+
+{% if motion %}
+      <!-- ===================== motion design discret ===================== -->
+{% if motion.lt %}
+      <div class="clip layer" id="lt" data-start="{{ motion.lt.at }}" data-duration="{{ motion.lt.dur }}" data-track-index="7">
+        <div class="lt" id="lt-box"><div class="lt-name"><span id="lt-name">{{ motion.lt.name }}</span></div><div class="lt-rule" id="lt-rule"></div><div class="lt-role" id="lt-role">{{ motion.lt.role }}</div></div>
+      </div>
+{% endif %}
+{% for st in motion.stats %}
+      <div class="clip layer" id="stat-{{ st.id }}" data-start="{{ st.at }}" data-duration="{{ st.dur }}" data-track-index="7">
+        <div class="stat" id="statbox-{{ st.id }}">{% if st.prefix %}<div class="stat-prefix">{{ st.prefix }}</div>{% endif %}<div class="stat-num" id="statnum-{{ st.id }}">0</div>{% if st.label %}<div class="stat-label">{{ st.label }}</div>{% endif %}</div>
+      </div>
+{% endfor %}
+{% for x in motion.sfx %}
+      <audio id="sfx-{{ x.id }}" src="assets/{{ x.file }}" data-start="{{ x.at }}" data-duration="{{ x.dur }}" data-media-start="{{ x.ms }}" data-track-index="{{ 20 + x.id }}" data-volume="{{ x.vol }}"></audio>
+{% endfor %}
+{% endif %}
 
       <!-- ===================== jonctions entre segments ===================== -->
 {% if join_transition == "flash" %}{% for j in junctions %}
@@ -366,6 +400,21 @@
 {% endif %}
 {% endfor %}
 
+{% if motion %}
+      // ---- motion design discret ----
+{% if motion.lt %}
+      tl.fromTo("#lt-rule", { scaleX: 0 }, { scaleX: 1, duration: 0.55, ease: "power3.out" }, {{ motion.lt.at }});
+      tl.fromTo("#lt-name", { y: "110%" }, { y: "0%", duration: 0.5, ease: "power3.out" }, {{ (motion.lt.at + 0.12) | round(3) }});
+      tl.fromTo("#lt-role", { opacity: 0, y: 8 }, { opacity: 0.9, y: 0, duration: 0.45, ease: "power2.out" }, {{ (motion.lt.at + 0.3) | round(3) }});
+      tl.to("#lt-box", { opacity: 0, y: 10, duration: 0.35, ease: "power2.in" }, {{ (motion.lt.at + motion.lt.dur - 0.35) | round(3) }});
+{% endif %}
+{% for st in motion.stats %}
+      tl.fromTo("#statbox-{{ st.id }}", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.4, ease: "power3.out" }, {{ st.at }});
+      { const o = { v: 0 }; const el = document.querySelector("#statnum-{{ st.id }}");
+        tl.to(o, { v: {{ st.value }}, duration: 0.9, ease: "power2.out", onUpdate: () => { el.textContent = String(Math.round(o.v)).replace(/\B(?=(\d{3})+(?!\d))/g, " "); } }, {{ st.at }}); }
+      tl.to("#statbox-{{ st.id }}", { opacity: 0, y: -8, duration: 0.35, ease: "power2.in" }, {{ (st.at + st.dur - 0.35) | round(3) }});
+{% endfor %}
+{% endif %}
       // ---- flash aux jonctions ----
 {% if join_transition == "flash" %}{% for j in junctions %}
       tl.fromTo("#flashin-{{ loop.index }}", { opacity: 0 }, { opacity: 0.9, duration: 0.08, ease: "power2.in" }, {{ (j - 0.1) | round(3) }});

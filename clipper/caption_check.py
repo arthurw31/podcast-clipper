@@ -18,6 +18,7 @@ découpage différent (le 2e décalé de 0,7 s de silence) ; un mot n'est retenu
 from __future__ import annotations
 
 import difflib
+import re
 import json
 import subprocess
 from pathlib import Path
@@ -42,7 +43,15 @@ def _listen(audio: np.ndarray, pad: float, cfg=None) -> list[dict]:
                 out.append({"w": txt, "s": round(max(0.0, w.start - pad), 3), "e": round(max(0.0, w.end - pad), 3),
                             "p": float(w.probability)})
     words = merge_fragments(out)
-    return [dict(w, n=_norm(w["w"])) for w in words if _norm(w["w"]) and _norm(w["w"]) not in FILLERS]
+    # nombres découpés par Whisper (« 3 » « 000 ») -> « 3000 », comme dans la transcription normale (sinon le double
+    # contrôle ajoutait un « 3 » devant « 3000 » : « DE 3 3000 agents », teaser E22, 09/10/2026)
+    merged: list[dict] = []
+    for w in words:
+        if merged and re.fullmatch(r"\d{3}[.,]?", w["w"]) and re.fullmatch(r"\d{1,3}", merged[-1]["w"]):
+            merged[-1] = dict(merged[-1], w=merged[-1]["w"] + w["w"], e=w["e"])
+            continue
+        merged.append(dict(w))
+    return [dict(w, n=_norm(w["w"])) for w in merged if _norm(w["w"]) and _norm(w["w"]) not in FILLERS]
 
 
 def heard_words(media: Path, dur: float, cfg=None, cache: Path | None = None) -> list[dict]:

@@ -237,6 +237,58 @@ def _smooth_plan(plan: list[dict], shots: list[dict], junctions: list[float], fr
     return _punch_junctions(plan, junctions, fr)
 
 
+def _motion_ctx(fcfg, clip: dict, words_rel: list[dict], plan: list[dict], D_speech: float, outro_start: float,
+                brand, assets: Path, fonts_dir: Path) -> dict:
+    """Motion design discret aux couleurs AI Partners (Arthur, 09/10/2026 : « ajoute du motion design aux couleurs
+    d'AI Partners, quelque chose de subtil, que ça ne fasse pas trop ») — section `motion:` de la config :
+    - carte invité (nom + rôle + filet bleu qui se trace) à la 1re apparition de l'invité ;
+    - chiffre-clé qui se compte, sur le côté, quand il est prononcé (`clip["stats"]` : {match, value, prefix, label}) ;
+    - sons discrets : whoosh sous les transitions zoom-flou, montée avant la carte de fin."""
+    import re
+    m = dict(fcfg.get("motion") or {})
+    if not m.get("enabled"):
+        return {}
+    out: dict = {"accent": m.get("accent", "#258AF3")}
+    lt = dict(m.get("lower_third") or {})
+    if lt.get("enabled") and clip.get("guest"):
+        reg = brand.font_path("regular") if hasattr(brand, "font_path") else None
+        if reg:
+            shutil.copy2(reg, fonts_dir / reg.name)
+        at = float(lt.get("at", 0.6))
+        # du côté de l'invité dans le plan large (l'animateur est à `host_side`) : la carte est sous la bonne personne
+        hs = (fcfg.get("framing") or {}).get("host_side") or clip.get("host_side") or "left"
+        side = lt.get("side") or ("right" if hs == "left" else "left")
+        out["lt"] = {"at": at, "dur": float(lt.get("duration", 3.2)), "name": clip["guest"], "side": side,
+                     "role": clip.get("guest_role") or clip.get("company", ""), "font_regular": reg.name if reg else ""}
+    stats = []
+    if (m.get("stats") or {}).get("enabled"):
+        for k, st in enumerate(clip.get("stats") or []):
+            pat = str(st.get("match", "")).lower()
+            hit = next((w for w in words_rel if pat and re.sub(r"[^0-9a-zà-ÿ]", "", w["w"].lower()).startswith(pat)), None)
+            if hit:
+                stats.append({"id": k + 1, "at": round(max(0.0, hit["s"] - 0.1), 3), "dur": float(st.get("duration", 2.4)),
+                              "value": int(st["value"]), "prefix": st.get("prefix", ""), "label": st.get("label", "")})
+    out["stats"] = stats
+    sfx = dict(m.get("sfx") or {})
+    sounds = []
+    if sfx.get("enabled"):
+        def add(key: str, at: float, dur: float, vol: float, tail: bool = False) -> None:
+            f = brand.asset(sfx.get(key))
+            if f and at >= 0:
+                shutil.copy2(f, assets / f.name)
+                # tail : on joue la FIN du son (une montée culmine à la fin de son fichier)
+                ms = max(0.0, float(probe(f)["duration"]) - dur) if tail else 0.0
+                sounds.append({"id": len(sounds) + 1, "file": f.name, "at": round(at, 3), "dur": round(dur, 3),
+                               "vol": vol, "ms": round(ms, 3)})
+        for e in plan:
+            if e.get("fx_in") == "zoomblur":
+                add("whoosh", e["t0"] - 0.18, 0.57, float(sfx.get("whoosh_volume", 0.3)))
+        rl = float(sfx.get("riser_len", 2.4))
+        add("riser", outro_start - rl, rl, float(sfx.get("riser_volume", 0.18)), tail=True)
+    out["sfx"] = sounds
+    return out
+
+
 def _calm_check(multicam: dict, limit: float):
     """Écran partagé seulement si celui qui écoute est calme (pas de geste parasite : se gratter, s'étirer…)."""
     from .multicam import listener_motion
@@ -790,6 +842,7 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
         # d'image de part et d'autre du raccord (même caméra 0,5–7 ; autre caméra ≈ 50 sur le short 1 de E22).
         thr = float(fcfg.montage.get("transition_min_diff", 25))
         fx_junctions = [j for j in junctions if frame_diff(j) >= thr]
+        motion = _motion_ctx(fcfg, clip, words_rel, plan, D_speech, outro_start, brand, assets, fonts_dir)
         html = tpl.render(
             lang=cfg.get("language", "fr"), title=f"{clip.get('title','')} · {fmt}", W=W, H=H, fps=int(cfg.fps),
             D_total=D_total, D_speech=D_speech, A_dur=A_dur, A_fade=round(A_fade, 3),
@@ -797,7 +850,7 @@ def build_clip(brand: Brand, source: Path, transcript: dict, clip: dict, episode
             colors=dict(cfg.colors), plan=plan_render, captions=caps, cap=Cfg(cap_ctx), logo=Cfg(logo_ctx),
             outro=Cfg(outro_ctx), hook=Cfg(hook_ctx), broll=Cfg(broll_ctx), brolls=brolls_fmt, music=music,
             guest_logo=Cfg(guest_logo_ctx), outro_start=outro_start,
-            guest=clip.get("guest", ""), company=clip.get("company", ""),
+            guest=clip.get("guest", ""), company=clip.get("company", ""), motion=motion,
             junctions=fx_junctions, join_transition=fcfg.montage.get("join_transition", "cut"), flash_color=fcfg.montage.get("flash_color", "#FFFFFF"),
             split_divider=int(fcfg.framing.get("split_divider", 0)), split_divider_color=fcfg.framing.get("split_divider_color", "#FFFFFF"),
         )

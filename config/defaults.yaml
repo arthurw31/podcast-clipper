@@ -311,3 +311,12 @@ format_overrides:
       position_y: 0.70
     outro:
       logo_width: 0.45
+
+# ------------------------------------------------------------ motion design ---
+# Discret, aux couleurs de la marque (Arthur, 09/10/2026) — activé par marque (teaser AI Corner).
+motion:
+  enabled: false
+  accent: "#258AF3"
+  lower_third: {enabled: true, at: 0.6, duration: 3.2}   # nom de l'invité + clip["guest_role"]
+  stats: {enabled: true}                                  # clip["stats"] : [{match, value, prefix, label}]
+  sfx: {enabled: true, whoosh: "", whoosh_volume: 0.3, riser: "", riser_volume: 0.18, riser_len: 2.4}
